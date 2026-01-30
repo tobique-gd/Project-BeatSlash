@@ -47,11 +47,11 @@ class Renderer:
     def create_node_structure(self, node, nodes_array=None):
         if nodes_array is None:
             nodes_array = []
-        
+
         if isinstance(node, Nodes.Sprite2D):
             nodes_array.append(node)
-        
-        for child in node.children:
+
+        for child in getattr(node, '_children', []):
             self.create_node_structure(child, nodes_array)
-        
+
         return nodes_array

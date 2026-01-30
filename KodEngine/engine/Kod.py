@@ -63,7 +63,7 @@ class App:
         if isinstance(node, Nodes.Camera2D):
             return node
 
-        for child in getattr(node, "children", []):
+        for child in getattr(node, "_children", []):
             cam = self.find_camera_in_scene(child)
             if cam:
                 return cam

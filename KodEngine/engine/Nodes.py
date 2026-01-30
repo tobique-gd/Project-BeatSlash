@@ -5,20 +5,20 @@ import pygame
 class Node:
     def __init__(self) -> None:
         self.name = self.__class__.__name__
-        self.children = []
-        self.parent: 'Node | None' = None
+        self._children = []
+        self._parent: 'Node | None' = None
         self.script = None
 
     def add_child(self, _node):
-        self.children.append(_node)
-        _node.parent = self
+        self._children.append(_node)
+        _node._parent = self
 
     def get_child(self, _path_to_child: str):
         parts = _path_to_child.split("/")
         current_node = self
         for part in parts:
             found = None
-            for child in current_node.children:
+            for child in current_node._children:
                 if child.name == part:
                     found = child
                     break
@@ -44,20 +44,20 @@ class Node2D(Node):
 
     @property
     def global_position(self):
-        if self.parent is None:
+        if self._parent is None:
             return self.position
-        if isinstance(self.parent, Node2D):
-            p = self.parent.global_position
+        if isinstance(self._parent, Node2D):
+            p = self._parent.global_position
             return (self.position[0] + p[0], self.position[1] + p[1])
         return self.position
 
 
     @global_position.setter
     def global_position(self, value: tuple[float, float]) -> None:
-        if self.parent is None:
+        if self._parent is None:
             self.position = value
-        elif isinstance(self.parent, Node2D):
-            parent_global = self.parent.global_position
+        elif isinstance(self._parent, Node2D):
+            parent_global = self._parent.global_position
             self.position = (value[0] - parent_global[0], value[1] - parent_global[1])
         else:
             self.position = value
@@ -79,11 +79,11 @@ class Sprite2D(Node2D):
 
     @property
     def texture(self):
-        return pygame.transform.flip(self.image, self.flip_h, self.flip_v)
+        return pygame.transform.flip(self._image, self.flip_h, self.flip_v)
     
     @texture.setter
     def texture(self, _texture) -> None:
-        self.image = _texture
+        self._image = _texture
 
         
 

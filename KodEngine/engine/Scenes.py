@@ -10,7 +10,7 @@ class Scene:
         if hasattr(node, "script") and node.script:
             node.script._ready()
 
-        for child in getattr(node, "children", []):
+        for child in getattr(node, "_children", []):
             self._ready_node(child)
 
     def _process(self, delta):
@@ -23,7 +23,7 @@ class Scene:
 
         node._update(delta)
 
-        for child in getattr(node, "children", []):
+        for child in getattr(node, "_children", []):
             self._process_node(child, delta)
 
     def _input(self, _event):
@@ -33,5 +33,5 @@ class Scene:
         if node.script:
             node.script._input(_event)
         
-        for child in node.children:
+        for child in node._children:
             self._input_node(child, _event)

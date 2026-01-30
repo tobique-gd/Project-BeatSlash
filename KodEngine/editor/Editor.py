@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as pygui
 import pygame
 import numpy as np
-from KodEngine.engine import Kod, Nodes, Scenes
+from KodEngine.engine import Kod, Nodes, Scenes, Scripts
 
 class KodEditor:
     def __init__(self):
@@ -10,7 +10,6 @@ class KodEditor:
         self.settings.window_settings["internal_viewport_resolution"] = self.initial_res
         self.app = Kod.App(self.settings, editor_mode=True)
 
-        # Scene Setup
         self.sprite = Nodes.Sprite2D()
         self.sprite.texture = pygame.image.load("BeatSlash/assets/asd.png")
         self.root = Nodes.Node2D()
@@ -20,6 +19,12 @@ class KodEditor:
         
         self.root.add_child(self.sprite)
         self.sprite.add_child(self.custom_node)
+
+        class try_script(Scripts.Script):
+            def __init__(self, node):
+                super().__init__(node)
+
+        self.sprite.script = try_script(self.sprite)
 
         self.scene = Scenes.Scene("World", self.root)
         self.camera = Nodes.Camera2D()
@@ -40,7 +45,6 @@ class KodEditor:
 
     def run(self):
         while pygui.is_dearpygui_running():
-            # Check for resize every frame (it's very cheap if nothing changed)
             self.ui.check_resize()
             
             frame = self.render_frame()
@@ -50,7 +54,7 @@ class KodEditor:
     
     def get_scene_hierarchy(self):
         def build(node):
-            return {child: build(child) for child in getattr(node, "children", [])}
+            return {child: build(child) for child in getattr(node, "_children", [])}
         return {self.root: build(self.root)}
 
 
@@ -146,11 +150,11 @@ class EditorUI:
 
 
     def _draw_tree(self, tree):
-        for node, children in tree.items():
-            if children:
+        for node, _children in tree.items():
+            if _children:
                 with pygui.tree_node(label=node.name, default_open=True):
                     self._add_node_selectable(node)
-                    self._draw_tree(children)
+                    self._draw_tree(_children)
             else:
                 self._add_node_selectable(node)
 
@@ -189,7 +193,7 @@ class EditorUI:
             if attr.startswith("_"):
                 continue
 
-            if attr in ("children", "parent", "script"):
+            if attr in ("_children", "_parent", "script"):
                 continue
 
             if callable(value):
@@ -202,9 +206,6 @@ class EditorUI:
         FLOAT_MAX = 1000000.0
 
         parent = "inspector_panel"
-
-        if attr.startswith("_") or attr in ("children", "parent", "image"):
-            return
 
         if isinstance(value, str):
             pygui.add_input_text(label = attr.replace("_", " ").title(),
