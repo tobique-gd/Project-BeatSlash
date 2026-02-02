@@ -1,19 +1,20 @@
 import dearpygui.dearpygui as pygui
 import pygame
 import numpy as np
+from pathlib import Path
+
 from KodEngine.engine import Kod, Nodes, Scenes, Scripts, NodeComponents
 from BeatSlash.scripts.player import Player
-from pathlib import Path
+from KodEngine.editor import ResourceManager
 
 BASE_DIR = Path("BeatSlash")
 
 class KodEditor:
     def __init__(self):
         self.settings = Kod.Settings()
-        self.initial_res = (987, 760)
+        self.initial_res = (640, 360)
         self.settings.window_settings["internal_viewport_resolution"] = self.initial_res
         self.app = Kod.App(self.settings, editor_mode=True)
-
         
         self.root = Nodes.Node2D()
         self.root.name = "World"
@@ -22,10 +23,14 @@ class KodEditor:
         player_node.script = Player(player_node)
         player_node.name = "Player"
 
-        idle_front_animation = NodeComponents.SpriteAnimation("Idle_Front", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/idle_front.png").convert_alpha(), (17, 27), 4, True, 4)
-        idle_back_animation = NodeComponents.SpriteAnimation("Idle_Back", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/idle_back.png").convert_alpha(), (17, 27), 4, True, 4)
-        idle_side_animation = NodeComponents.SpriteAnimation("Idle_Side", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/idle_side.png").convert_alpha(), (17, 27), 4, True, 4)
-        run_front_animation = NodeComponents.SpriteAnimation("Run_Front", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/run_front.png").convert_alpha(), (17, 27), 8, True, 12)
+        idle_front_animation = NodeComponents.SpriteAnimation("Idle_Front", pygame.image.load(str(BASE_DIR / "assets/textures/spritesheets/player/idle_front.png")).convert_alpha(), (17, 27), 4, True, 4)
+        idle_front_animation.spritesheet_path = str(BASE_DIR / "assets/textures/spritesheets/player/idle_front.png")
+        idle_back_animation = NodeComponents.SpriteAnimation("Idle_Back", pygame.image.load(str(BASE_DIR / "assets/textures/spritesheets/player/idle_back.png")).convert_alpha(), (17, 27), 4, True, 4)
+        idle_back_animation.spritesheet_path = str(BASE_DIR / "assets/textures/spritesheets/player/idle_back.png")
+        idle_side_animation = NodeComponents.SpriteAnimation("Idle_Side", pygame.image.load(str(BASE_DIR / "assets/textures/spritesheets/player/idle_side.png")).convert_alpha(), (17, 27), 4, True, 4)
+        idle_side_animation.spritesheet_path = str(BASE_DIR / "assets/textures/spritesheets/player/idle_side.png")
+        run_front_animation = NodeComponents.SpriteAnimation("Run_Front", pygame.image.load(str(BASE_DIR / "assets/textures/spritesheets/player/run_front.png")).convert_alpha(), (17, 27), 8, True, 12)
+        run_front_animation.spritesheet_path = str(BASE_DIR / "assets/textures/spritesheets/player/run_front.png")
 
         player_sprite = Nodes.AnimatedSprite2D()
 
@@ -36,7 +41,7 @@ class KodEditor:
         player_sprite.play("Idle_Front")
 
         player_camera = Nodes.Camera2D()
-        self.camera = player_camera
+
 
 
         self.root.add_child(player_node)
@@ -45,6 +50,7 @@ class KodEditor:
 
         sprite2 = Nodes.Sprite2D()
         sprite2.texture = pygame.image.load(BASE_DIR / "assets/textures/dmimage.png").convert_alpha()
+        sprite2.texture_path = str(BASE_DIR / "assets/textures/dmimage.png")
         sprite2.global_position = (0,0)
         sprite2.z_index = -1
 
@@ -52,34 +58,70 @@ class KodEditor:
         music_player.audio = str(BASE_DIR / "assets/audio/Aftermath.mp3")
 
         self.root.add_child(music_player)
-        # music_player.play()
+        music_player.play()
 
 
         self.root.add_child(sprite2)
 
-        current_scene = Scenes.Scene("Main", self.root)
+        sc_save = Scenes.Scene("world_scene", self.root)
+        current_scene = ResourceManager.SceneLoader.load("sc.kscn")
 
+        ResourceManager.SceneLoader.save("sc.kscn", sc_save)
+
+
+        self.camera = Nodes.Camera2D()
+        
+        self.root = getattr(current_scene, "root", None)
+        if self.root is None:
+            self.root = Nodes.Node2D()
+        
         self.app.set_camera(self.camera)
         self.app.set_scene(current_scene)
 
         self.width, self.height = self.initial_res
         self.ui = EditorUI(self)
 
+        
+
+ 
+
     def render_frame(self):
-        self.app.run_in_editor(self.camera)
+        if not self.app.screen:
+            print("Error, no screen supplied. Stopping rendering")
+            return None
+
+        self.app.renderer.render_frame(self.app.current_scene, self.camera)
+        self.app.scaled_surface = pygame.transform.scale(self.app.internal_surface, self.app.resolution)
+        self.app.screen.blit(self.app.scaled_surface, (0, 0))
+
+        self.app.clock.tick(self.app.FPS)
+        
         data = pygame.surfarray.array3d(self.app.internal_surface)
         data = data.transpose([1, 0, 2])
         alpha = np.full((self.height, self.width, 1), 255, dtype=np.uint8)
         rgba = np.concatenate((data, alpha), axis=2)
         return rgba.astype(np.float32) / 255.0
 
+
+
     def run(self):
+        last_frame_time = pygame.time.get_ticks()
         while pygui.is_dearpygui_running():
+            now = pygame.time.get_ticks()
+            delta = (now - last_frame_time) / 1000.0
+            last_frame_time = now
             self.ui.check_resize()
             
+            self._update_node(self.root, delta)
+
             frame = self.render_frame()
+
+
             self.ui.push_frame(frame)
             pygui.render_dearpygui_frame()
+
+
+
         pygui.destroy_context()
     
     def get_scene_hierarchy(self):
@@ -105,6 +147,12 @@ class KodEditor:
         self.app.renderer.screen = new_surface
         
         return True
+
+    def _update_node(self, node, delta):
+        node._update(delta)
+
+        for child in getattr(node, "_children", []):
+            self._update_node(child, delta)
 
 class EditorUI:
     def __init__(self, editor: KodEditor):
@@ -237,14 +285,48 @@ class EditorUI:
         FLOAT_MIN = -1000000.0
         FLOAT_MAX = 1000000.0
 
+        
+        if attr == "animations" and isinstance(value, (list, tuple)):
+            label_text = "Animations"
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                with pygui.group():
+                    for anim in value:
+                        
+                        try:
+                            anim_name = anim["name"]
+                        except Exception:
+                            anim_name = str(anim.name)
+
+                        pygui.add_button(label=anim_name,
+                                         user_data=(node, anim_name),
+                                         callback=lambda s, a, u: u[0].play(u[1]))
+            return
+
+        if attr == "current_animation":
+            label_text = "Current Animation"
+            name = None
+            try:
+                name = getattr(value, "name", None)
+            except Exception:
+                try:
+                    name = value.get("name")
+                except Exception:
+                    name = None
+
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                pygui.add_text(str(name))
+            return
+
         if isinstance(value, str):
             label_text = attr.replace("_", " ").title()
             with pygui.table_row():
                 pygui.add_text(label_text)
                 pygui.add_input_text(label = f"##{attr}",
-                                        default_value=value,
-                                        width=-1,
-                                        callback=lambda s, v: setattr(node, attr, v)
+                                    default_value=value,
+                                    width=-1,
+                                    callback=lambda s, v: setattr(node, attr, v)
                 )
             return
 
@@ -253,9 +335,8 @@ class EditorUI:
             with pygui.table_row():
                 pygui.add_text(label_text)
                 pygui.add_checkbox(label = f"##{attr}",
-                                   default_value=value,
-                                
-                                   callback=lambda s, v: setattr(node, attr, v)
+                                default_value=value,
+                                callback=lambda s, v: setattr(node, attr, v)
                 )
             return
 

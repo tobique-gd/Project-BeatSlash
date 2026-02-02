@@ -19,7 +19,6 @@ class Settings:
             "default_background_color": (50, 50, 50)
         }
 
-
 class App:
     def __init__(self, configuration: Settings, editor_mode = False):
         pygame.init()
@@ -51,8 +50,21 @@ class App:
         self.screen = pygame.display.set_mode(self.resolution, pygame.RESIZABLE, vsync=1)
         self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
 
-    def set_scene(self, scene: Scenes.Scene):
+    def set_scene(self, scene):
+        if self.current_scene and getattr(self.current_scene, "root", None):
+            try:
+                self.current_scene.root.on_exit()
+            except Exception:
+                pass
+
         self.current_scene = scene
+
+        if self.current_scene and getattr(self.current_scene, "root", None):
+            try:
+                self.current_scene.root._on_enter()
+            except Exception:
+                pass
+
         if self.current_scene:
             self.current_scene._ready()
 
@@ -114,16 +126,5 @@ class App:
 
             self.clock.tick(self.FPS)
 
-    def run_in_editor(self, editor_camera):
-        if not self.screen:
-            return
-
-        self.renderer.render_frame(self.current_scene, editor_camera)
-
-        self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
-        self.screen.blit(self.scaled_surface, (0, 0))
-
-        self.clock.tick(self.FPS)
-    
     def kill(self):
         pygame.quit()

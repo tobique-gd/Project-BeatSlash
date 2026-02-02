@@ -1,6 +1,7 @@
 from KodEngine.engine.NodeComponents import SpriteAnimation
 
 import pygame
+import os
 
 class Node:
     def __init__(self) -> None:
@@ -8,6 +9,20 @@ class Node:
         self._children = []
         self._parent: 'Node | None' = None
         self.script : object | None = None
+
+    def _on_enter(self):
+        for child in getattr(self, "_children", []):
+            try:
+                child._on_enter()
+            except Exception:
+                pass
+
+    def on_exit(self):
+        for child in getattr(self, "_children", []):
+            try:
+                child.on_exit()
+            except Exception:
+                pass
 
     def add_child(self, _node):
         self._children.append(_node)
@@ -29,6 +44,9 @@ class Node:
 
     
     def _update(self, _delta):
+        pass
+
+    def editor_update(self, delta):
         pass
 
 
@@ -69,18 +87,53 @@ class Sprite2D(Node2D):
         super().__init__()
 
         self.flip_h, self.flip_v = False, False
-
+        self._image :  pygame.Surface | None = None
+        self.texture_path: str | None = None
         self.position = (0,0)
         self.offset = (0,0)
 
 
     @property
     def texture(self):
+        if self._image is None:
+            return None
         return pygame.transform.flip(self._image, self.flip_h, self.flip_v)
     
     @texture.setter
     def texture(self, _texture) -> None:
-        self._image = _texture
+        if isinstance(_texture, str):
+            try:
+                self.texture_path = os.path.abspath(str(_texture))
+            except Exception:
+                self.texture_path = _texture
+
+            try:
+                self._image = pygame.image.load(str(_texture)).convert_alpha()
+            except Exception:
+                self._image = None
+        else:
+            self._image = _texture
+
+    def _on_enter(self):
+        if self._image is None and getattr(self, "texture_path", None):
+            try:
+                self.texture = self.texture_path
+            except Exception:
+                pass
+
+
+        for child in getattr(self, "_children", []):
+            try:
+                child._on_enter()
+            except Exception:
+                pass
+
+    def on_exit(self):
+        for child in getattr(self, "_children", []):
+            try:
+                child.on_exit()
+            except Exception:
+                pass
 
         
 
@@ -89,6 +142,7 @@ class AnimatedSprite2D(Sprite2D):
         super().__init__()
         self.animations: list[SpriteAnimation] = []
         self.name = "AnimatedSprite2D"
+        
         self.current_animation: SpriteAnimation | None = None
 
     def add_animation(self, animation: SpriteAnimation):
@@ -106,6 +160,10 @@ class AnimatedSprite2D(Sprite2D):
                 break
 
     def _update(self, delta: float):
+        if self.current_animation:
+            self.current_animation.update(delta)
+    
+    def editor_update(self, delta):
         if self.current_animation:
             self.current_animation.update(delta)
 
@@ -135,6 +193,7 @@ class AudioPlayer(Node):
         super().__init__()
         self._audio = None
         self._volume = 1.0
+        self.audio_path: str | None = None
 
     def play(self):
         if self._audio:
@@ -156,5 +215,44 @@ class AudioPlayer(Node):
 
     @audio.setter
     def audio(self, _audio_file):
-        self._audio = pygame.mixer.Sound(_audio_file)
-        self._audio.set_volume(self._volume)
+        try:
+            self.audio_path = os.path.abspath(_audio_file)
+
+        except Exception:
+            self.audio_path = None
+
+        try:
+            self._audio = pygame.mixer.Sound(_audio_file)
+            self._audio.set_volume(self._volume)
+
+        except Exception:
+            self._audio = None
+
+    def _on_enter(self):
+        if self._audio is None and getattr(self, "audio_path", None):
+            try:
+                self.audio = self.audio_path
+            except Exception:
+                pass
+
+        for child in getattr(self, "_children", []):
+            try:
+                child._on_enter()
+            except Exception:
+                pass
+
+    def on_exit(self):
+        try:
+            if self._audio:
+                try:
+                    self._audio.stop()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        for child in getattr(self, "_children", []):
+            try:
+                child.on_exit()
+            except Exception:
+                pass
