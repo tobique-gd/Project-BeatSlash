@@ -1,7 +1,11 @@
 import dearpygui.dearpygui as pygui
 import pygame
 import numpy as np
-from KodEngine.engine import Kod, Nodes, Scenes, Scripts
+from KodEngine.engine import Kod, Nodes, Scenes, Scripts, NodeComponents
+from BeatSlash.scripts.player import Player
+from pathlib import Path
+
+BASE_DIR = Path("BeatSlash")
 
 class KodEditor:
     def __init__(self):
@@ -10,27 +14,53 @@ class KodEditor:
         self.settings.window_settings["internal_viewport_resolution"] = self.initial_res
         self.app = Kod.App(self.settings, editor_mode=True)
 
-        self.sprite = Nodes.Sprite2D()
-        self.sprite.texture = pygame.image.load("BeatSlash/assets/asd.png")
-        self.root = Nodes.Node2D()
-        self.root.name = "Epickej node"
-        self.custom_node = Nodes.Node()
-        self.custom_node.name = "custom nodeík"
         
-        self.root.add_child(self.sprite)
-        self.sprite.add_child(self.custom_node)
+        self.root = Nodes.Node2D()
+        self.root.name = "World"
 
-        class try_script(Scripts.Script):
-            def __init__(self, node):
-                super().__init__(node)
+        player_node = Nodes.CharacterBody2D()
+        player_node.script = Player(player_node)
+        player_node.name = "Player"
 
-        self.sprite.script = try_script(self.sprite)
+        idle_front_animation = NodeComponents.SpriteAnimation("Idle_Front", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/idle_front.png").convert_alpha(), (17, 27), 4, True, 4)
+        idle_back_animation = NodeComponents.SpriteAnimation("Idle_Back", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/idle_back.png").convert_alpha(), (17, 27), 4, True, 4)
+        idle_side_animation = NodeComponents.SpriteAnimation("Idle_Side", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/idle_side.png").convert_alpha(), (17, 27), 4, True, 4)
+        run_front_animation = NodeComponents.SpriteAnimation("Run_Front", pygame.image.load(BASE_DIR / "assets/textures/spritesheets/player/run_front.png").convert_alpha(), (17, 27), 8, True, 12)
 
-        self.scene = Scenes.Scene("World", self.root)
-        self.camera = Nodes.Camera2D()
+        player_sprite = Nodes.AnimatedSprite2D()
+
+        player_sprite.add_animation(idle_front_animation)
+        player_sprite.add_animation(idle_back_animation)
+        player_sprite.add_animation(idle_side_animation)
+        player_sprite.add_animation(run_front_animation)
+        player_sprite.play("Idle_Front")
+
+        player_camera = Nodes.Camera2D()
+        self.camera = player_camera
+
+
+        self.root.add_child(player_node)
+        player_node.add_child(player_sprite)
+        player_node.add_child(player_camera)
+
+        sprite2 = Nodes.Sprite2D()
+        sprite2.texture = pygame.image.load(BASE_DIR / "assets/textures/dmimage.png").convert_alpha()
+        sprite2.global_position = (0,0)
+        sprite2.z_index = -1
+
+        music_player = Nodes.AudioPlayer()
+        music_player.audio = str(BASE_DIR / "assets/audio/Aftermath.mp3")
+
+        self.root.add_child(music_player)
+        # music_player.play()
+
+
+        self.root.add_child(sprite2)
+
+        current_scene = Scenes.Scene("Main", self.root)
 
         self.app.set_camera(self.camera)
-        self.app.set_scene(self.scene)
+        self.app.set_scene(current_scene)
 
         self.width, self.height = self.initial_res
         self.ui = EditorUI(self)
@@ -132,7 +162,6 @@ class EditorUI:
                         pygui.add_separator()
                         self._draw_tree(self.editor.get_scene_hierarchy())
 
-
                     with pygui.group():
 
                         with pygui.child_window(tag="viewport_container", border=True, height=-250, no_scrollbar=True):
@@ -188,67 +217,90 @@ class EditorUI:
 
         pygui.add_text(f"Type: {type(node).__name__}", parent="inspector_panel")
 
-        for attr, value in vars(node).items():
+        with pygui.table(parent="inspector_panel", header_row=False, resizable=True):
+            pygui.add_table_column(init_width_or_weight=0.35)
+            pygui.add_table_column(init_width_or_weight=0.65)
 
-            if attr.startswith("_"):
-                continue
+            for attr, value in vars(node).items():
+                if attr.startswith("_"):
+                    continue
 
-            if attr in ("_children", "_parent", "script"):
-                continue
+                if attr in ("_children", "_parent", "script"):
+                    continue
 
-            if callable(value):
-                continue
+                if callable(value):
+                    continue
 
-            self._draw_property(node, attr, value)
+                self._draw_property(node, attr, value)
 
     def _draw_property(self, node, attr, value):
         FLOAT_MIN = -1000000.0
         FLOAT_MAX = 1000000.0
 
-        parent = "inspector_panel"
-
         if isinstance(value, str):
-            pygui.add_input_text(label = attr.replace("_", " ").title(),
-                                 default_value=value, parent=parent,
-                                 callback=lambda s, v: setattr(node, attr, v)
-            )
+            label_text = attr.replace("_", " ").title()
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                pygui.add_input_text(label = f"##{attr}",
+                                        default_value=value,
+                                        width=-1,
+                                        callback=lambda s, v: setattr(node, attr, v)
+                )
             return
 
         if isinstance(value, bool):
-            pygui.add_checkbox(label = attr.replace("_", " ").title(),
-                               default_value=value, parent=parent,
-                               callback=lambda s, v: setattr(node, attr, v)
-            )
+            label_text = attr.replace("_", " ").title()
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                pygui.add_checkbox(label = f"##{attr}",
+                                   default_value=value,
+                                
+                                   callback=lambda s, v: setattr(node, attr, v)
+                )
             return
 
         if hasattr(value, "__len__") and len(value) >= 2:
             try:
                 float_list = [float(value[0]), float(value[1])]
-                
-                pygui.add_drag_floatx(
-                    label = attr.replace("_", " ").title(),
-                    default_value=float_list,
-                    size=2,
-                    speed=0.1,
-                    parent=parent,
-                    min_value=FLOAT_MIN,
-                    max_value=FLOAT_MAX,
-                    callback=lambda s, v: setattr(node, attr, (v[0], v[1]))
-                )
+                label_text = attr.replace("_", " ").title()
+                with pygui.table_row():
+                    pygui.add_text(label_text)
+                    pygui.add_drag_floatx(
+                        label = f"##{attr}",
+                        default_value=float_list,
+                        size=2,
+                        speed=0.1,
+                        min_value=FLOAT_MIN,
+                        max_value=FLOAT_MAX,
+                        width=-1,
+                        callback=lambda s, v: setattr(node, attr, (v[0], v[1]))
+                    )
                 return
             except (TypeError, ValueError):
-                print("TypeError, ValueError, Type or Value not found.")
-
+                print("Error. Attribute (",attr,") or Value (",value,") could not be resolved. Displaying as text instead.")
+                with pygui.table_row():
+                    label_text = attr.replace("_", " ").title()
+                    pygui.add_text(label_text)
+                    pygui.add_text(value)
+                
         try:
             val_as_float = float(value)
-            pygui.add_drag_float(label = attr.replace("_", " ").title(),
-                                 default_value=val_as_float, parent=parent,
-                                 min_value=FLOAT_MIN,
-                                 max_value=FLOAT_MAX,
-                                 callback=lambda s, v: setattr(node, attr, v))
-        
+            label_text = attr.replace("_", " ").title()
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                pygui.add_drag_float(label = f"##{attr}",
+                                     default_value=val_as_float,
+                                     min_value=FLOAT_MIN,
+                                     max_value=FLOAT_MAX,
+                                     width=-1,
+                                     callback=lambda s, v: setattr(node, attr, v))
         except (TypeError, ValueError):
-            print("TypeError, ValueError, Type or Value not found.")
+            print("Error. Attribute (",attr,") or Value (",value,") could not be resolved. Displaying as text instead.")
+
+            with pygui.table_row():
+                    label_text = attr.replace("_", " ").title()
+                    pygui.add_text(label_text)
+                    pygui.add_text(value)
 
 
 

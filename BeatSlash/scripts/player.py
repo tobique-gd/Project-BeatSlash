@@ -6,7 +6,7 @@ class Player(Script):
     SPEED = 150
 
     def _ready(self):
-        self.animated_sprite = self.node.get_child("AnimatedSprite2D")
+        self.animated_sprite = self.node.get_node("AnimatedSprite2D")
         self.last_direction = (0, 1)
 
     def _process(self, delta):

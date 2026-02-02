@@ -7,13 +7,13 @@ class Node:
         self.name = self.__class__.__name__
         self._children = []
         self._parent: 'Node | None' = None
-        self.script = None
+        self.script : object | None = None
 
     def add_child(self, _node):
         self._children.append(_node)
         _node._parent = self
 
-    def get_child(self, _path_to_child: str):
+    def get_node(self, _path_to_child: str):
         parts = _path_to_child.split("/")
         current_node = self
         for part in parts:
@@ -27,9 +27,6 @@ class Node:
             current_node = found
         return current_node
 
-    def set_script(self, script_cls):
-        self.script = script_cls(self)
-        self.script.ready()
     
     def _update(self, _delta):
         pass
