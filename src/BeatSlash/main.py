@@ -1,7 +1,7 @@
 import pygame
 from pathlib import Path
 
-from KodEngine.engine import (Kod, Nodes, Scenes, NodeComponents)
+from ..KodEngine.engine import (Kod, Nodes, Scenes, NodeComponents)
 from .scripts.player import Player
 
 BASE_DIR = Path(__file__).parent

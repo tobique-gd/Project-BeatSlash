@@ -8,12 +8,12 @@ import os
 from . import ui_components as UIComp
 
 #ENGINE IMPORTS
-from KodEngine.engine import Kod, Nodes, Scenes, Scripts, NodeComponents, ResourceManager
+from ..engine import Kod, Nodes, Scenes, Scripts, NodeComponents, ResourceManager
 
 #SCRIPTS TODO: musim predelat protoze to je uplne na picu
-from BeatSlash.scripts.player import Player
+from ...BeatSlash.scripts.player import Player
 
-BASE_DIR = os.path.abspath("BeatSlash")
+BASE_DIR = os.path.abspath("src/BeatSlash")
 
 class KodEditor:
     def __init__(self):
@@ -21,6 +21,11 @@ class KodEditor:
         self.initial_res = (640, 360)
         self.settings.window_settings["internal_viewport_resolution"] = self.initial_res
         self.app = Kod.App(self.settings, editor_mode=True)
+
+        # current_scene = ResourceManager.SceneLoader.load("world.kscn")
+
+
+
         
         self.root = Nodes.Node2D()
         self.root.name = "World"
@@ -67,27 +72,22 @@ class KodEditor:
 
         self.root.add_child(sprite2)
 
-        sc_save = Scenes.Scene("world_scene", self.root)
-        current_scene = ResourceManager.SceneLoader.load("sc.kscn")
-
-        ResourceManager.SceneLoader.save("sc.kscn", sc_save)
-
+        # sc_save = Scenes.Scene("world_scene", self.root)
+        sc_save = ResourceManager.SceneLoader.load("world.kscn")
 
         self.camera = Nodes.Camera2D()
         
-        self.root = getattr(current_scene, "root", None)
+        self.root = getattr(sc_save, "root", None)
         if self.root is None:
             self.root = Nodes.Node2D()
         
         self.app.set_camera(self.camera)
-        self.app.set_scene(current_scene)
+        self.app.set_scene(sc_save)
 
         self.width, self.height = self.initial_res
         self.ui = EditorUI(self)
-
         
-
- 
+        ResourceManager.SceneLoader.save("world.kscn", sc_save)
 
     def render_frame(self):
         if not self.app.screen:

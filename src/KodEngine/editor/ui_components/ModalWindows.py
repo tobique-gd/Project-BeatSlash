@@ -1,5 +1,5 @@
 import dearpygui.dearpygui as pygui
-from KodEngine.engine import Nodes
+from ...engine import Nodes
 
 class NodeDialogs:
     def __init__(self, ui):

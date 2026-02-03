@@ -1,4 +1,4 @@
-from KodEngine.engine.Scripts import Script
+from ...KodEngine.engine.Scripts import Script
 from .common import mathlib
 import pygame
 

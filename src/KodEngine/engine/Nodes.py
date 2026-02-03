@@ -1,4 +1,4 @@
-from KodEngine.engine.NodeComponents import SpriteAnimation
+from .NodeComponents import SpriteAnimation
 
 import pygame
 import os

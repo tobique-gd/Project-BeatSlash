@@ -1,5 +1,5 @@
 import json
-from KodEngine.engine import (Nodes, NodeComponents, Scenes)
+from . import (Nodes, NodeComponents, Scenes)
 
 class SceneLoader:
     def __init__(self) -> None:
@@ -76,7 +76,7 @@ class SceneLoader:
                                 pass
                     elif k == "animations":
                         try:
-                            from KodEngine.engine import NodeComponents as NC
+                            from . import NodeComponents as NC
                         except Exception:
                             NC = None
 

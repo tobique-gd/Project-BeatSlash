@@ -1,0 +1,112 @@
+{
+  "name": "world_scene",
+  "root": {
+    "type": "Node2D",
+    "properties": {
+      "name": "World",
+      "position": [
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0
+      ],
+      "z_index": 0
+    },
+    "children": [
+      {
+        "type": "CharacterBody2D",
+        "properties": {
+          "name": "Player",
+          "position": [
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0
+          ],
+          "z_index": 0
+        },
+        "children": [
+          {
+            "type": "AnimatedSprite2D",
+            "properties": {
+              "name": "AnimatedSprite2D",
+              "position": [
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0
+              ],
+              "z_index": 0,
+              "flip_h": false,
+              "flip_v": false,
+              "offset": [
+                0,
+                0
+              ],
+              "animations": []
+            },
+            "children": []
+          },
+          {
+            "type": "Camera2D",
+            "properties": {
+              "name": "Camera2D",
+              "position": [
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0
+              ],
+              "z_index": 0,
+              "offset": [
+                0,
+                0
+              ],
+              "current": true
+            },
+            "children": []
+          }
+        ]
+      },
+      {
+        "type": "AudioPlayer",
+        "properties": {
+          "name": "AudioPlayer",
+          "audio_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/audio/Aftermath.mp3"
+        },
+        "children": []
+      },
+      {
+        "type": "Sprite2D",
+        "properties": {
+          "name": "Sprite2D",
+          "position": [
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0
+          ],
+          "z_index": -1,
+          "flip_h": false,
+          "flip_v": false,
+          "texture_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/dmimage.png",
+          "offset": [
+            0,
+            0
+          ]
+        },
+        "children": []
+      }
+    ]
+  }
+}

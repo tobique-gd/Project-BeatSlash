@@ -1,8 +1,8 @@
 import pygame
 
-import KodEngine.engine.RenderingServer as RenderingServer
-import KodEngine.engine.Nodes as Nodes
-import KodEngine.engine.Scenes as Scenes
+from . import RenderingServer
+from . import Nodes
+from . import Scenes
 
 
 class Settings:

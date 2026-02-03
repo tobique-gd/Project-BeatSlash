@@ -1,4 +1,4 @@
-import KodEngine.engine.Nodes as Nodes
+from . import Nodes
 
 class Renderer:
     def __init__(self, _configuration, _pygame, _screen) -> None:
