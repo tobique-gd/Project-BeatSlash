@@ -9,6 +9,7 @@ class Node:
         self._children = []
         self._parent: 'Node | None' = None
         self.script : object | None = None
+        self._queued_for_deletion = False
 
     def _on_enter(self):
         for child in getattr(self, "_children", []):
@@ -27,6 +28,14 @@ class Node:
     def add_child(self, _node):
         self._children.append(_node)
         _node._parent = self
+    
+    def remove_child(self, _node):
+        if _node in self._children:
+            _node._parent = None
+            self._children.remove(_node)
+    
+    def queue_free(self):
+        self._queued_for_deletion = True
 
     def get_node(self, _path_to_child: str):
         parts = _path_to_child.split("/")

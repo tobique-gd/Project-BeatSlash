@@ -192,7 +192,7 @@ class SceneLoader:
             for attr, val in vars(node).items():
                 if attr.startswith("_"):
                     continue
-                if attr in ("_children", "_parent", "script"):
+                if attr in ("_children", "_parent"):
                     continue
                 if callable(val):
                     continue
