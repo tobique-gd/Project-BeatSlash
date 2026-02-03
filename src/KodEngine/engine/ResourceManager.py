@@ -301,7 +301,7 @@ class SceneLoader:
                 if hasattr(node, "script") and isinstance(node.script, str):
                     script_name = node.script
                 elif getattr(node, "runtime_script", None) is not None:
-                    script_name = Scripts.get_script_module(node.runtime_script)
+                    script_name = Scripts.get_script_path(node.runtime_script)
                 if script_name:
                     node_dict["properties"]["script"] = script_name
             except Exception as e:

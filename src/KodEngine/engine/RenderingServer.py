@@ -31,8 +31,8 @@ class Renderer:
             )
 
             camera_offset_centered = (
-                camera_offset_node_position[0] + self.configuration.window_settings["internal_viewport_resolution"][0] / 2.0,
-                camera_offset_node_position[1] + self.configuration.window_settings["internal_viewport_resolution"][1] / 2.0
+                camera_offset_node_position[0] + self.configuration.project_settings["window"]["internal_viewport_resolution"][0] / 2.0,
+                camera_offset_node_position[1] + self.configuration.project_settings["window"]["internal_viewport_resolution"][1] / 2.0
             )
 
             tex_width, tex_height = tex.get_size()

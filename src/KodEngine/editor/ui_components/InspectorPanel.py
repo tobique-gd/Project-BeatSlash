@@ -37,7 +37,7 @@ class InspectorPanel:
         FLOAT_MIN = -1000000.0
         FLOAT_MAX = 1000000.0
 
-        
+
         if attr == "animations" and isinstance(value, (list, tuple)):
             label_text = "Animations"
             with pygui.table_row():
@@ -117,10 +117,10 @@ class InspectorPanel:
                 ErrorHandler.throw_warning(
                     f"Attribute '{attr}' with value '{value}' could not be resolved as a 2D vector. Displaying as text instead."
                 )
+                label_text = attr.replace("_", " ").title()
                 with pygui.table_row():
-                    label_text = attr.replace("_", " ").title()
                     pygui.add_text(label_text)
-                    pygui.add_text(value)
+                    pygui.add_text(str(value))
                 
         try:
             val_as_float = float(value)
@@ -134,16 +134,50 @@ class InspectorPanel:
                                      width=-1,
                                      callback=lambda s, v: setattr(node, attr, v))
         except (TypeError, ValueError):
-            ErrorHandler.throw_warning(
-                f"Attribute '{attr}' with value '{value}' could not be resolved as a float. Displaying as text instead."
-            )
-
+            label_text = attr.replace("_", " ").title()
             with pygui.table_row():
-                    label_text = attr.replace("_", " ").title()
-                    pygui.add_text(label_text)
-                    pygui.add_text(value)
+                pygui.add_text(label_text)
+                button_tag = f"resource_btn_{id(node)}_{attr}"
+                display_value = str(value) if value else "None"
+                if len(display_value) > 30:
+                    display_value = "..." + display_value[-27:]
+                
+                pygui.add_button(
+                    label=display_value,
+                    tag=button_tag,
+                    width=-1,
+                    user_data=(node, attr),
+                    drop_callback=self._drop_resource_file,
+                    payload_type="file_payload"
+                )
 
     def clear(self):
         pygui.delete_item("inspector_panel", children_only=True)
         pygui.add_text("Inspector", parent="inspector_panel", color=(150, 150, 150))
         pygui.add_separator(parent="inspector_panel")
+
+    def _drop_resource_file(self, sender, app_data, user_data):
+        try:
+            
+            button_user_data = pygui.get_item_user_data(sender)
+            if button_user_data is None:
+                ErrorHandler.throw_error("No user data found on button")
+                return
+            
+            node, attr = button_user_data
+    
+            file_path = app_data
+            if file_path is None or not isinstance(file_path, str):
+                ErrorHandler.throw_error("No valid file path in drop event")
+                return
+            
+            try:
+                setattr(node, attr, file_path)
+                ErrorHandler.throw_success(f"Set {attr} to: {file_path}")
+                
+                self.update(node)
+            except Exception as e:
+                ErrorHandler.throw_error(f"Failed to set {attr}: {e}")
+                
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to process dropped file: {e}")

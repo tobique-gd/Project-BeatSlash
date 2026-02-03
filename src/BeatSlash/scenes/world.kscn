@@ -5,8 +5,8 @@
     "properties": {
       "name": "World",
       "position": [
-        0,
-        0
+        0.0,
+        0.0
       ],
       "rotation": [
         0,
@@ -19,7 +19,6 @@
         "type": "CharacterBody2D",
         "properties": {
           "name": "Player",
-          "script": "BeatSlash.scripts.player",
           "position": [
             0.0,
             0.0
@@ -28,7 +27,8 @@
             0,
             0
           ],
-          "z_index": 0
+          "z_index": 0,
+          "script": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/scripts/player.py"
         },
         "children": [
           {
@@ -97,9 +97,9 @@
                 }
               ],
               "current_animation": {
-                "name": "Idle_Back",
-                "current_frame": 2,
-                "time_accumulator": 0.20200000000000662
+                "name": "Run_Front",
+                "current_frame": 7,
+                "time_accumulator": 0.037333333333339186
               }
             },
             "children": []
@@ -131,7 +131,31 @@
         "type": "AudioPlayer",
         "properties": {
           "name": "AudioPlayer",
-          "audio_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/audio/Aftermath.mp3"
+          "audio_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/audio/Aftermath.mp3",
+          "script": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/scripts/audio_player.py"
+        },
+        "children": []
+      },
+      {
+        "type": "Sprite2D",
+        "properties": {
+          "name": "Bg",
+          "position": [
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0
+          ],
+          "z_index": -1.0,
+          "flip_h": false,
+          "flip_v": false,
+          "texture_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/dmimage.png",
+          "offset": [
+            0,
+            0
+          ]
         },
         "children": []
       }

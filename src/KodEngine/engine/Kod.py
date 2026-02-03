@@ -7,10 +7,17 @@ from . import Scenes
 
 class Settings:
     def __init__(self) -> None:
-        self.window_settings = {
-            "viewport_resolution": (1280, 720),
-            "internal_viewport_resolution": (640, 360)
+        self.project_settings = {
+            "file_management" : {
+                "project_directory" : "/"
+            },
+
+            "window" : {
+                "viewport_resolution": (1280, 720),
+                "internal_viewport_resolution": (640, 360)
+            }
         }
+        
         self.runtime_settings = {
             "FPS": 60
         }
@@ -24,8 +31,8 @@ class App:
         pygame.init()
 
         self.configuration = _configuration
-        self.internal_resolution = self.configuration.window_settings["internal_viewport_resolution"]
-        self.resolution = self.configuration.window_settings["viewport_resolution"]
+        self.internal_resolution = self.configuration.project_settings["window"]["internal_viewport_resolution"]
+        self.resolution = self.configuration.project_settings["window"]["viewport_resolution"]
         self.FPS = self.configuration.runtime_settings["FPS"]
 
         if editor_mode:
