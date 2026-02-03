@@ -1,8 +1,8 @@
 import pygame
 
-import KodEngine.engine.RenderingServer as RenderingServer
-import KodEngine.engine.Nodes as Nodes
-import KodEngine.engine.Scenes as Scenes
+from . import RenderingServer
+from . import Nodes
+from . import Scenes
 
 
 class Settings:
@@ -20,12 +20,13 @@ class Settings:
         }
 
 class App:
-    def __init__(self, configuration: Settings, editor_mode = False):
+    def __init__(self, _configuration: Settings, editor_mode = False):
         pygame.init()
 
-        self.internal_resolution = configuration.window_settings["internal_viewport_resolution"]
-        self.resolution = configuration.window_settings["viewport_resolution"]
-        self.FPS = configuration.runtime_settings["FPS"]
+        self.configuration = _configuration
+        self.internal_resolution = self.configuration.window_settings["internal_viewport_resolution"]
+        self.resolution = self.configuration.window_settings["viewport_resolution"]
+        self.FPS = self.configuration.runtime_settings["FPS"]
 
         if editor_mode:
             self.screen = pygame.display.set_mode(self.internal_resolution, pygame.HIDDEN)
@@ -37,7 +38,7 @@ class App:
         self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
 
         self.clock = pygame.time.Clock()
-        self.renderer = RenderingServer.Renderer(configuration, pygame, self.internal_surface)
+        self.renderer = RenderingServer.Renderer(self.configuration, pygame, self.internal_surface)
 
         self.running = False
         self.current_scene = None
@@ -72,7 +73,7 @@ class App:
         self.current_camera = camera
 
     def find_camera_in_scene(self, node):
-        if isinstance(node, Nodes.Camera2D):
+        if isinstance(node, Nodes.Camera2D) and node.current == True:
             return node
 
         for child in getattr(node, "_children", []):

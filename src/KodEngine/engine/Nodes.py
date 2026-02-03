@@ -1,4 +1,4 @@
-from KodEngine.engine.NodeComponents import SpriteAnimation
+from .NodeComponents import SpriteAnimation
 
 import pygame
 import os
@@ -8,7 +8,8 @@ class Node:
         self.name = self.__class__.__name__
         self._children = []
         self._parent: 'Node | None' = None
-        self.script : object | None = None
+        self.script: str | None = None
+        self.runtime_script: object | None = None
         self._queued_for_deletion = False
 
     def _on_enter(self):
@@ -50,6 +51,11 @@ class Node:
                 return None
             current_node = found
         return current_node
+
+    def set_script(self, module_name: str):
+        from . import Scripts
+        self.script = module_name
+        self.runtime_script = Scripts.load_script(module_name, self)
 
     
     def _update(self, _delta):

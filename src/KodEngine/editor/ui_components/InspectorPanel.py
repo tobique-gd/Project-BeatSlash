@@ -1,4 +1,5 @@
 import dearpygui.dearpygui as pygui
+from ...engine import ErrorHandler
 
 class InspectorPanel:
     def __init__(self, ui):
@@ -24,7 +25,7 @@ class InspectorPanel:
                 if attr.startswith("_"):
                     continue
 
-                if attr in ("_children", "_parent", "script"):
+                if attr in ("_children", "_parent", "runtime_script"):
                     continue
 
                 if callable(value):
@@ -47,7 +48,11 @@ class InspectorPanel:
                         try:
                             anim_name = anim["name"]
                         except Exception:
-                            anim_name = str(anim.name)
+                            try:
+                                anim_name = str(anim.name)
+                            except Exception as e:
+                                anim_name = "<unknown>"
+                                ErrorHandler.throw_warning(f"Failed to resolve animation name: {e}")
 
                         pygui.add_button(label=anim_name,
                                          user_data=(node, anim_name),
@@ -109,7 +114,9 @@ class InspectorPanel:
                     )
                 return
             except (TypeError, ValueError):
-                print("Error. Attribute (",attr,") or Value (",value,") could not be resolved. Displaying as text instead.")
+                ErrorHandler.throw_warning(
+                    f"Attribute '{attr}' with value '{value}' could not be resolved as a 2D vector. Displaying as text instead."
+                )
                 with pygui.table_row():
                     label_text = attr.replace("_", " ").title()
                     pygui.add_text(label_text)
@@ -127,7 +134,9 @@ class InspectorPanel:
                                      width=-1,
                                      callback=lambda s, v: setattr(node, attr, v))
         except (TypeError, ValueError):
-            print("Error. Attribute (",attr,") or Value (",value,") could not be resolved. Displaying as text instead.")
+            ErrorHandler.throw_warning(
+                f"Attribute '{attr}' with value '{value}' could not be resolved as a float. Displaying as text instead."
+            )
 
             with pygui.table_row():
                     label_text = attr.replace("_", " ").title()

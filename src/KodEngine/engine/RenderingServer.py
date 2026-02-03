@@ -1,4 +1,4 @@
-import KodEngine.engine.Nodes as Nodes
+from . import Nodes
 
 class Renderer:
     def __init__(self, _configuration, _pygame, _screen) -> None:
@@ -12,7 +12,7 @@ class Renderer:
         
         if scene != None:
             nodes = self.create_node_structure(scene.root)
-            nodes.sort(key=lambda node: (node.z_index, node.global_position[1]))
+            nodes.sort(key=lambda node: (node.z_index))
             
             for sprite in nodes:
                 self.render_node(sprite)

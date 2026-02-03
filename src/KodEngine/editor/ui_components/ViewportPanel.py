@@ -13,7 +13,7 @@ class ViewportPanel:
 
         with pygui.texture_registry(show=False):
             initial_data = [0.0] * (self.ui.editor.width * self.ui.editor.height * 4)
-            pygui.add_dynamic_texture(
+            pygui.add_raw_texture(
                 width=self.ui.editor.width,
                 height=self.ui.editor.height,
                 default_value=initial_data,
