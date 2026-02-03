@@ -1,0 +1,140 @@
+{
+  "name": "my world scene",
+  "root": {
+    "type": "Node2D",
+    "properties": {
+      "name": "World",
+      "position": [
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0
+      ],
+      "z_index": 0
+    },
+    "children": [
+      {
+        "type": "CharacterBody2D",
+        "properties": {
+          "name": "Player",
+          "script": "BeatSlash.scripts.player",
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0
+          ],
+          "z_index": 0
+        },
+        "children": [
+          {
+            "type": "AnimatedSprite2D",
+            "properties": {
+              "name": "AnimatedSprite2D",
+              "position": [
+                0.0,
+                0.0
+              ],
+              "rotation": [
+                0,
+                0
+              ],
+              "z_index": 0,
+              "flip_h": false,
+              "flip_v": false,
+              "offset": [
+                0,
+                0
+              ],
+              "animations": [
+                {
+                  "name": "Idle_Front",
+                  "frame_size": [
+                    17,
+                    27
+                  ],
+                  "frames": 4,
+                  "fps": 4,
+                  "loop": true,
+                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/idle_front.png"
+                },
+                {
+                  "name": "Idle_Back",
+                  "frame_size": [
+                    17,
+                    27
+                  ],
+                  "frames": 4,
+                  "fps": 4,
+                  "loop": true,
+                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/idle_back.png"
+                },
+                {
+                  "name": "Idle_Side",
+                  "frame_size": [
+                    17,
+                    27
+                  ],
+                  "frames": 4,
+                  "fps": 4,
+                  "loop": true,
+                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/idle_side.png"
+                },
+                {
+                  "name": "Run_Front",
+                  "frame_size": [
+                    17,
+                    27
+                  ],
+                  "frames": 8,
+                  "fps": 12,
+                  "loop": true,
+                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/run_front.png"
+                }
+              ],
+              "current_animation": {
+                "name": "Idle_Back",
+                "current_frame": 2,
+                "time_accumulator": 0.20200000000000662
+              }
+            },
+            "children": []
+          },
+          {
+            "type": "Camera2D",
+            "properties": {
+              "name": "Camera2D",
+              "position": [
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0
+              ],
+              "z_index": 0,
+              "offset": [
+                0,
+                0
+              ],
+              "current": true
+            },
+            "children": []
+          }
+        ]
+      },
+      {
+        "type": "AudioPlayer",
+        "properties": {
+          "name": "AudioPlayer",
+          "audio_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/audio/Aftermath.mp3"
+        },
+        "children": []
+      }
+    ]
+  }
+}

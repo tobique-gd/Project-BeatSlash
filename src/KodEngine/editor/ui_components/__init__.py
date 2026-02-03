@@ -1,6 +1,8 @@
 from .HierarchyPanel import HierarchyPanel
 from .InspectorPanel import InspectorPanel
-from .ModalWindows import NodeDialogs
+from .Popups import NodeDialogs
 from .ViewportPanel import ViewportPanel
+from .ConsolePanel import ConsolePanel
+from .MenuBar import MenuBar
 
-__all__ = ['HierarchyPanel', 'InspectorPanel', 'ModalWindows', 'NodeDialogs', 'ViewportPanel']
+__all__ = ['HierarchyPanel', 'InspectorPanel', 'Popups', 'NodeDialogs', 'ViewportPanel', 'ConsolePanel', 'MenuBar']

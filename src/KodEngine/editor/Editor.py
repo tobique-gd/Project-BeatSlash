@@ -3,95 +3,45 @@ import dearpygui.dearpygui as pygui
 import numpy as np
 import pygame
 import os
+import subprocess
+import sys
+import tempfile
 
 #EDITOR IMPORTS
 from . import ui_components as UIComp
 
 #ENGINE IMPORTS
 from ..engine import Kod, Nodes, Scenes, Scripts, NodeComponents, ResourceManager
+from ..engine.ErrorHandler import ErrorHandler
 
 #SCRIPTS TODO: musim predelat protoze to je uplne na picu
-from ...BeatSlash.scripts.player import Player
-
-BASE_DIR = os.path.abspath("src/BeatSlash")
 
 class KodEditor:
     def __init__(self):
+        ErrorHandler.set_editor_mode(True)
         self.settings = Kod.Settings()
         self.initial_res = (640, 360)
         self.settings.window_settings["internal_viewport_resolution"] = self.initial_res
         self.app = Kod.App(self.settings, editor_mode=True)
 
-        # current_scene = ResourceManager.SceneLoader.load("world.kscn")
-
-
-
-        
-        self.root = Nodes.Node2D()
-        self.root.name = "World"
-
-        player_node = Nodes.CharacterBody2D()
-        player_node.script = Player(player_node)
-        player_node.name = "Player"
-
-        idle_front_animation = NodeComponents.SpriteAnimation("Idle_Front", pygame.image.load(str(BASE_DIR + "/assets/textures/spritesheets/player/idle_front.png")).convert_alpha(), (17, 27), 4, True, 4)
-        idle_front_animation.spritesheet_path = str(BASE_DIR + "/assets/textures/spritesheets/player/idle_front.png")
-        idle_back_animation = NodeComponents.SpriteAnimation("Idle_Back", pygame.image.load(str(BASE_DIR + "/assets/textures/spritesheets/player/idle_back.png")).convert_alpha(), (17, 27), 4, True, 4)
-        idle_back_animation.spritesheet_path = str(BASE_DIR + "/assets/textures/spritesheets/player/idle_back.png")
-        idle_side_animation = NodeComponents.SpriteAnimation("Idle_Side", pygame.image.load(str(BASE_DIR + "/assets/textures/spritesheets/player/idle_side.png")).convert_alpha(), (17, 27), 4, True, 4)
-        idle_side_animation.spritesheet_path = str(BASE_DIR + "/assets/textures/spritesheets/player/idle_side.png")
-        run_front_animation = NodeComponents.SpriteAnimation("Run_Front", pygame.image.load(str(BASE_DIR + "/assets/textures/spritesheets/player/run_front.png")).convert_alpha(), (17, 27), 8, True, 12)
-        run_front_animation.spritesheet_path = str(BASE_DIR + "/assets/textures/spritesheets/player/run_front.png")
-
-        player_sprite = Nodes.AnimatedSprite2D()
-
-        player_sprite.add_animation(idle_front_animation)
-        player_sprite.add_animation(idle_back_animation)
-        player_sprite.add_animation(idle_side_animation)
-        player_sprite.add_animation(run_front_animation)
-        player_sprite.play("Idle_Front")
-
-        player_camera = Nodes.Camera2D()
-
-        self.root.add_child(player_node)
-        player_node.add_child(player_sprite)
-        player_node.add_child(player_camera)
-
-        sprite2 = Nodes.Sprite2D()
-        sprite2.texture = pygame.image.load(BASE_DIR + "/assets/textures/dmimage.png").convert_alpha()
-        sprite2.texture_path = str(BASE_DIR + "/assets/textures/dmimage.png")
-        sprite2.global_position = (0,0)
-        sprite2.z_index = -1
-
-        music_player = Nodes.AudioPlayer()
-        music_player.audio = str(BASE_DIR + "/assets/audio/Aftermath.mp3")
-
-        self.root.add_child(music_player)
-        music_player.play()
-
-
-        self.root.add_child(sprite2)
-
-        # sc_save = Scenes.Scene("world_scene", self.root)
-        sc_save = ResourceManager.SceneLoader.load("world.kscn")
+        current_scene = ResourceManager.SceneLoader.load("src/BeatSlash/scenes/world.kscn")
+        self.current_scene_path = getattr(current_scene, 'path', None)
 
         self.camera = Nodes.Camera2D()
         
-        self.root = getattr(sc_save, "root", None)
+        self.root = getattr(current_scene, "root", None)
         if self.root is None:
             self.root = Nodes.Node2D()
         
         self.app.set_camera(self.camera)
-        self.app.set_scene(sc_save)
+        self.app.set_scene(current_scene)
 
         self.width, self.height = self.initial_res
-        self.ui = EditorUI(self)
-        
-        ResourceManager.SceneLoader.save("world.kscn", sc_save)
+        self.ui = EditorUI(self, self.app)
 
     def render_frame(self):
         if not self.app.screen:
-            print("Error, no screen supplied. Stopping rendering")
+            ErrorHandler.throw_error("No screen supplied. Stopping rendering")
             return None
 
         self.app.renderer.render_frame(self.app.current_scene, self.camera)
@@ -106,15 +56,14 @@ class KodEditor:
         rgba = np.concatenate((data, alpha), axis=2)
         return rgba.astype(np.float32) / 255.0
 
-
-
     def run(self):
         last_frame_time = pygame.time.get_ticks()
         while pygui.is_dearpygui_running():
             now = pygame.time.get_ticks()
             delta = (now - last_frame_time) / 1000.0
             last_frame_time = now
-            self.ui.check_resize()
+            if not self.app.running:
+                self.ui.check_resize()
             
             self._update_node(self.root, delta)
             
@@ -122,14 +71,13 @@ class KodEditor:
                 nodes_were_deleted = self.app.current_scene._process_deletion_queue()
                 if nodes_were_deleted and hasattr(self, 'ui'):
                     self.ui._update_hierarchy()
+            
+            if not self.app.running:
+                frame = self.render_frame()
 
-            frame = self.render_frame()
-
-
-            self.ui.push_frame(frame)
+            if not self.app.running:
+                self.ui.push_frame(frame)
             pygui.render_dearpygui_frame()
-
-
 
         pygui.destroy_context()
     
@@ -166,6 +114,66 @@ class KodEditor:
 
         for child in getattr(node, "_children", []):
             self._update_node(child, delta)
+    
+
+    def _save_scene(self, scene=None, scene_path=None):
+        if scene is None:
+            scene = self.app.current_scene
+        if scene_path is None:
+            scene_path = getattr(scene, 'path', self.current_scene_path) if scene else self.current_scene_path
+    
+        if ResourceManager.SceneLoader.save(scene, scene_path):
+            self.current_scene_path = scene_path
+            ErrorHandler.throw_success(f"Scene saved to {scene_path}!")
+        else:
+            ErrorHandler.throw_error(f"Failed to save scene to {scene_path}")
+
+    def _load_scene(self, scene_path=None):
+        if scene_path is None:
+            scene_path = self.current_scene_path
+        result = ResourceManager.SceneLoader.load(scene_path)
+        if result:
+            self.app.set_scene(result)
+            self.current_scene_path = getattr(result, 'path', scene_path)
+            ErrorHandler.throw_success(f"Scene loaded from {scene_path}!")
+            self.ui._update_hierarchy()
+        else:
+            ErrorHandler.throw_error(f"Failed to load scene from {scene_path}")
+
+    def _run_scene(self, scene_path=None):
+        #this needs to run in a subprocess to avoid freezing the editor
+        try:
+            if scene_path is None:
+                scene_path = getattr(self.app.current_scene, 'path', self.current_scene_path) if self.app.current_scene else self.current_scene_path
+    
+            if scene_path is None:
+                ErrorHandler.throw_error("No scene path available to run")
+                return
+
+            scene_path = os.path.abspath(scene_path)
+            if not ResourceManager.SceneLoader.save(self.app.current_scene, scene_path):
+                ErrorHandler.throw_error(f"Failed to save scene before running: {scene_path}")
+                return
+            
+            ErrorHandler.throw_info(f"Starting scene: {scene_path}...")
+            import subprocess
+            editor_file = os.path.abspath(__file__)
+            src_root = os.path.dirname(os.path.dirname(os.path.dirname(editor_file)))
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "KodEngine.editor.subprocess.runtime",
+                    "--scene",
+                    scene_path,
+                ],
+                cwd=src_root,
+            )
+            ErrorHandler.throw_success("Scene finished running")
+            
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to run scene: {e}")
 
 class UIState:
     def __init__(self):
@@ -173,31 +181,44 @@ class UIState:
         self.selectables = {}
 
 class EditorUI:
-    def __init__(self, editor: KodEditor):
-        self.editor = editor
+    def __init__(self, _editor: KodEditor, _app):
+        self.editor = _editor
+        self.app = _app
         self.state = UIState()
         self.viewport = UIComp.ViewportPanel(self)
         self.hierarchy = UIComp.HierarchyPanel(self)
         self.inspector = UIComp.InspectorPanel(self)
+        self.console = UIComp.ConsolePanel(self)
         self.dialogs = UIComp.NodeDialogs(self)
+        self.menubar = UIComp.MenuBar(self)
+        
 
         pygui.create_context()
         self.viewport.create_texture()
         self._create_layout()
         self._setup_dpg()
 
+        ErrorHandler.set_console_callback(self._handle_console_message)
+
         if pygui.does_item_exist("add_node_btn"):
             pygui.configure_item("add_node_btn", enabled=False)
 
     def _create_layout(self):
         with pygui.window(tag="Primary Window"):
+            with pygui.table(header_row=False, resizable=False, borders_innerV=False, height=20):
+                pygui.add_table_column(init_width_or_weight=0.2)
+                pygui.add_table_column(init_width_or_weight=0.6)
+                pygui.add_table_column(init_width_or_weight=0.2)
+
+                with pygui.table_row():
+                    self.menubar.build()
+
             with pygui.table(header_row=False, resizable=True, borders_innerV=True):
                 pygui.add_table_column(init_width_or_weight=0.2)
                 pygui.add_table_column(init_width_or_weight=0.6)
                 pygui.add_table_column(init_width_or_weight=0.2)
 
                 with pygui.table_row():
-
                     with pygui.child_window(border=True):
                         self.hierarchy.build()
 
@@ -208,9 +229,7 @@ class EditorUI:
                             pygui.add_image("engine_texture", tag="viewport_image")
 
                         with pygui.child_window(border=True, height=-1):
-                            pygui.add_text("Console", color=(150, 150, 150))
-                            pygui.add_separator()
-                            pygui.add_text("[Log]: Manual Resize check active.", color=(0, 255, 0))
+                            self.console.build()
 
                     with pygui.child_window(border=True, tag="inspector_panel"):
                         self.inspector.build()
@@ -232,6 +251,12 @@ class EditorUI:
 
     def _clear_inspector(self):
         self.inspector.clear()
+    
+    def _handle_console_message(self, msg_type: str, message: str):
+        if hasattr(self, 'console'):
+            self.console.add_message(msg_type, message)
+    
+
 
 def main():
     editor = KodEditor()

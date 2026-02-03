@@ -1,20 +1,24 @@
 import dearpygui.dearpygui as pygui
+import pygame
+import numpy as np
 
 class HierarchyPanel:
     def __init__(self, ui):
         self.ui = ui
 
+    
     def build(self):
         pygui.add_text("Hierarchy", color=(150, 150, 150))
         pygui.add_separator()
         with pygui.table(header_row=False, resizable=False):
-            pygui.add_table_column(init_width_or_weight=0.1)
-            pygui.add_table_column(init_width_or_weight=0.1)
-            pygui.add_table_column(init_width_or_weight=0.8)
+            pygui.add_table_column(init_width_or_weight=0.2)
+            pygui.add_table_column(init_width_or_weight=0.2)
+            pygui.add_table_column(init_width_or_weight=0.6)
 
             with pygui.table_row():
-                pygui.add_button(label="+", tag="add_node_btn", width=-1, callback=self.ui.dialogs.show_add_node_window)
-                pygui.add_button(label="-", tag="delete_node_btn", width=-1, callback=self.ui.dialogs.show_delete_node_window)
+                #TODO: use textures instead of words
+                pygui.add_button(label="Add", tag="add_node_btn", width=-1, callback=self.ui.dialogs.show_add_node_window)
+                pygui.add_button(label="Del", tag="delete_node_btn", width=-1, callback=self.ui.dialogs.show_delete_node_window)
                 
         pygui.add_separator()
         with pygui.group(tag="hierarchy_tree"):

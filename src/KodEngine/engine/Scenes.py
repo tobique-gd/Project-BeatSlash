@@ -1,15 +1,18 @@
+from . import ErrorHandler
+
 class Scene:
-    def __init__(self, name, root):
+    def __init__(self, name, root, path=None):
         self.name = name
         self.root = root
         self.deletion_queue = []
+        self.path = path
     
     def _ready(self):
         self._ready_node(self.root)
 
     def _ready_node(self, node):
-        if hasattr(node, "script") and node.script:
-            node.script._ready()
+        if hasattr(node, "runtime_script") and node.runtime_script:
+            node.runtime_script._ready()
 
         for child in getattr(node, "_children", []):
             self._ready_node(child)
@@ -20,8 +23,8 @@ class Scene:
 
     def _process_node(self, node, delta):
 
-        if hasattr(node, "script") and node.script:
-            node.script._process(delta)
+        if hasattr(node, "runtime_script") and node.runtime_script:
+            node.runtime_script._process(delta)
 
         node._update(delta)
         
@@ -47,7 +50,7 @@ class Scene:
                     parent.remove_child(node)
                     nodes_deleted = True
                 except Exception as e:
-                    print(f"Error deleting node {node.name}: {e}")
+                    ErrorHandler.throw_error(f"Failed to delete node {node.name}: {e}")
         
         self.deletion_queue.clear()
         return nodes_deleted
@@ -56,8 +59,8 @@ class Scene:
         self._input_node(self.root, _event)
     
     def _input_node(self, node, _event):
-        if node.script:
-            node.script._input(_event)
+        if node.runtime_script:
+            node.runtime_script._input(_event)
         
         for child in node._children:
             self._input_node(child, _event)
