@@ -1,0 +1,19 @@
+{
+  "name": "new_scene.kscn",
+  "root": {
+    "type": "Node2D",
+    "properties": {
+      "name": "Root",
+      "position": [
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0
+      ],
+      "z_index": 0
+    },
+    "children": []
+  }
+}

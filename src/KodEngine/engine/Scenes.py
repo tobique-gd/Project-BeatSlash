@@ -1,5 +1,6 @@
 from . import ErrorHandler
 
+#scenes store a collection of nodes
 class Scene:
     def __init__(self, name, root, path=None):
         self.name = name

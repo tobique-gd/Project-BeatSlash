@@ -1,11 +1,13 @@
 from . import Nodes
 
+#render works by sorting nodes by z-index and rendnering them 
 class Renderer:
     def __init__(self, _configuration, _pygame, _screen) -> None:
         self.configuration = _configuration
         self.pygame = _pygame
         self.screen = _screen
 
+    #TODO: precompute nodes into buckets and pass the buckets to each server (Rendering, Physics) so that we dont loop through everything every frame.
     def render_frame(self, scene, _camera):
         self.camera = _camera
         self.screen.fill(self.configuration.editor_settings["default_background_color"])
@@ -19,9 +21,12 @@ class Renderer:
         
         self.pygame.display.flip()
 
+    #rendering accounts for camera transformation and offset
+    
     def render_node(self, node):
+        #only render nodes that inherit from Sprite2D
         if isinstance(node, Nodes.Sprite2D):
-            tex = node.texture
+            tex = node.image
             if tex is None:
                 return
 
@@ -31,8 +36,8 @@ class Renderer:
             )
 
             camera_offset_centered = (
-                camera_offset_node_position[0] + self.configuration.window_settings["internal_viewport_resolution"][0] / 2.0,
-                camera_offset_node_position[1] + self.configuration.window_settings["internal_viewport_resolution"][1] / 2.0
+                camera_offset_node_position[0] + self.configuration.project_settings["window"]["internal_viewport_resolution"][0] / 2.0,
+                camera_offset_node_position[1] + self.configuration.project_settings["window"]["internal_viewport_resolution"][1] / 2.0
             )
 
             tex_width, tex_height = tex.get_size()

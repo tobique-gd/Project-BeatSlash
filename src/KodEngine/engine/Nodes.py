@@ -1,7 +1,8 @@
 from .NodeComponents import SpriteAnimation
-
+from . import Resources
 import pygame
 import os
+
 
 class Node:
     def __init__(self) -> None:
@@ -53,9 +54,8 @@ class Node:
         return current_node
 
     def set_script(self, module_name: str):
-        from . import Scripts
         self.script = module_name
-        self.runtime_script = Scripts.load_script(module_name, self)
+        self.runtime_script = Resources.load_script(module_name, self)
 
     
     def _update(self, _delta):
@@ -95,48 +95,74 @@ class Node2D(Node):
 class CollisionShape2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
-        self.rect = ((0,0), (16,16))
+        from .Resources import CollisionRectangleShape
+        # Initialize with a unique default shape
+        self._shape = CollisionRectangleShape(size=(32, 32))
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @shape.setter
+    def shape(self, value):
+        from .ResourceServer import ResourceLoader
+        from .Resources import CollisionShape
+        
+        if isinstance(value, CollisionShape):
+            self._shape = value
+        elif isinstance(value, str):
+            # Try to load as resource
+            try:
+                res = ResourceLoader.load(value)
+                if isinstance(res, CollisionShape):
+                    self._shape = res
+            except Exception:
+                pass
+        # If it's none or invalid, we keep previous or set default? 
+        # For now let's allow setting it if valid.
+
 
 class Sprite2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
 
         self.flip_h, self.flip_v = False, False
-        self._image :  pygame.Surface | None = None
-        self.texture_path: str | None = None
+        self._texture_resource = None
         self.position = (0,0)
         self.offset = (0,0)
-
-
+    
     @property
     def texture(self):
-        if self._image is None:
-            return None
-        return pygame.transform.flip(self._image, self.flip_h, self.flip_v)
-    
-    @texture.setter
-    def texture(self, _texture) -> None:
-        if isinstance(_texture, str):
-            try:
-                self.texture_path = os.path.abspath(str(_texture))
-            except Exception:
-                self.texture_path = _texture
+        return self._texture_resource
 
-            try:
-                self._image = pygame.image.load(str(_texture)).convert_alpha()
-            except Exception:
-                self._image = None
+    @texture.setter
+    def texture(self, value):
+        from .Resources import TextureResource
+
+        if isinstance(value, TextureResource):
+            self._texture_resource = value
+        elif isinstance(value, str):
+             from .ResourceServer import ResourceLoader
+             try:
+                 res = ResourceLoader.load(value)
+                 if isinstance(res, TextureResource):
+                     self._texture_resource = res
+                 else:
+                     self._texture_resource = TextureResource(resource_path=value)
+             except Exception:
+                 self._texture_resource = None
         else:
-            self._image = _texture
+             self._texture_resource = None
+
+    @property
+    def image(self):
+         if self._texture_resource:
+             surf = self._texture_resource.get_texture()
+             if surf:
+                return pygame.transform.flip(surf, self.flip_h, self.flip_v)
+         return None
 
     def _on_enter(self):
-        if self._image is None and getattr(self, "texture_path", None):
-            try:
-                self.texture = self.texture_path
-            except Exception:
-                pass
-
-
         for child in getattr(self, "_children", []):
             try:
                 child._on_enter()
@@ -150,7 +176,6 @@ class Sprite2D(Node2D):
             except Exception:
                 pass
 
-        
 
 class AnimatedSprite2D(Sprite2D):
     def __init__(self):
@@ -183,7 +208,7 @@ class AnimatedSprite2D(Sprite2D):
             self.current_animation.update(delta)
 
     @property
-    def texture(self):
+    def image(self):
         if self.current_animation:
             return pygame.transform.flip(self.current_animation.frames_surfaces[self.current_animation.current_frame], self.flip_h, self.flip_v)
         return None
@@ -192,9 +217,25 @@ class TileMap2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
 
-class CharacterBody2D(Node2D):
+
+
+
+class StaticBody2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
+        self.collision_shape : CollisionShape2D | None = None
+
+class DynamicBody2D(Node2D):
+    def __init__(self) -> None:
+        super().__init__()
+        self.velocity = (0, 0)
+        self.collision_shape : CollisionShape2D | None = None
+
+class KinematicBody2D(Node2D):
+    def __init__(self) -> None:
+        super().__init__()
+        self.velocity = (0, 0)
+        self.collision_shape : CollisionShape2D | None = None
 
 class Camera2D(Node2D):
     def __init__(self) -> None:
@@ -206,13 +247,14 @@ class Camera2D(Node2D):
 class AudioPlayer(Node):
     def __init__(self) -> None:
         super().__init__()
-        self._audio = None
+        self._audio_resource = None
         self._volume = 1.0
-        self.audio_path: str | None = None
 
     def play(self):
-        if self._audio:
-            self._audio.play()
+        if self._audio_resource:
+            sound = self._audio_resource.get_sound()
+            if sound:
+                sound.play()
 
     @property
     def volume(self):
@@ -221,35 +263,40 @@ class AudioPlayer(Node):
     @volume.setter
     def volume(self, _vol: float):
         self._volume = _vol
-        if self._audio:
-            self._audio.set_volume(_vol)
+        if self._audio_resource:
+            sound = self._audio_resource.get_sound()
+            if sound:
+                sound.set_volume(_vol)
 
     @property
     def audio(self):
-        return self._audio
+        return self._audio_resource
 
     @audio.setter
-    def audio(self, _audio_file):
-        try:
-            self.audio_path = os.path.abspath(_audio_file)
+    def audio(self, value):
+        from .Resources import AudioResource
+        from .ResourceServer import ResourceLoader
 
-        except Exception:
-            self.audio_path = None
+        if isinstance(value, AudioResource):
+            self._audio_resource = value
+        elif isinstance(value, str):
+            try:
+                res = ResourceLoader.load(value)
+                if isinstance(res, AudioResource):
+                    self._audio_resource = res
+                else:
+                    self._audio_resource = AudioResource(file_path=value)
+            except Exception:
+                self._audio_resource = None
+        else:
+            self._audio_resource = None
 
-        try:
-            self._audio = pygame.mixer.Sound(_audio_file)
-            self._audio.set_volume(self._volume)
-
-        except Exception:
-            self._audio = None
+        if self._audio_resource:
+            sound = self._audio_resource.get_sound()
+            if sound:
+                sound.set_volume(self._volume)
 
     def _on_enter(self):
-        if self._audio is None and getattr(self, "audio_path", None):
-            try:
-                self.audio = self.audio_path
-            except Exception:
-                pass
-
         for child in getattr(self, "_children", []):
             try:
                 child._on_enter()
@@ -258,16 +305,11 @@ class AudioPlayer(Node):
 
     def on_exit(self):
         try:
-            if self._audio:
-                try:
-                    self._audio.stop()
-                except Exception:
-                    pass
+            if self._audio_resource:
+                sound = self._audio_resource.get_sound()
+                if sound:
+                    sound.stop()
         except Exception:
             pass
 
-        for child in getattr(self, "_children", []):
-            try:
-                child.on_exit()
-            except Exception:
-                pass
+    

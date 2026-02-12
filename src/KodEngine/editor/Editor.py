@@ -3,41 +3,52 @@ import dearpygui.dearpygui as pygui
 import numpy as np
 import pygame
 import os
-import subprocess
 import sys
-import tempfile
+
+#i need to run this in a dummy environment to eliminate event overlaps between dpg and pygame
+os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 #EDITOR IMPORTS
 from . import ui_components as UIComp
 
 #ENGINE IMPORTS
-from ..engine import Kod, Nodes, Scenes, Scripts, NodeComponents, ResourceManager
+from ..engine import Kod, Nodes, ResourceServer
 from ..engine.ErrorHandler import ErrorHandler
-
-#SCRIPTS TODO: musim predelat protoze to je uplne na picu
 
 class KodEditor:
     def __init__(self):
         ErrorHandler.set_editor_mode(True)
         self.settings = Kod.Settings()
         self.initial_res = (640, 360)
-        self.settings.window_settings["internal_viewport_resolution"] = self.initial_res
+        self.settings.project_settings["window"]["internal_viewport_resolution"] = self.initial_res
+        self.settings.project_settings["file_management"]["project_directory"] = os.path.abspath("src/BeatSlash")
         self.app = Kod.App(self.settings, editor_mode=True)
 
-        current_scene = ResourceManager.SceneLoader.load("src/BeatSlash/scenes/world.kscn")
-        self.current_scene_path = getattr(current_scene, 'path', None)
+        loaded_scene = ResourceServer.SceneLoader.load("src/BeatSlash/scenes/world.kscn")
 
         self.camera = Nodes.Camera2D()
         
-        self.root = getattr(current_scene, "root", None)
-        if self.root is None:
-            self.root = Nodes.Node2D()
-        
         self.app.set_camera(self.camera)
-        self.app.set_scene(current_scene)
+        self.app.set_scene(loaded_scene)
 
         self.width, self.height = self.initial_res
         self.ui = EditorUI(self, self.app)
+    
+    def to_relative_path(self, path_str):
+        if not isinstance(path_str, str):
+            return path_str
+        
+        try:
+            project_directory = self.settings.project_settings["file_management"]["project_directory"]
+        
+            if not path_str or not os.path.isabs(path_str):
+                return path_str
+
+            return os.path.relpath(path_str, project_directory)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to convert to relative path {e}")
+       
+        return path_str
 
     def render_frame(self):
         if not self.app.screen:
@@ -65,7 +76,9 @@ class KodEditor:
             if not self.app.running:
                 self.ui.check_resize()
             
-            self._update_node(self.root, delta)
+            root = getattr(self.app.current_scene, "root", None)
+            if root:
+                self._update_node(root, delta)
             
             if self.app.current_scene:
                 nodes_were_deleted = self.app.current_scene._process_deletion_queue()
@@ -82,9 +95,12 @@ class KodEditor:
         pygui.destroy_context()
     
     def get_scene_hierarchy(self):
+        root = getattr(self.app.current_scene, "root", None)
+        if root is None:
+            return {}
         def build(node):
             return {child: build(child) for child in getattr(node, "_children", [])}
-        return {self.root: build(self.root)}
+        return {root: build(root)}
 
 
     def update_viewport_size(self, new_width, new_height):
@@ -96,7 +112,7 @@ class KodEditor:
         self.width, self.height = new_width, new_height
         
         self.app.internal_resolution = (self.width, self.height)
-        self.settings.window_settings["internal_viewport_resolution"] = (self.width, self.height)
+        self.settings.project_settings["window"]["internal_viewport_resolution"] = (self.width, self.height)
 
         new_surface = pygame.Surface((self.width, self.height)).convert_alpha()
         self.app.internal_surface = new_surface
@@ -116,42 +132,47 @@ class KodEditor:
             self._update_node(child, delta)
     
 
-    def _save_scene(self, scene=None, scene_path=None):
+    def save_scene(self, scene=None, scene_path=None):
         if scene is None:
             scene = self.app.current_scene
         if scene_path is None:
-            scene_path = getattr(scene, 'path', self.current_scene_path) if scene else self.current_scene_path
-    
-        if ResourceManager.SceneLoader.save(scene, scene_path):
-            self.current_scene_path = scene_path
-            ErrorHandler.throw_success(f"Scene saved to {scene_path}!")
-        else:
-            ErrorHandler.throw_error(f"Failed to save scene to {scene_path}")
+            scene_path = getattr(scene, 'path', None) if scene else None
+        
+        try:
+            ResourceServer.SceneLoader.save(scene, scene_path)
 
-    def _load_scene(self, scene_path=None):
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to save scene to {scene_path}, {e}")
+        
+    def load_scene(self, scene_path):
         if scene_path is None:
-            scene_path = self.current_scene_path
-        result = ResourceManager.SceneLoader.load(scene_path)
-        if result:
-            self.app.set_scene(result)
-            self.current_scene_path = getattr(result, 'path', scene_path)
-            ErrorHandler.throw_success(f"Scene loaded from {scene_path}!")
+            ErrorHandler.throw_error(f"Failed to load scene from None")
+        
+        try:
+            new_scene = ResourceServer.SceneLoader.load(scene_path)
+            self.app.set_scene(new_scene)
+            self.ui.state.selected_node = None
+            self.ui.inspector.clear()
             self.ui._update_hierarchy()
-        else:
-            ErrorHandler.throw_error(f"Failed to load scene from {scene_path}")
+            self.ui.menubar.update()
+        
+        except Exception as e: 
+            ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
+        
 
-    def _run_scene(self, scene_path=None):
+
+    def run_scene(self, scene_path=None):
         #this needs to run in a subprocess to avoid freezing the editor
         try:
             if scene_path is None:
-                scene_path = getattr(self.app.current_scene, 'path', self.current_scene_path) if self.app.current_scene else self.current_scene_path
+                scene_path = getattr(self.app.current_scene, 'path', None)
     
             if scene_path is None:
                 ErrorHandler.throw_error("No scene path available to run")
                 return
 
             scene_path = os.path.abspath(scene_path)
-            if not ResourceManager.SceneLoader.save(self.app.current_scene, scene_path):
+            if not ResourceServer.SceneLoader.save(self.app.current_scene, scene_path):
                 ErrorHandler.throw_error(f"Failed to save scene before running: {scene_path}")
                 return
             
@@ -159,6 +180,10 @@ class KodEditor:
             import subprocess
             editor_file = os.path.abspath(__file__)
             src_root = os.path.dirname(os.path.dirname(os.path.dirname(editor_file)))
+
+            env = os.environ.copy()
+            if "SDL_VIDEODRIVER" in env:
+                del env["SDL_VIDEODRIVER"]
 
             subprocess.run(
                 [
@@ -169,11 +194,15 @@ class KodEditor:
                     scene_path,
                 ],
                 cwd=src_root,
+                env=env,
             )
             ErrorHandler.throw_success("Scene finished running")
             
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to run scene: {e}")
+
+    def drag_file(self):
+        pass
 
 class UIState:
     def __init__(self):
@@ -191,6 +220,7 @@ class EditorUI:
         self.console = UIComp.ConsolePanel(self)
         self.dialogs = UIComp.NodeDialogs(self)
         self.menubar = UIComp.MenuBar(self)
+        self.file_system = UIComp.FileSystem(self)
         
 
         pygui.create_context()
@@ -229,7 +259,18 @@ class EditorUI:
                             pygui.add_image("engine_texture", tag="viewport_image")
 
                         with pygui.child_window(border=True, height=-1):
-                            self.console.build()
+                            with pygui.tab_bar(tag="bottom_dock_tabs"):
+                                with pygui.tab(label="Console"):
+                                    self.console.build()
+                                
+                                with pygui.tab(label="File System"):
+                                    pygui.add_text("File System", color=(150, 150, 150))
+                                    pygui.add_separator()
+                                    with pygui.child_window(border=False, tag="file_system_tree"):
+                                        self.file_system.build()
+                                    
+                                    with pygui.handler_registry():
+                                        pygui.add_mouse_click_handler(button=pygui.mvMouseButton_Right, callback=self._file_system_right_click)
 
                     with pygui.child_window(border=True, tag="inspector_panel"):
                         self.inspector.build()
@@ -251,6 +292,14 @@ class EditorUI:
 
     def _clear_inspector(self):
         self.inspector.clear()
+    
+    def _file_system_right_click(self, sender, app_data):
+        if pygui.is_item_hovered("file_system_tree"):
+            self.file_system._show_context_menu()
+    
+    # TODO: Implement file opening logic
+    def _open_file(self, file_path):
+        pass
     
     def _handle_console_message(self, msg_type: str, message: str):
         if hasattr(self, 'console'):

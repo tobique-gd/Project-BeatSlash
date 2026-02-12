@@ -1,13 +1,15 @@
 import pygame
 from . import ErrorHandler
+from .Resources import Resource
 
-class SpriteAnimation:
-
-    def __init__(self, name, spritesheet, frame_size: tuple[int,int], frames: int, _loop: bool, fps: int = 12):
+#sprite animation is a resource that manages animations in the AnimatedSprite2D
+#it precomputes all surfaces and stores them in an array for fast O(1) look up when looping through the animation
+class SpriteAnimation(Resource):
+    def __init__(self, name, spritesheet, frame_size: tuple[int,int], frames: int, _loop: bool, fps: int = 12, resource_path: str | None = None):
+        super().__init__(name=name, resource_path=resource_path)
         self.frames_surfaces = []
         self.frames_local_rects = []
 
-        self.name = name
         self.spritesheet_path = None
 
         if isinstance(spritesheet, str):
@@ -44,6 +46,17 @@ class SpriteAnimation:
         self.time_accumulator = 0.0
         self.loop = _loop
         self.finished = False
+
+    def to_dict(self):
+        data = super().to_dict()
+        data.update({
+            "spritesheet_path": self.spritesheet_path,
+            "frame_size": self.frame_size,
+            "frames": self.frames,
+            "fps": self.fps,
+            "loop": self.loop
+        })
+        return data
 
     def reload(self):
         if not self.frames_surfaces and self.spritesheet_path:
