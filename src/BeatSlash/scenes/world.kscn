@@ -16,7 +16,39 @@
     },
     "children": [
       {
-        "type": "CharacterBody2D",
+        "type": "AudioPlayer",
+        "properties": {
+          "name": "AudioPlayer",
+          "audio": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/audio/IMissYou.mp3",
+          "script": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/scripts/audio_player.py"
+        },
+        "children": []
+      },
+      {
+        "type": "Sprite2D",
+        "properties": {
+          "name": "Bg",
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0
+          ],
+          "z_index": -1.0,
+          "flip_h": false,
+          "flip_v": false,
+          "offset": [
+            0,
+            0
+          ],
+          "texture": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/dmimage.png"
+        },
+        "children": []
+      },
+      {
+        "type": "KinematicBody2D",
         "properties": {
           "name": "Player",
           "position": [
@@ -28,6 +60,10 @@
             0
           ],
           "z_index": 0,
+          "velocity": [
+            0,
+            0
+          ],
           "script": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/scripts/player.py"
         },
         "children": [
@@ -97,9 +133,9 @@
                 }
               ],
               "current_animation": {
-                "name": "Run_Front",
-                "current_frame": 7,
-                "time_accumulator": 0.037333333333339186
+                "name": "Idle_Front",
+                "current_frame": 3,
+                "time_accumulator": 0.004999999999999949
               }
             },
             "children": []
@@ -109,8 +145,8 @@
             "properties": {
               "name": "Camera2D",
               "position": [
-                0,
-                0
+                100.0,
+                0.0
               ],
               "rotation": [
                 0,
@@ -124,40 +160,24 @@
               "current": true
             },
             "children": []
+          },
+          {
+            "type": "CollisionShape2D",
+            "properties": {
+              "name": "Collision",
+              "position": [
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0
+              ],
+              "z_index": 0
+            },
+            "children": []
           }
         ]
-      },
-      {
-        "type": "AudioPlayer",
-        "properties": {
-          "name": "AudioPlayer",
-          "audio_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/audio/Aftermath.mp3",
-          "script": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/scripts/audio_player.py"
-        },
-        "children": []
-      },
-      {
-        "type": "Sprite2D",
-        "properties": {
-          "name": "Bg",
-          "position": [
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0
-          ],
-          "z_index": -1.0,
-          "flip_h": false,
-          "flip_v": false,
-          "texture_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/dmimage.png",
-          "offset": [
-            0,
-            0
-          ]
-        },
-        "children": []
       }
     ]
   }

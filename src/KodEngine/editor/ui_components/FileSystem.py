@@ -1,9 +1,9 @@
 import dearpygui.dearpygui as pygui
-from ...engine import ErrorHandler
+from ...engine import ErrorHandler, ResourceServer
 import os
 import time
 
-from ...engine import ResourceManager, Nodes, Scenes
+from ...engine import Nodes, Scenes
 
 ignored_file_list = ["__init__.py"]
 ignored_directory_list = ["__pycache__"]
@@ -15,7 +15,7 @@ class FileSystem:
         self._double_click_threshold = 0.5
         self._context_menu_path = None
         self._selected_directory = None
-        self._open_directories = set()  # Track which directories are open
+        self._open_directories = set()
     
     def build(self, path=None):
         if path is None:
@@ -28,7 +28,7 @@ class FileSystem:
         if not pygui.does_item_exist("file_system_context_menu"):
             self._create_context_menu()
 
-    #recursive building of file tree
+    #Recursive building of file tree
     def _build_file_tree(self, path=None):
         if path is None:
             path = self.ui.app.configuration.project_settings["file_management"]["project_directory"]
@@ -41,11 +41,11 @@ class FileSystem:
 
                 full_path = os.path.join(path, item)
                 if os.path.isdir(full_path):
-                    # Use stable path-based tags instead of id()
+            
                     tree_tag = f"dir_item_{full_path.replace('/', '_').replace(' ', '_')}"
                     selectable_tag = f"dir_selectable_{full_path.replace('/', '_').replace(' ', '_')}"
                     
-                    # Check if this directory was previously open
+                    
                     was_open = full_path in self._open_directories
                     
                     pygui.add_selectable(
@@ -81,7 +81,7 @@ class FileSystem:
             return
         
         current_time = time.time()
-        # Use file path as key instead of sender which changes on rebuild
+
         last_time = self._last_click_time.get(file_path, 0)
         time_diff = current_time - last_time
         
@@ -292,7 +292,7 @@ def _input(self, events):
             root_node.name = "Root"
             new_scene = Scenes.Scene(name=scene_name, root=root_node)
             
-            if ResourceManager.SceneLoader.save(new_scene, scene_path):
+            if ResourceServer.SceneLoader.save(new_scene, scene_path):
                 ErrorHandler.throw_success(f"Created scene: {scene_name}")
                 self._refresh_file_tree()
                 pygui.delete_item("new_scene_window")

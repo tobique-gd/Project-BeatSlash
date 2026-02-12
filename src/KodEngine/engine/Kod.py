@@ -3,6 +3,7 @@ import pygame
 from . import RenderingServer
 from . import Nodes
 from . import Scenes
+from . import ErrorHandler
 
 
 class Settings:
@@ -15,6 +16,9 @@ class Settings:
             "window" : {
                 "viewport_resolution": (1280, 720),
                 "internal_viewport_resolution": (640, 360)
+            },
+            "physics" : {
+                "physics_substeps" : 4
             }
         }
         
@@ -53,6 +57,7 @@ class App:
         self.fallback_camera = Nodes.Camera2D()
         self.current_camera = None
 
+    #handling resizing of window since pygame doesnt do it automatically
     def handle_resize(self, size):
         self.resolution = size
         self.screen = pygame.display.set_mode(self.resolution, pygame.RESIZABLE, vsync=1)
@@ -72,9 +77,6 @@ class App:
                 self.current_scene.root._on_enter()
             except Exception:
                 pass
-
-        if self.current_scene:
-            self.current_scene._ready()
 
     def set_camera(self, camera: Nodes.Camera2D):
         self.current_camera = camera
@@ -103,8 +105,14 @@ class App:
 
     def run(self):
         if not self.screen:
+            ErrorHandler.throw_error("No screen set. Stopping running.")
             return
         
+        if not self.current_scene:
+            ErrorHandler.throw_error("No scene set. Stopping running.")
+            return
+        
+        self.current_scene._ready()
         self.running = True
         last_frame_time = pygame.time.get_ticks()
 

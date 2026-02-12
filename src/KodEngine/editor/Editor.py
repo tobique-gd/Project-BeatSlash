@@ -5,11 +5,14 @@ import pygame
 import os
 import sys
 
+#i need to run this in a dummy environment to eliminate event overlaps between dpg and pygame
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+
 #EDITOR IMPORTS
 from . import ui_components as UIComp
 
 #ENGINE IMPORTS
-from ..engine import Kod, Nodes, ResourceManager
+from ..engine import Kod, Nodes, ResourceServer
 from ..engine.ErrorHandler import ErrorHandler
 
 class KodEditor:
@@ -21,7 +24,7 @@ class KodEditor:
         self.settings.project_settings["file_management"]["project_directory"] = os.path.abspath("src/BeatSlash")
         self.app = Kod.App(self.settings, editor_mode=True)
 
-        loaded_scene = ResourceManager.SceneLoader.load("src/BeatSlash/scenes/world.kscn")
+        loaded_scene = ResourceServer.SceneLoader.load("src/BeatSlash/scenes/world.kscn")
 
         self.camera = Nodes.Camera2D()
         
@@ -30,6 +33,22 @@ class KodEditor:
 
         self.width, self.height = self.initial_res
         self.ui = EditorUI(self, self.app)
+    
+    def to_relative_path(self, path_str):
+        if not isinstance(path_str, str):
+            return path_str
+        
+        try:
+            project_directory = self.settings.project_settings["file_management"]["project_directory"]
+        
+            if not path_str or not os.path.isabs(path_str):
+                return path_str
+
+            return os.path.relpath(path_str, project_directory)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to convert to relative path {e}")
+       
+        return path_str
 
     def render_frame(self):
         if not self.app.screen:
@@ -118,20 +137,29 @@ class KodEditor:
             scene = self.app.current_scene
         if scene_path is None:
             scene_path = getattr(scene, 'path', None) if scene else None
-    
-        if scene_path and ResourceManager.SceneLoader.save(scene, scene_path):
-            ErrorHandler.throw_success(f"Scene saved to {scene_path}!")
-        else:
-            ErrorHandler.throw_error(f"Failed to save scene to {scene_path}")
+        
+        try:
+            ResourceServer.SceneLoader.save(scene, scene_path)
 
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to save scene to {scene_path}, {e}")
+        
     def load_scene(self, scene_path):
-        result = ResourceManager.SceneLoader.load(scene_path)
-        if result:
-            self.app.set_scene(result)
-            ErrorHandler.throw_success(f"Scene loaded from {scene_path}!")
+        if scene_path is None:
+            ErrorHandler.throw_error(f"Failed to load scene from None")
+        
+        try:
+            new_scene = ResourceServer.SceneLoader.load(scene_path)
+            self.app.set_scene(new_scene)
+            self.ui.state.selected_node = None
+            self.ui.inspector.clear()
             self.ui._update_hierarchy()
-        else:
-            ErrorHandler.throw_error(f"Failed to load scene from {scene_path}")
+            self.ui.menubar.update()
+        
+        except Exception as e: 
+            ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
+        
+
 
     def run_scene(self, scene_path=None):
         #this needs to run in a subprocess to avoid freezing the editor
@@ -144,7 +172,7 @@ class KodEditor:
                 return
 
             scene_path = os.path.abspath(scene_path)
-            if not ResourceManager.SceneLoader.save(self.app.current_scene, scene_path):
+            if not ResourceServer.SceneLoader.save(self.app.current_scene, scene_path):
                 ErrorHandler.throw_error(f"Failed to save scene before running: {scene_path}")
                 return
             
@@ -152,6 +180,10 @@ class KodEditor:
             import subprocess
             editor_file = os.path.abspath(__file__)
             src_root = os.path.dirname(os.path.dirname(os.path.dirname(editor_file)))
+
+            env = os.environ.copy()
+            if "SDL_VIDEODRIVER" in env:
+                del env["SDL_VIDEODRIVER"]
 
             subprocess.run(
                 [
@@ -162,6 +194,7 @@ class KodEditor:
                     scene_path,
                 ],
                 cwd=src_root,
+                env=env,
             )
             ErrorHandler.throw_success("Scene finished running")
             
@@ -236,7 +269,6 @@ class EditorUI:
                                     with pygui.child_window(border=False, tag="file_system_tree"):
                                         self.file_system.build()
                                     
-                                    # Add right-click handler for file system
                                     with pygui.handler_registry():
                                         pygui.add_mouse_click_handler(button=pygui.mvMouseButton_Right, callback=self._file_system_right_click)
 
@@ -262,8 +294,6 @@ class EditorUI:
         self.inspector.clear()
     
     def _file_system_right_click(self, sender, app_data):
-        """Handle right-click in file system"""
-        # Check if mouse is over the file system tree
         if pygui.is_item_hovered("file_system_tree"):
             self.file_system._show_context_menu()
     

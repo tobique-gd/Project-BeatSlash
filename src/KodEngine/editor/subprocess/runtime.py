@@ -2,6 +2,8 @@ import argparse
 import os
 import sys
 
+from KodEngine.engine import ResourceServer
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -13,7 +15,7 @@ def main():
     if src_root not in sys.path:
         sys.path.insert(0, src_root)
 
-    from KodEngine.engine import Kod, ResourceManager
+    from KodEngine.engine import Kod
 
     scene_path = args.scene
     if not os.path.isabs(scene_path):
@@ -22,7 +24,7 @@ def main():
     try:
         settings = Kod.Settings()
         app = Kod.App(settings, editor_mode=False)
-        scene = ResourceManager.SceneLoader.load(scene_path)
+        scene = ResourceServer.SceneLoader.load(scene_path)
         if scene:
             app.set_scene(scene)
             app.run()

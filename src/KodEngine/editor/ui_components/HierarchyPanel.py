@@ -41,12 +41,17 @@ class HierarchyPanel:
         kwargs = {
             "label": node.name,
             "tag": tag,
-            "callback": self.on_node_selected
+            "callback": self.on_node_selected,
+            "user_data": node,
+            "drag_callback": self._on_node_drag
         }
         if _parent is not None:
             kwargs["parent"] = _parent
 
         pygui.add_selectable(**kwargs)
+        
+        with pygui.drag_payload(parent=tag, drag_data=tag, payload_type="collision_shape_payload"):
+            pygui.add_text(f"Drag {node.name}")
 
     def on_node_selected(self, sender, app_data):
         node = self.ui.state.selectables[sender]
@@ -62,6 +67,9 @@ class HierarchyPanel:
         
         if pygui.does_item_exist("add_node_btn"):
             pygui.configure_item("add_node_btn", enabled=True)
+
+    def _on_node_drag(self, sender, app_data, user_data):
+        pass
 
     def update_hierarchy(self):
         if pygui.does_item_exist("hierarchy_tree"):
