@@ -134,8 +134,8 @@
               ],
               "current_animation": {
                 "name": "Idle_Front",
-                "current_frame": 3,
-                "time_accumulator": 0.004999999999999949
+                "current_frame": 2,
+                "time_accumulator": 0.20600000000000285
               }
             },
             "children": []
@@ -145,7 +145,7 @@
             "properties": {
               "name": "Camera2D",
               "position": [
-                100.0,
+                0.0,
                 0.0
               ],
               "rotation": [
