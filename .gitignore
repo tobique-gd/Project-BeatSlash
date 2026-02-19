@@ -1,4 +1,12 @@
 *.blend
 *.blend1
 *.pyc
+
+.venv/
+venv/
+__pycache__/
+*.egg-info/
+build/
+dist/
+
 ArtAss/

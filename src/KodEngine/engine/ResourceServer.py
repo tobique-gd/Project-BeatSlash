@@ -7,9 +7,24 @@ from .ErrorHandler import ErrorHandler
 #might need to redo this to be extendable easily and i wont have to manually define acceptable formats its just a little hacky
 class ResourceLoader:
     _cache = {}
+    _project_root = None
+
+    @staticmethod
+    def set_project_root(path: str):
+        ResourceLoader._project_root = os.path.abspath(path)
+
+    @staticmethod
+    def resolve_path(path: str):
+        # Helper to resolve path without loading
+        if not os.path.isabs(path) and ResourceLoader._project_root:
+             potential_path = os.path.join(ResourceLoader._project_root, path)
+             if os.path.exists(potential_path):
+                 return potential_path
+        return path
 
     @staticmethod
     def load(path: str):
+        path = ResourceLoader.resolve_path(path)
         path = os.path.abspath(path)
         if path in ResourceLoader._cache:
             return ResourceLoader._cache[path]
@@ -138,7 +153,9 @@ class SceneLoader:
                 spritesheet_path = anim_meta.get("spritesheet_path")
 
                 if spritesheet_path:
-                    anim = NC.SpriteAnimation(name, spritesheet_path, frame_size, frames, loop, fps)
+                    # Resolve path using ResourceLoader settings
+                    resolved_path = ResourceLoader.resolve_path(spritesheet_path)
+                    anim = NC.SpriteAnimation(name, resolved_path, frame_size, frames, loop, fps)
                     node.add_animation(anim)
             except Exception as e:
                 SceneLoader._warn(f"Failed to create animation '{anim_meta.get('name', 'unknown')}': {e}")

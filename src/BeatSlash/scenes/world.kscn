@@ -19,8 +19,8 @@
         "type": "AudioPlayer",
         "properties": {
           "name": "AudioPlayer",
-          "audio": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/audio/IMissYou.mp3",
-          "script": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/scripts/audio_player.py"
+          "audio": "assets/audio/IMissYou.mp3",
+          "script": "scripts/audio_player.py"
         },
         "children": []
       },
@@ -43,7 +43,7 @@
             0,
             0
           ],
-          "texture": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/dmimage.png"
+          "texture": "assets/textures/dmimage.png"
         },
         "children": []
       },
@@ -64,7 +64,7 @@
             0,
             0
           ],
-          "script": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/scripts/player.py"
+          "script": "scripts/player.py"
         },
         "children": [
           {
@@ -96,7 +96,7 @@
                   "frames": 4,
                   "fps": 4,
                   "loop": true,
-                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/idle_front.png"
+                  "spritesheet_path": "assets/textures/spritesheets/player/idle_front.png"
                 },
                 {
                   "name": "Idle_Back",
@@ -107,7 +107,7 @@
                   "frames": 4,
                   "fps": 4,
                   "loop": true,
-                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/idle_back.png"
+                  "spritesheet_path": "assets/textures/spritesheets/player/idle_back.png"
                 },
                 {
                   "name": "Idle_Side",
@@ -118,7 +118,7 @@
                   "frames": 4,
                   "fps": 4,
                   "loop": true,
-                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/idle_side.png"
+                  "spritesheet_path": "assets/textures/spritesheets/player/idle_side.png"
                 },
                 {
                   "name": "Run_Front",
@@ -129,7 +129,8 @@
                   "frames": 8,
                   "fps": 12,
                   "loop": true,
-                  "spritesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/player/run_front.png"
+                  "spritesheet_path": "assets/textures/spritesheets/player/run_front.png"
+
                 }
               ],
               "current_animation": {

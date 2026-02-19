@@ -21,10 +21,21 @@ class KodEditor:
         self.settings = Kod.Settings()
         self.initial_res = (640, 360)
         self.settings.project_settings["window"]["internal_viewport_resolution"] = self.initial_res
-        self.settings.project_settings["file_management"]["project_directory"] = os.path.abspath("src/BeatSlash")
+        
+    
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        potential_path = os.path.abspath(os.path.join(current_dir, "..", "..", "BeatSlash"))
+        if os.path.exists(potential_path):
+            project_dir = potential_path
+            sys.path.append(os.path.dirname(potential_path))
+    
+        self.settings.project_settings["file_management"]["project_directory"] = project_dir
+        
+        ResourceServer.ResourceLoader.set_project_root(project_dir)
         self.app = Kod.App(self.settings, editor_mode=True)
 
-        loaded_scene = ResourceServer.SceneLoader.load("src/BeatSlash/scenes/world.kscn")
+        scene_path = os.path.join(project_dir, "scenes", "world.kscn")
+        loaded_scene = ResourceServer.SceneLoader.load(scene_path)
 
         self.camera = Nodes.Camera2D()
         

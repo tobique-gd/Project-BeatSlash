@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Project-BeatSlash"
+version = "0.2.0"
+description = "Herní engine KodEngine a projekt BeatSlash"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Tobias Zilvar", email = "zilvato24@sps-prosek.cz"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "dearpygui",
+    "pygame",
+    "numpy",
+]
+
+[project.urls]
+Homepage = "https://github.com/tobique-gd/Project-BeatSlash"
+Issues = "https://github.com/tobique-gd/Project-BeatSlash/issues"
+
+
+[project.scripts]
+kod-editor = "KodEngine.editor.Editor:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.kscn", "*.png", "*.jpg", "*.jpeg", "*.mp3", "*.wav", "*.ogg", "*.json"]
+"BeatSlash" = ["assets/**/*", "scenes/*"]
+"KodEngine" = ["editor/assets/**/*"]
