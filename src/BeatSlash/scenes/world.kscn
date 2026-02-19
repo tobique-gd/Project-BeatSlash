@@ -130,13 +130,12 @@
                   "fps": 12,
                   "loop": true,
                   "spritesheet_path": "assets/textures/spritesheets/player/run_front.png"
-
                 }
               ],
               "current_animation": {
                 "name": "Idle_Front",
                 "current_frame": 2,
-                "time_accumulator": 0.20600000000000285
+                "time_accumulator": 0.18100000000000016
               }
             },
             "children": []

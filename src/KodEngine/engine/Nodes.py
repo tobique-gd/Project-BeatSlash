@@ -210,7 +210,13 @@ class AnimatedSprite2D(Sprite2D):
     @property
     def image(self):
         if self.current_animation:
-            return pygame.transform.flip(self.current_animation.frames_surfaces[self.current_animation.current_frame], self.flip_h, self.flip_v)
+            frames = getattr(self.current_animation, "frames_surfaces", None)
+            frame_index = getattr(self.current_animation, "current_frame", 0)
+            if not frames:
+                return None
+            if frame_index < 0 or frame_index >= len(frames):
+                return None
+            return pygame.transform.flip(frames[frame_index], self.flip_h, self.flip_v)
         return None
 
 class TileMap2D(Node2D):

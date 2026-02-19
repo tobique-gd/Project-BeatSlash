@@ -202,7 +202,14 @@ def _path_to_module_name(file_path: str) -> tuple[str, str]:
 
 def _load_module_from_path(script_path: str):
     if _is_file_path(script_path):
-        abs_path = os.path.abspath(script_path)
+        resolved_path = script_path
+        try:
+            from .ResourceServer import ResourceLoader
+            resolved_path = ResourceLoader.resolve_path(script_path)
+        except Exception:
+            resolved_path = script_path
+
+        abs_path = os.path.abspath(resolved_path)
         if not os.path.exists(abs_path):
             raise FileNotFoundError(f"Script file not found: {abs_path}")
         

@@ -23,6 +23,10 @@ def main():
 
     try:
         settings = Kod.Settings()
+        scene_dir = os.path.dirname(scene_path)
+        project_dir = os.path.dirname(scene_dir)
+        settings.project_settings["file_management"]["project_directory"] = project_dir
+        ResourceServer.ResourceLoader.set_project_root(project_dir)
         app = Kod.App(settings, editor_mode=False)
         scene = ResourceServer.SceneLoader.load(scene_path)
         if scene:

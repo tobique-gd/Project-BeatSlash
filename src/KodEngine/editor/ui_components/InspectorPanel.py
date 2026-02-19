@@ -325,11 +325,6 @@ class InspectorPanel:
                 return
             
             try:
-                # relative_path = self.ui.editor.to_relative_path(file_path)
-                # Instead of setting relative string, set absolute path so Resource loader works immediately.
-                # If using relative strings in the custom Resource system, the Resource class needs project context.
-                # Since we are using simple path setters in Nodes.py, passing absolute is safer for runtime.
-                # Note: Serialization might need to handle making this relative again if desired.
                 
                 setattr(node, attr, file_path)
                 display_path = self.ui.editor.to_relative_path(file_path)

@@ -63,6 +63,25 @@ class SceneLoader:
     def _error(message: str):
         ErrorHandler.throw_error(message)
 
+    @staticmethod
+    def _to_project_relative(path: str):
+        if not isinstance(path, str) or not path:
+            return path
+
+        project_root = getattr(ResourceLoader, "_project_root", None)
+        if not project_root:
+            return path
+
+        try:
+            abs_path = os.path.abspath(path)
+            root = os.path.abspath(project_root)
+            if os.path.commonpath([abs_path, root]) == root:
+                return os.path.relpath(abs_path, root)
+        except Exception:
+            return path
+
+        return path
+
     #reading scene files (.kscn) that are basically json
     @staticmethod
     def _read_json(file_path):
@@ -303,12 +322,17 @@ class SceneLoader:
         def is_primitive(v):
             return isinstance(v, (str, int, float, bool)) or v is None
 
+        def normalize_path(v):
+            if not isinstance(v, str):
+                return v
+            return SceneLoader._to_project_relative(v)
+
         def serialize_value(v):
             if isinstance(v, Resources.Resource) and v.resource_path:
-                return v.resource_path
+                return normalize_path(v.resource_path)
 
             if is_primitive(v):
-                return v
+                return normalize_path(v)
             if isinstance(v, (list, tuple)):
                 out = []
                 for e in v:
@@ -380,7 +404,7 @@ class SceneLoader:
                                     "frames": getattr(a, "frames", None),
                                     "fps": getattr(a, "fps", None),
                                     "loop": getattr(a, "loop", None),
-                                    "spritesheet_path": getattr(a, "spritesheet_path", None),
+                                    "spritesheet_path": normalize_path(getattr(a, "spritesheet_path", None)),
                                 })
                             except Exception as e:
                                 SceneLoader._warn(f"Failed to serialize animation '{getattr(a, 'name', 'unknown')}': {e}")
@@ -395,12 +419,12 @@ class SceneLoader:
                 if hasattr(node, "texture"):
                      tex = getattr(node, "texture", None)
                      if isinstance(tex, Resources.Resource) and tex.resource_path:
-                         node_dict["properties"]["texture"] = tex.resource_path
+                         node_dict["properties"]["texture"] = normalize_path(tex.resource_path)
                 
                 if hasattr(node, "audio"):
                      aud = getattr(node, "audio", None)
                      if isinstance(aud, Resources.Resource) and aud.resource_path:
-                         node_dict["properties"]["audio"] = aud.resource_path
+                         node_dict["properties"]["audio"] = normalize_path(aud.resource_path)
                         
             except Exception as e:
                 SceneLoader._warn(f"Failed to serialize specific resource properties: {e}")
@@ -412,7 +436,7 @@ class SceneLoader:
                 elif getattr(node, "runtime_script", None) is not None:
                     script_name = Resources.get_script_path(node.runtime_script)
                 if script_name:
-                    node_dict["properties"]["script"] = script_name
+                    node_dict["properties"]["script"] = normalize_path(script_name)
             except Exception as e:
                 SceneLoader._warn(f"Failed to serialize script: {e}")
 
