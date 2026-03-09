@@ -1,6 +1,6 @@
 import json
 import os
-from . import (Nodes, NodeComponents, Scenes, Resources)
+from . import (Nodes, Scenes, Resources)
 from .ErrorHandler import ErrorHandler
 
 #ResourceLoader handles caching, loading and saving resources liek audio, textures
@@ -15,7 +15,6 @@ class ResourceLoader:
 
     @staticmethod
     def resolve_path(path: str):
-        # Helper to resolve path without loading
         if not os.path.isabs(path) and ResourceLoader._project_root:
              potential_path = os.path.join(ResourceLoader._project_root, path)
              if os.path.exists(potential_path):
@@ -144,20 +143,11 @@ class SceneLoader:
 
     @staticmethod
     def _apply_animations(node, animations_meta):
-        try:
-            from . import NodeComponents as NC
-        except Exception as e:
-            SceneLoader._warn(f"Failed to import NodeComponents for animations: {e}")
-            return
-
-        if not (NC and isinstance(animations_meta, (list, tuple)) and hasattr(node, "add_animation")):
-            return
-
         for anim_meta in animations_meta:
             if isinstance(anim_meta, str):
                 try:
                     res = ResourceLoader.load(anim_meta)
-                    if res and isinstance(res, NC.SpriteAnimation):
+                    if res and isinstance(res, Resources.SpriteAnimationResource):
                         node.add_animation(res)
                 except Exception as e:
                     SceneLoader._warn(f"Failed to load animation resource '{anim_meta}': {e}")
@@ -172,9 +162,8 @@ class SceneLoader:
                 spritesheet_path = anim_meta.get("spritesheet_path")
 
                 if spritesheet_path:
-                    # Resolve path using ResourceLoader settings
                     resolved_path = ResourceLoader.resolve_path(spritesheet_path)
-                    anim = NC.SpriteAnimation(name, resolved_path, frame_size, frames, loop, fps)
+                    anim = Resources.SpriteAnimationResource(name, resolved_path, frame_size, frames, loop, fps)
                     node.add_animation(anim)
             except Exception as e:
                 SceneLoader._warn(f"Failed to create animation '{anim_meta.get('name', 'unknown')}': {e}")
@@ -230,10 +219,7 @@ class SceneLoader:
                 t = val["__type__"]
                 if t == "CollisionRectangleShape":
                     return Resources.CollisionRectangleShape(size=tuple(val.get("size", (0,0))))
-                if t == "CollisionCircleShape":
-                    return Resources.CollisionCircleShape(radius=val.get("radius", 0))
-                if t == "CollisionPolygonShape":
-                    return Resources.CollisionPolygonShape(points=val.get("points", []))
+                
             return val
 
 
@@ -304,7 +290,7 @@ class SceneLoader:
                     except Exception as e2:
                         SceneLoader._error(f"Failed to add child node '{child_data.get('type', 'unknown')}': {e2}")
 
-            if script_name:
+            if script_name and getattr(node, "runtime_script", None) is None:
                 try:
                     node.runtime_script = Resources.load_script(script_name, node)
                 except Exception as e:
@@ -351,10 +337,7 @@ class SceneLoader:
             try:
                 if isinstance(v, Resources.CollisionRectangleShape):
                     return {"__type__": "CollisionRectangleShape", "size": list(v.size)}
-                if isinstance(v, Resources.CollisionCircleShape):
-                    return {"__type__": "CollisionCircleShape", "radius": v.radius}
-                if isinstance(v, Resources.CollisionPolygonShape):
-                    return {"__type__": "CollisionPolygonShape", "points": list(v.points)}
+            
             except Exception:
                 pass
 
@@ -431,7 +414,9 @@ class SceneLoader:
 
             try:
                 script_name = None
-                if hasattr(node, "script") and isinstance(node.script, str):
+                if hasattr(node, "script") and isinstance(node.script, Resources.ScriptResource):
+                    script_name = node.script.resource_path or node.script.script_path
+                elif hasattr(node, "script") and isinstance(node.script, str):
                     script_name = node.script
                 elif getattr(node, "runtime_script", None) is not None:
                     script_name = Resources.get_script_path(node.runtime_script)

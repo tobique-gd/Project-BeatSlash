@@ -38,7 +38,7 @@ class NodeDialogs:
         if not self.ui.state.selected_node:
             return
         
-        if self.ui.state.selected_node == self.ui.editor.root:
+        if self.ui.state.selected_node == self.ui.editor.app.current_scene.root:
             ErrorHandler.throw_warning("Cannot delete root node")
             if pygui.does_item_exist("delete_node_window"):
                 pygui.delete_item("delete_node_window")

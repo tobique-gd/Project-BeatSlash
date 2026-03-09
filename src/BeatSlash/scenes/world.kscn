@@ -134,8 +134,8 @@
               ],
               "current_animation": {
                 "name": "Idle_Front",
-                "current_frame": 2,
-                "time_accumulator": 0.18100000000000016
+                "current_frame": 3,
+                "time_accumulator": 0.12000000000000817
               }
             },
             "children": []
@@ -162,9 +162,9 @@
             "children": []
           },
           {
-            "type": "CollisionShape2D",
+            "type": "RectangleCollisionShape2D",
             "properties": {
-              "name": "Collision",
+              "name": "RectangleCollisionShape2D",
               "position": [
                 0,
                 0

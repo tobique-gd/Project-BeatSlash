@@ -1,4 +1,3 @@
-from .NodeComponents import SpriteAnimation
 from . import Resources
 import pygame
 import os
@@ -9,8 +8,9 @@ class Node:
         self.name = self.__class__.__name__
         self._children = []
         self._parent: 'Node | None' = None
-        self.script: str | None = None
+        self._script_resource = None
         self.runtime_script: object | None = None
+        self.script = None
         self._queued_for_deletion = False
 
     def _on_enter(self):
@@ -55,7 +55,33 @@ class Node:
 
     def set_script(self, module_name: str):
         self.script = module_name
-        self.runtime_script = Resources.load_script(module_name, self)
+
+    @property
+    def script(self):
+        return self._script_resource
+
+    @script.setter
+    def script(self, value):
+        if isinstance(value, Resources.ScriptResource):
+            self._script_resource = value
+        elif isinstance(value, str):
+            self._script_resource = Resources.ScriptResource(script_path=value)
+        elif value is None:
+            self._script_resource = None
+        else:
+            self._script_resource = None
+
+        script_path = None
+        if self._script_resource is not None:
+            script_path = self._script_resource.resource_path or self._script_resource.script_path
+
+        if script_path:
+            try:
+                self.runtime_script = Resources.load_script(script_path, self)
+            except Exception:
+                self.runtime_script = None
+        else:
+            self.runtime_script = None
 
     
     def _update(self, _delta):
@@ -95,31 +121,12 @@ class Node2D(Node):
 class CollisionShape2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
-        from .Resources import CollisionRectangleShape
-        # Initialize with a unique default shape
-        self._shape = CollisionRectangleShape(size=(32, 32))
 
-    @property
-    def shape(self):
-        return self._shape
-
-    @shape.setter
-    def shape(self, value):
-        from .ResourceServer import ResourceLoader
-        from .Resources import CollisionShape
-        
-        if isinstance(value, CollisionShape):
-            self._shape = value
-        elif isinstance(value, str):
-            # Try to load as resource
-            try:
-                res = ResourceLoader.load(value)
-                if isinstance(res, CollisionShape):
-                    self._shape = res
-            except Exception:
-                pass
-        # If it's none or invalid, we keep previous or set default? 
-        # For now let's allow setting it if valid.
+class RectangleCollisionShape2D(CollisionShape2D):
+    def __init__(self) -> None:
+        super().__init__()
+        self.shape = Resources.CollisionRectangleShape(size=(32, 32))
+   
 
 
 class Sprite2D(Node2D):
@@ -180,12 +187,12 @@ class Sprite2D(Node2D):
 class AnimatedSprite2D(Sprite2D):
     def __init__(self):
         super().__init__()
-        self.animations: list[SpriteAnimation] = []
+        self.animations: list[Resources.SpriteAnimationResource] = []
         self.name = "AnimatedSprite2D"
         
-        self.current_animation: SpriteAnimation | None = None
+        self.current_animation: Resources.SpriteAnimationResource | None = None
 
-    def add_animation(self, animation: SpriteAnimation):
+    def add_animation(self, animation: Resources.SpriteAnimationResource):
         self.animations.append(animation)
 
     def play(self, name: str):
@@ -229,19 +236,18 @@ class TileMap2D(Node2D):
 class StaticBody2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
-        self.collision_shape : CollisionShape2D | None = None
 
 class DynamicBody2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
         self.velocity = (0, 0)
-        self.collision_shape : CollisionShape2D | None = None
 
 class KinematicBody2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
         self.velocity = (0, 0)
-        self.collision_shape : CollisionShape2D | None = None
+
+    
 
 class Camera2D(Node2D):
     def __init__(self) -> None:

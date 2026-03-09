@@ -4,6 +4,7 @@ import pygame
 import importlib
 import importlib.util
 import os
+from . import ErrorHandler
 
 
 #resource is a custom data structure that just hase a name and path with a template function for serializing data
@@ -33,7 +34,7 @@ class Resource:
         except Exception as e:
             print(f"Error saving resource {self.name} to {self.resource_path}: {e}")
 
-#audio preloading loading with pygame mixer
+#audio preloading, loading with pygame mixer
 class AudioResource(Resource):
     def __init__(self, name: str = "Audio", file_path: str | None = None):
         super().__init__(name=name, resource_path=file_path)
@@ -64,7 +65,7 @@ class AudioResource(Resource):
 
 class ScriptResource(Resource):
     def __init__(self, name="Script", script_path: str | None = None):
-        super().__init__(name=name)
+        super().__init__(name=name, resource_path=script_path)
         self.script_path = script_path
     
     def to_dict(self) -> dict:
@@ -101,7 +102,6 @@ class TextureResource(Resource):
         data["texture_path"] = self.texture_path
         return data
 
-#TODO i dont like the way im handling this for now so i may need to redo how collision shape resources work
 class CollisionShape(Resource):
     def __init__(self, name="CollisionShape", resource_path=None):
         super().__init__(name, resource_path)
@@ -115,33 +115,6 @@ class CollisionRectangleShape(CollisionShape):
         data = super().to_dict()
         data["size"] = self.size
         return data
-
-
-class CollisionCircleShape(CollisionShape):
-    def __init__(self, radius: float, resource_path: str | None = None):
-        super().__init__(name="Circle", resource_path=resource_path)
-        self.radius = radius
-
-    def to_dict(self):
-        data = super().to_dict()
-        data["radius"] = self.radius
-        return data
-
-class CollisionPolygonShape(CollisionShape):
-    def __init__(self, points: list[tuple[float, float]], resource_path: str | None = None):
-        super().__init__(name="Polygon", resource_path=resource_path)
-        self.points = points
-
-    def to_dict(self):
-        data = super().to_dict()
-        data["points"] = self.points
-        return data
-
-class CollisionShapeType:
-    RECTANGLE = CollisionRectangleShape(size=(0, 0))
-    CIRCLE = CollisionCircleShape(radius=0)
-    POLYGON = CollisionPolygonShape(points=[])
-
 
 
 #script proxy for handling runtime loading of scripts to be executed on nodes
@@ -257,3 +230,109 @@ def get_script_path(script) -> str | None:
     if module:
         return getattr(module, "__module__", None)
     return None
+
+
+
+#sprite animation is a resource that manages animations in the AnimatedSprite2D
+#it precomputes all surfaces and stores them in an array for fast O(1) look up when looping through the animation
+class SpriteAnimationResource(Resource):
+    def __init__(self, name, spritesheet, frame_size: tuple[int,int], frames: int, _loop: bool, fps: int = 12, resource_path: str | None = None):
+        super().__init__(name=name, resource_path=resource_path)
+        self.frames_surfaces = []
+        self.frames_local_rects = []
+
+        self.spritesheet_path = None
+
+        if isinstance(spritesheet, str):
+            self.spritesheet_path = spritesheet
+            try:
+                spritesheet_surface = pygame.image.load(spritesheet).convert_alpha()
+            except Exception:
+                spritesheet_surface = None
+        else:
+            spritesheet_surface = spritesheet
+
+        if spritesheet_surface is not None:
+            for i in range(frames):
+                rect = pygame.Rect(
+                    (i * frame_size[0]) % spritesheet_surface.get_width(),
+                    ((i * frame_size[0]) // spritesheet_surface.get_width()) * frame_size[1],
+                    *frame_size
+                )
+                surface = spritesheet_surface.subsurface(rect).copy()
+                self.frames_surfaces.append(surface)
+
+                w, h = surface.get_size()
+                self.frames_local_rects.append(((-w / 2, -h / 2), (w, h)))
+        else:
+            self.frames_surfaces = []
+            self.frames_local_rects = []
+
+        self.spritesheet = spritesheet_surface
+        self.frame_size = frame_size
+        self.frames = frames
+        self.fps = fps
+
+        self.current_frame = 0
+        self.time_accumulator = 0.0
+        self.loop = _loop
+        self.finished = False
+
+    def to_dict(self):
+        data = super().to_dict()
+        data.update({
+            "spritesheet_path": self.spritesheet_path,
+            "frame_size": self.frame_size,
+            "frames": self.frames,
+            "fps": self.fps,
+            "loop": self.loop
+        })
+        return data
+
+    def reload(self):
+        if not self.frames_surfaces and self.spritesheet_path:
+            spritesheet_surface = pygame.image.load(self.spritesheet_path).convert_alpha()
+            self.spritesheet = spritesheet_surface
+            self.frames_surfaces = []
+            self.frames_local_rects = []
+            
+            for i in range(self.frames):
+                rect = pygame.Rect(
+                    (i * self.frame_size[0]) % spritesheet_surface.get_width(),
+                    ((i * self.frame_size[0]) // spritesheet_surface.get_width()) * self.frame_size[1],
+                    *self.frame_size
+                )
+                surface = spritesheet_surface.subsurface(rect).copy()
+                self.frames_surfaces.append(surface)
+
+                w, h = surface.get_size()
+                self.frames_local_rects.append(((-w / 2, -h / 2), (w, h)))
+
+
+    def update(self, delta: float):
+        if self.finished:
+            return
+
+        self.time_accumulator += delta
+        frame_time = 1.0 / self.fps
+
+        while self.time_accumulator >= frame_time:
+            self.current_frame += 1
+            self.time_accumulator -= frame_time
+
+            if self.current_frame >= self.frames:
+                if self.loop:
+                    self.current_frame = 0
+                else:
+                    self.current_frame = self.frames - 1
+                    self.finished = True
+                    break
+
+    def get_current_frame_rect(self) -> pygame.Rect:
+        if not self.spritesheet:
+            ErrorHandler.throw_error(f"No spritesheet supplied to {self}, returning blank Rect().")
+            return pygame.Rect(0, 0, 0, 0)
+
+        frame_x = (self.current_frame * self.frame_size[0]) % self.spritesheet.get_width()
+        frame_y = ((self.current_frame * self.frame_size[0]) // self.spritesheet.get_width()) * self.frame_size[1]
+        return pygame.Rect(frame_x, frame_y, self.frame_size[0], self.frame_size[1])
