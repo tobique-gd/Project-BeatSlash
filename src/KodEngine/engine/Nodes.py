@@ -227,7 +227,6 @@ class AnimatedSprite2D(Sprite2D):
                  if isinstance(res, Resources.SpriteAnimation):
                      self._current_animation = res
                  else:
-                     # Attempt to load as animation directly if ResourceLoader failed
                      self._current_animation = Resources.SpriteAnimation.from_path(value)
              except Exception:
                  self._current_animation = None
@@ -268,7 +267,6 @@ class AnimatedSprite2D(Sprite2D):
 
         for anim in self.animations:
             if anim.name == name:
-                # Bypass property setter to ensure internal list object is accepted
                 self._current_animation = anim
                 anim.current_frame = 0
                 anim.time_accumulator = 0

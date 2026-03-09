@@ -1,6 +1,7 @@
 import pygame
 
 from . import RenderingServer
+from . import DebugRenderingServer
 from . import Nodes
 from . import Scenes
 from . import ErrorHandler
@@ -14,8 +15,8 @@ class Settings:
             },
 
             "window" : {
-                "viewport_resolution": (1280, 720),
-                "internal_viewport_resolution": (640, 360)
+                "viewport_resolution" : (1280, 720),
+                "internal_viewport_resolution" : (640, 360)
             },
             "physics" : {
                 "physics_substeps" : 4
@@ -23,11 +24,12 @@ class Settings:
         }
         
         self.runtime_settings = {
-            "FPS": 60
+            "FPS" : 60
         }
         self.editor_settings = {
-            "editor_resolution": (1920, 1080),
-            "default_background_color": (50, 50, 50)
+            "editor_resolution" : (1920, 1080),
+            "default_background_color" : (50, 50, 50),
+            "default_gizmo_color" : (255, 165, 0)
         }
 
 class App:
@@ -49,7 +51,13 @@ class App:
         self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
 
         self.clock = pygame.time.Clock()
-        self.renderer = RenderingServer.Renderer(self.configuration, pygame, self.internal_surface)
+        self.debug_renderer = DebugRenderingServer.DebugRenderingServer(self.configuration)
+        self.renderer = RenderingServer.Renderer(
+            self.configuration,
+            pygame,
+            self.internal_surface,
+            self.debug_renderer,
+        )
 
         self.running = False
         self.current_scene = None

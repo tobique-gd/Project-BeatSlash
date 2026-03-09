@@ -481,10 +481,7 @@ class SpriteAnimation(Resource):
         if self.spritesheet:
             ss_path = self.spritesheet.resource_path
             
-        # Ensure we save the Texture2D object itself so SceneLoader encodes it as a resource reference
-        # We also keep 'spritesheet_path' for legacy or simple string-based lookups
         data.update({
-            "spritesheet_path": ss_path,
             "spritesheet": self.spritesheet, 
             "frame_size": self.frame_size,
             "frames": self.frames,
@@ -495,8 +492,7 @@ class SpriteAnimation(Resource):
 
     def load_data(self, data: dict):
         super().load_data(data)
-        
-        # Load path string first as fallback/legacy
+   
         path_val = data.get("spritesheet_path")
         if path_val:
             self.spritesheet_path = path_val

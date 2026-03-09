@@ -66,6 +66,8 @@ class KodEditor:
             ErrorHandler.throw_error("No screen supplied. Stopping rendering")
             return None
 
+        self._queue_editor_debug_overlays()
+
         self.app.renderer.render_frame(self.app.current_scene, self.camera)
         self.app.scaled_surface = pygame.transform.scale(self.app.internal_surface, self.app.resolution)
         self.app.screen.blit(self.app.scaled_surface, (0, 0))
@@ -77,6 +79,75 @@ class KodEditor:
         alpha = np.full((self.height, self.width, 1), 255, dtype=np.uint8)
         rgba = np.concatenate((data, alpha), axis=2)
         return rgba.astype(np.float32) / 255.0
+
+    def _queue_editor_debug_overlays(self):
+        if not hasattr(self.app, "debug_renderer"):
+            return
+
+        debug = self.app.debug_renderer
+        debug.clear_command_list()
+
+        root = getattr(self.app.current_scene, "root", None)
+        if root is None:
+            return
+
+        for node in self._collect_nodes(root):
+            if isinstance(node, Nodes.Camera2D):
+                viewport_w, viewport_h = self.ui.editor.initial_res
+                debug.draw_rect(
+                    (
+                        node.global_position[0] - node.offset[0] - viewport_w / 2.0,
+                        node.global_position[1] - node.offset[1] - viewport_h / 2.0,
+                        viewport_w,
+                        viewport_h,
+                    ),
+                    color=self.settings.editor_settings["default_gizmo_color"],
+                    space="world"
+                )
+            
+            if isinstance(node, Nodes.Sprite2D):
+                if node.texture:
+                    debug.draw_rect(
+                        (
+                            node.global_position[0] + node.offset[0],
+                            node.global_position[1] + node.offset[1],
+                            node.texture.get_width(),
+                            node.texture.get_height(),
+                        ),
+                        color=self.settings.editor_settings["default_gizmo_color"],
+                        space="world"
+                    )
+            
+            if isinstance(node, Nodes.AnimatedSprite2D):
+                if node.current_animation:
+                    animation_texture = node.current_animation.get_current_frame_rect()
+
+                    debug.draw_rect(
+                        (
+                            node.global_position[0] + node.offset[0],
+                            node.global_position[1] + node.offset[1],
+                            animation_texture.size[0],
+                            animation_texture.size[1],
+                        ),
+                        color=self.settings.editor_settings["default_gizmo_color"],
+                        space="world"
+                    )
+
+                    debug.draw_gizmo(node.global_position)
+
+        
+
+
+
+    def _collect_nodes(self, node, out=None):
+        if out is None:
+            out = []
+
+        out.append(node)
+        for child in getattr(node, "_children", []):
+            self._collect_nodes(child, out)
+
+        return out
 
     def run(self):
         last_frame_time = pygame.time.get_ticks()
