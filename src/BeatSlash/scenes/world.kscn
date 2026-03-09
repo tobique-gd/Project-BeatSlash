@@ -2,6 +2,7 @@
   "name": "my world scene",
   "root": {
     "type": "Node2D",
+    "name": "World",
     "properties": {
       "name": "World",
       "position": [
@@ -17,15 +18,33 @@
     "children": [
       {
         "type": "AudioPlayer",
+        "name": "AudioPlayer",
         "properties": {
           "name": "AudioPlayer",
-          "audio": "assets/audio/IMissYou.mp3",
-          "script": "scripts/audio_player.py"
+          "script": {
+            "__resource__": {
+              "name": "Script",
+              "resource_path": "scripts/audio_player.py",
+              "script_path": "scripts/audio_player.py",
+              "type": "Script",
+              "resource_type": "Script"
+            }
+          },
+          "audio": {
+            "__resource__": {
+              "name": "Audio",
+              "resource_path": "assets/audio/IMissYou.mp3",
+              "file_path": "assets/audio/IMissYou.mp3",
+              "type": "AudioStream",
+              "resource_type": "AudioStream"
+            }
+          }
         },
         "children": []
       },
       {
         "type": "Sprite2D",
+        "name": "Bg",
         "properties": {
           "name": "Bg",
           "position": [
@@ -43,16 +62,25 @@
             0,
             0
           ],
-          "texture": "assets/textures/dmimage.png"
+          "texture": {
+            "__resource__": {
+              "name": "Texture",
+              "resource_path": "assets/textures/dmimage.png",
+              "texture_path": "assets/textures/dmimage.png",
+              "type": "Texture2D",
+              "resource_type": "Texture2D"
+            }
+          }
         },
         "children": []
       },
       {
         "type": "KinematicBody2D",
+        "name": "Player",
         "properties": {
           "name": "Player",
           "position": [
-            0.0,
+            -65.0999984741211,
             0.0
           ],
           "rotation": [
@@ -64,11 +92,20 @@
             0,
             0
           ],
-          "script": "scripts/player.py"
+          "script": {
+            "__resource__": {
+              "name": "Script",
+              "resource_path": "scripts/player.py",
+              "script_path": "scripts/player.py",
+              "type": "Script",
+              "resource_type": "Script"
+            }
+          }
         },
         "children": [
           {
             "type": "AnimatedSprite2D",
+            "name": "AnimatedSprite2D",
             "properties": {
               "name": "AnimatedSprite2D",
               "position": [
@@ -88,60 +125,117 @@
               ],
               "animations": [
                 {
-                  "name": "Idle_Front",
-                  "frame_size": [
-                    17,
-                    27
-                  ],
-                  "frames": 4,
-                  "fps": 4,
-                  "loop": true,
-                  "spritesheet_path": "assets/textures/spritesheets/player/idle_front.png"
+                  "__resource__": {
+                    "name": "Idle_Front",
+                    "resource_path": null,
+                    "spritesheet_path": "assets/textures/spritesheets/player/idle_front.png",
+                    "spritesheet": {
+                      "__resource__": {
+                        "name": "Texture",
+                        "resource_path": "assets/textures/spritesheets/player/idle_front.png",
+                        "texture_path": "assets/textures/spritesheets/player/idle_front.png",
+                        "type": "Texture2D",
+                        "resource_type": "Texture2D"
+                      }
+                    },
+                    "frame_size": [
+                      17,
+                      27
+                    ],
+                    "frames": 4,
+                    "fps": 4,
+                    "loop": true,
+                    "type": "SpriteAnimation",
+                    "resource_type": "SpriteAnimation"
+                  }
                 },
                 {
-                  "name": "Idle_Back",
-                  "frame_size": [
-                    17,
-                    27
-                  ],
-                  "frames": 4,
-                  "fps": 4,
-                  "loop": true,
-                  "spritesheet_path": "assets/textures/spritesheets/player/idle_back.png"
+                  "__resource__": {
+                    "name": "Idle_Back",
+                    "resource_path": null,
+                    "spritesheet_path": "assets/textures/spritesheets/player/idle_back.png",
+                    "spritesheet": {
+                      "__resource__": {
+                        "name": "Texture",
+                        "resource_path": "assets/textures/spritesheets/player/idle_back.png",
+                        "texture_path": "assets/textures/spritesheets/player/idle_back.png",
+                        "type": "Texture2D",
+                        "resource_type": "Texture2D"
+                      }
+                    },
+                    "frame_size": [
+                      17,
+                      27
+                    ],
+                    "frames": 4,
+                    "fps": 4,
+                    "loop": true,
+                    "type": "SpriteAnimation",
+                    "resource_type": "SpriteAnimation"
+                  }
                 },
                 {
-                  "name": "Idle_Side",
-                  "frame_size": [
-                    17,
-                    27
-                  ],
-                  "frames": 4,
-                  "fps": 4,
-                  "loop": true,
-                  "spritesheet_path": "assets/textures/spritesheets/player/idle_side.png"
+                  "__resource__": {
+                    "name": "Idle_Side",
+                    "resource_path": null,
+                    "spritesheet_path": "assets/textures/spritesheets/player/idle_side.png",
+                    "spritesheet": {
+                      "__resource__": {
+                        "name": "Texture",
+                        "resource_path": "assets/textures/spritesheets/player/idle_side.png",
+                        "texture_path": "assets/textures/spritesheets/player/idle_side.png",
+                        "type": "Texture2D",
+                        "resource_type": "Texture2D"
+                      }
+                    },
+                    "frame_size": [
+                      17,
+                      27
+                    ],
+                    "frames": 4,
+                    "fps": 4,
+                    "loop": true,
+                    "type": "SpriteAnimation",
+                    "resource_type": "SpriteAnimation"
+                  }
                 },
                 {
-                  "name": "Run_Front",
-                  "frame_size": [
-                    17,
-                    27
-                  ],
-                  "frames": 8,
-                  "fps": 12,
-                  "loop": true,
-                  "spritesheet_path": "assets/textures/spritesheets/player/run_front.png"
+                  "__resource__": {
+                    "name": "Run_Front",
+                    "resource_path": null,
+                    "spritesheet_path": "assets/textures/spritesheets/player/run_front.png",
+                    "spritesheet": {
+                      "__resource__": {
+                        "name": "Texture",
+                        "resource_path": "assets/textures/spritesheets/player/run_front.png",
+                        "texture_path": "assets/textures/spritesheets/player/run_front.png",
+                        "type": "Texture2D",
+                        "resource_type": "Texture2D"
+                      }
+                    },
+                    "frame_size": [
+                      17,
+                      27
+                    ],
+                    "frames": 8,
+                    "fps": 12,
+                    "loop": true,
+                    "type": "SpriteAnimation",
+                    "resource_type": "SpriteAnimation"
+                  }
                 }
               ],
               "current_animation": {
                 "name": "Idle_Front",
-                "current_frame": 3,
-                "time_accumulator": 0.12000000000000817
+                "current_frame": 0,
+                "time_accumulator": 0.24500000000000277
               }
             },
             "children": []
           },
           {
             "type": "Camera2D",
+            "name": "Camera2D",
             "properties": {
               "name": "Camera2D",
               "position": [
@@ -163,6 +257,7 @@
           },
           {
             "type": "RectangleCollisionShape2D",
+            "name": "RectangleCollisionShape2D",
             "properties": {
               "name": "RectangleCollisionShape2D",
               "position": [
@@ -173,7 +268,19 @@
                 0,
                 0
               ],
-              "z_index": 0
+              "z_index": 0,
+              "shape": {
+                "__resource__": {
+                  "name": "Rectangle",
+                  "resource_path": null,
+                  "size": [
+                    32,
+                    32
+                  ],
+                  "type": "CollisionRectangleShape",
+                  "resource_type": "CollisionRectangleShape"
+                }
+              }
             },
             "children": []
           }

@@ -62,10 +62,10 @@ class Node:
 
     @script.setter
     def script(self, value):
-        if isinstance(value, Resources.ScriptResource):
+        if isinstance(value, Resources.Script):
             self._script_resource = value
         elif isinstance(value, str):
-            self._script_resource = Resources.ScriptResource(script_path=value)
+            self._script_resource = Resources.Script(resource_path=value)
         elif value is None:
             self._script_resource = None
         else:
@@ -90,6 +90,29 @@ class Node:
     def editor_update(self, delta):
         pass
 
+    def save_data(self) -> dict:
+        data = {}
+        for name, value in vars(self).items():
+            if name.startswith("_"):
+                continue
+            if name == "script" or name == "runtime_script":
+                continue
+            if callable(value):
+                continue
+            data[name] = value
+        
+        if self._script_resource:
+            data["script"] = self._script_resource
+            
+        return data
+
+    def load_data(self, data: dict):
+        for name, value in data.items():
+            if hasattr(self, name):
+                try:
+                    setattr(self, name, value)
+                except Exception as e:
+                    print(f"Error setting {name} on {self.name}: {e}")
 
 class Node2D(Node):
     def __init__(self) -> None:
@@ -138,24 +161,35 @@ class Sprite2D(Node2D):
         self.position = (0,0)
         self.offset = (0,0)
     
+    def save_data(self) -> dict:
+        data = super().save_data()
+        if self._texture_resource:
+            data["texture"] = self._texture_resource
+        return data
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        if "texture" in data:
+            self.texture = data["texture"]
+
     @property
     def texture(self):
         return self._texture_resource
 
     @texture.setter
     def texture(self, value):
-        from .Resources import TextureResource
+        from .Resources import Texture2D
 
-        if isinstance(value, TextureResource):
+        if isinstance(value, Texture2D):
             self._texture_resource = value
         elif isinstance(value, str):
              from .ResourceServer import ResourceLoader
              try:
                  res = ResourceLoader.load(value)
-                 if isinstance(res, TextureResource):
+                 if isinstance(res, Texture2D):
                      self._texture_resource = res
                  else:
-                     self._texture_resource = TextureResource(resource_path=value)
+                     self._texture_resource = Texture2D(resource_path=value)
              except Exception:
                  self._texture_resource = None
         else:
@@ -169,39 +203,73 @@ class Sprite2D(Node2D):
                 return pygame.transform.flip(surf, self.flip_h, self.flip_v)
          return None
 
-    def _on_enter(self):
-        for child in getattr(self, "_children", []):
-            try:
-                child._on_enter()
-            except Exception:
-                pass
-
-    def on_exit(self):
-        for child in getattr(self, "_children", []):
-            try:
-                child.on_exit()
-            except Exception:
-                pass
-
 
 class AnimatedSprite2D(Sprite2D):
     def __init__(self):
         super().__init__()
-        self.animations: list[Resources.SpriteAnimationResource] = []
+        self.animations: list[Resources.SpriteAnimation] = []
         self.name = "AnimatedSprite2D"
         
-        self.current_animation: Resources.SpriteAnimationResource | None = None
+        self._current_animation: Resources.SpriteAnimation | None = None
 
-    def add_animation(self, animation: Resources.SpriteAnimationResource):
+    @property
+    def current_animation(self):
+        return self._current_animation
+
+    @current_animation.setter
+    def current_animation(self, value):
+        if isinstance(value, Resources.SpriteAnimation):
+            self._current_animation = value
+        elif isinstance(value, str):
+             from .ResourceServer import ResourceLoader
+             try:
+                 res = ResourceLoader.load(value)
+                 if isinstance(res, Resources.SpriteAnimation):
+                     self._current_animation = res
+                 else:
+                     # Attempt to load as animation directly if ResourceLoader failed
+                     self._current_animation = Resources.SpriteAnimation.from_path(value)
+             except Exception:
+                 self._current_animation = None
+        else:
+             self._current_animation = None
+
+    def save_data(self) -> dict:
+        data = super().save_data()
+        if self.current_animation:
+             data["current_animation"] = {
+                 "name": self.current_animation.name,
+                 "current_frame": self.current_animation.current_frame,
+                 "time_accumulator": self.current_animation.time_accumulator
+             }
+        return data
+
+    def load_data(self, data: dict):
+        data_copy = data.copy()
+        curr_anim_data = data_copy.pop("current_animation", None)
+        
+        super().load_data(data_copy)
+        
+        if curr_anim_data and isinstance(curr_anim_data, dict):
+            name = curr_anim_data.get("name")
+            if name:
+                self.play(name)
+                if self.current_animation:
+                    self.current_animation.current_frame = int(curr_anim_data.get("current_frame", 0))
+                    self.current_animation.time_accumulator = float(curr_anim_data.get("time_accumulator", 0))
+
+
+    def add_animation(self, animation: Resources.SpriteAnimation):
         self.animations.append(animation)
 
     def play(self, name: str):
-        if self.current_animation and name == self.current_animation.name:
+        if self._current_animation and name == self._current_animation.name:
             return
 
         for anim in self.animations:
             if anim.name == name:
-                self.current_animation = anim
+                # Bypass property setter to ensure internal list object is accepted
+                self._current_animation = anim
                 anim.current_frame = 0
                 anim.time_accumulator = 0
                 break
@@ -262,6 +330,17 @@ class AudioPlayer(Node):
         self._audio_resource = None
         self._volume = 1.0
 
+    def save_data(self) -> dict:
+        data = super().save_data()
+        if self._audio_resource:
+            data["audio"] = self._audio_resource
+        return data
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        if "audio" in data:
+            self.audio = data["audio"]
+
     def play(self):
         if self._audio_resource:
             sound = self._audio_resource.get_sound()
@@ -286,18 +365,18 @@ class AudioPlayer(Node):
 
     @audio.setter
     def audio(self, value):
-        from .Resources import AudioResource
+        from .Resources import AudioStream
         from .ResourceServer import ResourceLoader
 
-        if isinstance(value, AudioResource):
+        if isinstance(value, AudioStream):
             self._audio_resource = value
         elif isinstance(value, str):
             try:
                 res = ResourceLoader.load(value)
-                if isinstance(res, AudioResource):
+                if isinstance(res, AudioStream):
                     self._audio_resource = res
                 else:
-                    self._audio_resource = AudioResource(file_path=value)
+                    self._audio_resource = AudioStream(resource_path=value)
             except Exception:
                 self._audio_resource = None
         else:
@@ -308,13 +387,6 @@ class AudioPlayer(Node):
             if sound:
                 sound.set_volume(self._volume)
 
-    def _on_enter(self):
-        for child in getattr(self, "_children", []):
-            try:
-                child._on_enter()
-            except Exception:
-                pass
-
     def on_exit(self):
         try:
             if self._audio_resource:
@@ -323,5 +395,7 @@ class AudioPlayer(Node):
                     sound.stop()
         except Exception:
             pass
+        
+        super().on_exit()
 
     
