@@ -17,7 +17,7 @@ class MenuBar:
         with pygui.child_window(border=False, height=20, menubar=True, no_scrollbar=True):
             with pygui.menu_bar():
                 with pygui.menu(label="File"):
-                    pygui.add_menu_item(label="Save Scene", callback=lambda: self.ui.editor.save_scene())
+                    pygui.add_menu_item(label="Save Scene", callback=lambda: self.ui.editor.queue_command("save_scene"))
 
     def _build_scene_info(self):
         display_text = self._get_scene_display_text()
@@ -25,7 +25,7 @@ class MenuBar:
 
     def _build_action_buttons(self):
         with pygui.child_window(border=False, height=20, no_scrollbar=True):
-            pygui.add_button(label="Run Scene", width=-1, callback=lambda: self.ui.editor.run_scene())
+            pygui.add_button(label="Run Scene", width=-1, callback=lambda: self.ui.editor.queue_command("run_scene"))
 
     def build(self):
         self._build_menu_bar()

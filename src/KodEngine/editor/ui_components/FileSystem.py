@@ -89,7 +89,7 @@ class FileSystem:
         
         if time_diff < self._double_click_threshold:
             if file_path.endswith(".kscn"):
-                self.ui.editor.load_scene(file_path)
+                self.ui.editor.queue_command("load_scene", path=file_path)
     
     def _on_directory_select(self, sender, app_data, user_data):
         directory_path = user_data
