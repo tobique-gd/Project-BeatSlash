@@ -148,9 +148,7 @@ class CollisionShape2D(Node2D):
 class RectangleCollisionShape2D(CollisionShape2D):
     def __init__(self) -> None:
         super().__init__()
-        self.shape = Resources.CollisionRectangleShape(size=(32, 32))
-   
-
+        self.size = (32, 32)
 
 class Sprite2D(Node2D):
     def __init__(self) -> None:
@@ -321,6 +319,7 @@ class Camera2D(Node2D):
 
         self.offset = (0, 0)
         self.current : bool = True
+        self.zoom = 1.0
     
 class AudioPlayer(Node):
     def __init__(self) -> None:

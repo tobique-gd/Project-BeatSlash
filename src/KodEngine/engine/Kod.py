@@ -1,7 +1,7 @@
 import pygame
+from typing import Any
 
 from . import RenderingServer
-from . import DebugRenderingServer
 from . import Nodes
 from . import Scenes
 from . import ErrorHandler
@@ -29,7 +29,8 @@ class Settings:
         self.editor_settings = {
             "editor_resolution" : (1920, 1080),
             "default_background_color" : (50, 50, 50),
-            "default_gizmo_color" : (255, 165, 0)
+            "default_gizmo_color" : (255, 165, 0),
+            "default_collision_color" : (0, 162, 255)
         }
 
 class App:
@@ -51,7 +52,7 @@ class App:
         self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
 
         self.clock = pygame.time.Clock()
-        self.debug_renderer = DebugRenderingServer.DebugRenderingServer(self.configuration)
+        self.debug_renderer: Any | None = None
         self.renderer = RenderingServer.Renderer(
             self.configuration,
             pygame,

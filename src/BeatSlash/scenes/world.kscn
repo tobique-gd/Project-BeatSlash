@@ -80,8 +80,8 @@
         "properties": {
           "name": "Player",
           "position": [
-            0.0,
-            0.0
+            8.492111194590546,
+            67.05785123966933
           ],
           "rotation": [
             0,
@@ -223,8 +223,8 @@
               ],
               "current_animation": {
                 "name": "Idle_Back",
-                "current_frame": 0,
-                "time_accumulator": 0.05200000000003825
+                "current_frame": 2,
+                "time_accumulator": 0.2400000000000838
               }
             },
             "children": []
@@ -247,7 +247,8 @@
                 0,
                 0
               ],
-              "current": true
+              "current": true,
+              "zoom": 1.0
             },
             "children": []
           },
@@ -257,26 +258,18 @@
             "properties": {
               "name": "RectangleCollisionShape2D",
               "position": [
-                0,
-                0
+                -8.5,
+                -13.5
               ],
               "rotation": [
                 0,
                 0
               ],
               "z_index": 0,
-              "shape": {
-                "__resource__": {
-                  "name": "Rectangle",
-                  "resource_path": null,
-                  "size": [
-                    32,
-                    32
-                  ],
-                  "type": "CollisionRectangleShape",
-                  "resource_type": "CollisionRectangleShape"
-                }
-              }
+              "size": [
+                17.0,
+                27.0
+              ]
             },
             "children": []
           }

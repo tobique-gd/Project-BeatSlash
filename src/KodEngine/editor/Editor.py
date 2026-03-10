@@ -4,16 +4,33 @@ import numpy as np
 import pygame
 import os
 import sys
+from collections import deque
+from dataclasses import dataclass
+from enum import Enum, auto
 
 #i need to run this in a dummy environment to eliminate event overlaps between dpg and pygame
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 #EDITOR IMPORTS
 from . import ui_components as UIComp
+from . import DebugRenderingServer
 
 #ENGINE IMPORTS
 from ..engine import Kod, Nodes, ResourceServer
 from ..engine.ErrorHandler import ErrorHandler
+
+
+class EditorMode(Enum):
+    EDIT = auto()
+    PLAYTEST = auto()
+    PAUSED = auto()
+
+
+@dataclass
+class EditorCommand:
+    type: str
+    payload: dict
+
 
 class KodEditor:
     def __init__(self):
@@ -33,6 +50,10 @@ class KodEditor:
         
         ResourceServer.ResourceLoader.set_project_root(project_dir)
         self.app = Kod.App(self.settings, editor_mode=True)
+        self.app.debug_renderer = DebugRenderingServer.DebugRenderingServer(self.settings)
+        self.app.renderer.debug_renderer = self.app.debug_renderer
+        self.mode = EditorMode.EDIT
+        self.commands = deque()
 
         scene_path = os.path.join(project_dir, "scenes", "world.kscn")
         loaded_scene = ResourceServer.SceneLoader.load(scene_path)
@@ -43,7 +64,284 @@ class KodEditor:
         self.app.set_scene(loaded_scene)
 
         self.width, self.height = self.initial_res
+        self._gizmo_drag_active = False
+        self._gizmo_drag_axis = None
+        self._gizmo_drag_start_mouse_screen = (0.0, 0.0)
+        self._gizmo_drag_start_node_world = (0.0, 0.0)
+        self._left_mouse_was_down = False
+        self._gizmo_hover_axis = None
+        self.zoom_step = 1.1
+        self.min_zoom = 0.2
+        self.max_zoom = 12.0
         self.ui = EditorUI(self, self.app)
+
+    def queue_command(self, command_type, **payload):
+        self.commands.append(EditorCommand(type=command_type, payload=payload))
+
+    def _dispatch_command(self, cmd: EditorCommand):
+        if cmd.type == "save_scene":
+            self.save_scene()
+        elif cmd.type == "load_scene":
+            self.load_scene(cmd.payload.get("path"))
+        elif cmd.type == "run_scene":
+            self.run_scene(cmd.payload.get("scene_path"))
+
+    def _drain_commands(self):
+        while self.commands:
+            cmd = self.commands.popleft()
+            self._dispatch_command(cmd)
+
+    def _screen_to_world(self, screen_x, screen_y):
+        zoom = self._get_camera_zoom()
+
+        return (
+            (screen_x - self.width / 2.0) / zoom + self.camera.global_position[0] - self.camera.offset[0],
+            (screen_y - self.height / 2.0) / zoom + self.camera.global_position[1] - self.camera.offset[1],
+        )
+
+    def _world_to_screen(self, world_x, world_y):
+        zoom = self._get_camera_zoom()
+        return (
+            (world_x - self.camera.global_position[0] + self.camera.offset[0]) * zoom + self.width / 2.0,
+            (world_y - self.camera.global_position[1] + self.camera.offset[1]) * zoom + self.height / 2.0,
+        )
+
+    def _get_camera_zoom(self):
+        zoom = getattr(self.camera, "zoom", 1.0)
+        if isinstance(zoom, (list, tuple)):
+            zoom = zoom[0] if len(zoom) > 0 else 1.0
+        try:
+            zoom = float(zoom)
+        except Exception:
+            zoom = 1.0
+        return max(0.05, zoom)
+
+    def _set_camera_zoom(self, value):
+        try:
+            value = float(value)
+        except Exception:
+            return
+        self.camera.zoom = max(self.min_zoom, min(self.max_zoom, value))
+
+    def _get_gizmo_spacing_scale(self):
+        return max(1.0, self._get_camera_zoom())
+
+    def _is_mouse_over_viewport(self):
+        if not pygui.does_item_exist("viewport_image"):
+            return False
+
+        try:
+            mouse_x, mouse_y = pygui.get_mouse_pos(local=False)
+            rect_min_x, rect_min_y = pygui.get_item_rect_min("viewport_image")
+            rect_w, rect_h = pygui.get_item_rect_size("viewport_image")
+        except Exception:
+            return False
+
+        if rect_w <= 0 or rect_h <= 0:
+            return False
+
+        local_x = mouse_x - rect_min_x
+        local_y = mouse_y - rect_min_y
+        return 0 <= local_x <= rect_w and 0 <= local_y <= rect_h
+
+    def on_mouse_wheel(self, wheel_delta):
+        if not self._is_mouse_over_viewport():
+            return
+
+        if self._gizmo_drag_active:
+            return
+
+        if isinstance(wheel_delta, (list, tuple)):
+            if len(wheel_delta) == 0:
+                return
+            wheel_delta = wheel_delta[0]
+
+        try:
+            delta = float(wheel_delta)
+        except Exception:
+            return
+
+        if abs(delta) < 0.0001:
+            return
+
+        before_mouse_world = self._viewport_mouse_world_position()
+        if before_mouse_world is None:
+            return
+
+        current_zoom = self._get_camera_zoom()
+        new_zoom = current_zoom * (self.zoom_step ** delta)
+        self._set_camera_zoom(new_zoom)
+
+        after_mouse_world = self._viewport_mouse_world_position()
+        if after_mouse_world is None:
+            return
+
+        cam_x, cam_y = self.camera.global_position
+        shift_x = before_mouse_world[0] - after_mouse_world[0]
+        shift_y = before_mouse_world[1] - after_mouse_world[1]
+        self.camera.global_position = (cam_x + shift_x, cam_y + shift_y)
+
+    def _viewport_mouse_world_position(self):
+        if not pygui.does_item_exist("viewport_image"):
+            return None
+
+        try:
+            mouse_x, mouse_y = pygui.get_mouse_pos(local=False)
+            rect_min_x, rect_min_y = pygui.get_item_rect_min("viewport_image")
+            rect_w, rect_h = pygui.get_item_rect_size("viewport_image")
+        except Exception:
+            return None
+
+        if rect_w <= 0 or rect_h <= 0:
+            return None
+
+        local_x = mouse_x - rect_min_x
+        local_y = mouse_y - rect_min_y
+
+        if not self._gizmo_drag_active:
+            if local_x < 0 or local_y < 0 or local_x > rect_w or local_y > rect_h:
+                return None
+
+        scaled_x = local_x * (self.width / float(rect_w))
+        scaled_y = local_y * (self.height / float(rect_h))
+        return self._screen_to_world(scaled_x, scaled_y)
+
+    def _viewport_mouse_screen_position(self):
+        if not pygui.does_item_exist("viewport_image"):
+            return None
+
+        try:
+            mouse_x, mouse_y = pygui.get_mouse_pos(local=False)
+            rect_min_x, rect_min_y = pygui.get_item_rect_min("viewport_image")
+            rect_w, rect_h = pygui.get_item_rect_size("viewport_image")
+        except Exception:
+            return None
+
+        if rect_w <= 0 or rect_h <= 0:
+            return None
+
+        local_x = mouse_x - rect_min_x
+        local_y = mouse_y - rect_min_y
+
+        if not self._gizmo_drag_active:
+            if local_x < 0 or local_y < 0 or local_x > rect_w or local_y > rect_h:
+                return None
+
+        return (
+            local_x * (self.width / float(rect_w)),
+            local_y * (self.height / float(rect_h)),
+        )
+
+    def _pick_gizmo_axis(self, node_world_pos, mouse_screen_pos):
+        nx, ny = node_world_pos
+        mx, my = mouse_screen_pos
+        sx, sy = self._world_to_screen(nx, ny)
+        spacing_scale = self._get_gizmo_spacing_scale()
+
+        def in_rect(x, y, w, h, pad=0.0):
+            return (x - pad) <= mx <= (x + w + pad) and (y - pad) <= my <= (y + h + pad)
+
+        x_axis_center_x = sx + 60.0 * spacing_scale
+        x_axis_center_y = sy
+        y_axis_center_x = sx
+        y_axis_center_y = sy + 60.0 * spacing_scale
+        xy_axis_center_x = sx + 30.0 * spacing_scale
+        xy_axis_center_y = sy + 30.0 * spacing_scale
+        if in_rect(xy_axis_center_x - 16.0, xy_axis_center_y - 16.0, 32.0, 32.0, pad=4.0) or in_rect(sx - 15.5, sy - 15.5, 31.0, 31.0, pad=4.0):
+            return "xy"
+
+        if in_rect(x_axis_center_x - 32.0, x_axis_center_y - 16.0, 64.0, 32.0, pad=4.0):
+            return "x"
+
+        if in_rect(y_axis_center_x - 16.0, y_axis_center_y - 32.0, 32.0, 64.0, pad=4.0):
+            return "y"
+
+        return None
+
+    def _update_gizmo_cursor(self):
+        set_cursor = getattr(pygui, "set_mouse_cursor", None)
+        cursor_arrow = getattr(pygui, "mvMouseCursor_Arrow", None)
+        cursor_resize_ew = getattr(pygui, "mvMouseCursor_ResizeEW", None)
+        cursor_resize_ns = getattr(pygui, "mvMouseCursor_ResizeNS", None)
+        cursor_resize_all = getattr(pygui, "mvMouseCursor_ResizeAll", None)
+
+        node = self.ui.state.selected_node
+        if not isinstance(node, Nodes.Node2D):
+            self._gizmo_hover_axis = None
+            return
+
+        mouse_screen = self._viewport_mouse_screen_position()
+        if mouse_screen is None or self._gizmo_drag_active:
+            self._gizmo_hover_axis = None
+            if set_cursor is not None:
+                try:
+                    if cursor_arrow is not None:
+                        set_cursor(cursor_arrow)
+                except Exception:
+                    pass
+            return
+
+        axis = self._pick_gizmo_axis(node.global_position, mouse_screen)
+        self._gizmo_hover_axis = axis
+
+        if set_cursor is not None:
+            try:
+                if axis == "x":
+                    if cursor_resize_ew is not None:
+                        set_cursor(cursor_resize_ew)
+                elif axis == "y":
+                    if cursor_resize_ns is not None:
+                        set_cursor(cursor_resize_ns)
+                elif axis == "xy":
+                    if cursor_resize_all is not None:
+                        set_cursor(cursor_resize_all)
+                else:
+                    if cursor_arrow is not None:
+                        set_cursor(cursor_arrow)
+            except Exception:
+                pass
+
+    def _update_gizmo_interaction(self):
+        node = self.ui.state.selected_node
+        if not isinstance(node, Nodes.Node2D):
+            self._gizmo_drag_active = False
+            self._left_mouse_was_down = pygui.is_mouse_button_down(pygui.mvMouseButton_Left)
+            return
+
+        mouse_screen = self._viewport_mouse_screen_position()
+        mouse_down = pygui.is_mouse_button_down(pygui.mvMouseButton_Left)
+        just_pressed = mouse_down and not self._left_mouse_was_down
+        just_released = (not mouse_down) and self._left_mouse_was_down
+
+        if just_pressed and mouse_screen is not None:
+            axis = self._pick_gizmo_axis(node.global_position, mouse_screen)
+            if axis is not None:
+                self._gizmo_drag_active = True
+                self._gizmo_drag_axis = axis
+                self._gizmo_drag_start_mouse_screen = mouse_screen
+                self._gizmo_drag_start_node_world = node.global_position
+
+        if self._gizmo_drag_active and mouse_screen is not None and mouse_down:
+            start_mouse_x, start_mouse_y = self._gizmo_drag_start_mouse_screen
+            start_node_x, start_node_y = self._gizmo_drag_start_node_world
+            zoom = self._get_camera_zoom()
+            delta_x = (mouse_screen[0] - start_mouse_x) / zoom
+            delta_y = (mouse_screen[1] - start_mouse_y) / zoom
+
+            new_x, new_y = start_node_x, start_node_y
+            if self._gizmo_drag_axis in ("x", "xy"):
+                new_x = start_node_x + delta_x
+            if self._gizmo_drag_axis in ("y", "xy"):
+                new_y = start_node_y + delta_y
+
+            node.global_position = (new_x, new_y)
+
+        if self._gizmo_drag_active and just_released:
+            self._gizmo_drag_active = False
+            self._gizmo_drag_axis = None
+            self.ui.inspector.update(node)
+
+        self._left_mouse_was_down = mouse_down
     
     def to_relative_path(self, path_str):
         if not isinstance(path_str, str):
@@ -83,15 +381,18 @@ class KodEditor:
     def _queue_editor_debug_overlays(self):
         if not hasattr(self.app, "debug_renderer"):
             return
-
+        
         debug = self.app.debug_renderer
+        if debug is None:
+            return
         debug.clear_command_list()
 
-        root = getattr(self.app.current_scene, "root", None)
-        if root is None:
-            return
+        if self.ui.state.selected_node:
+            node = self.ui.state.selected_node
 
-        for node in self._collect_nodes(root):
+            if not hasattr(node, "global_position"):
+                return
+
             if isinstance(node, Nodes.Camera2D):
                 viewport_w, viewport_h = self.ui.editor.initial_res
                 debug.draw_rect(
@@ -132,8 +433,26 @@ class KodEditor:
                         color=self.settings.editor_settings["default_gizmo_color"],
                         space="world"
                     )
+            
+            if isinstance(node, Nodes.RectangleCollisionShape2D):
+                if node.size:
+                    debug.draw_rect(
+                        (
+                            node.global_position[0],
+                            node.global_position[1],
+                            node.size[0],
+                            node.size[1],
+                        ),
+                        color=self.settings.editor_settings["default_collision_color"],
+                        space="world"
+                    )
 
-                    debug.draw_gizmo(node.global_position)
+            highlight_axis = self._gizmo_drag_axis if self._gizmo_drag_active else self._gizmo_hover_axis
+            debug.draw_gizmo(
+                node.global_position,
+                highlight_axis=highlight_axis,
+                spacing_scale=self._get_gizmo_spacing_scale(),
+            )
 
         
 
@@ -157,6 +476,10 @@ class KodEditor:
             last_frame_time = now
             if not self.app.running:
                 self.ui.check_resize()
+
+            self._drain_commands()
+            self._update_gizmo_cursor()
+            self._update_gizmo_interaction()
             
             root = getattr(self.app.current_scene, "root", None)
             if root:
@@ -363,6 +686,9 @@ class EditorUI:
         pygui.show_viewport()
         pygui.set_primary_window("Primary Window", True)
 
+        with pygui.handler_registry():
+            pygui.add_mouse_wheel_handler(callback=self._on_mouse_wheel)
+
     def check_resize(self):
         self.viewport.check_resize()
 
@@ -386,6 +712,9 @@ class EditorUI:
     def _handle_console_message(self, msg_type: str, message: str):
         if hasattr(self, 'console'):
             self.console.add_message(msg_type, message)
+
+    def _on_mouse_wheel(self, sender, app_data):
+        self.editor.on_mouse_wheel(app_data)
     
 
 
