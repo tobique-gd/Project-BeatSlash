@@ -2,7 +2,7 @@ from ..engine import ResourceServer
 import os
 import pygame
 
-
+# Handles drawing primitives and textures for editor debug
 class DebugRenderingServer:
     def __init__(self, configuration):
         self.configuration = configuration
@@ -65,11 +65,8 @@ class DebugRenderingServer:
         xy_axis_texture = self._load_surface("assets/debug/gizmo/xy_axis.png")
         origin_texture = self._load_surface("assets/debug/gizmo/origin.png")
 
-        try:
-            spacing_scale = float(spacing_scale)
-        except Exception:
-            spacing_scale = 1.0
-        spacing_scale = max(0.05, spacing_scale)
+        spacing_scale = float(spacing_scale)
+        spacing_scale = max(0.001, spacing_scale)
 
         if highlight_axis == "x":
             x_axis_texture = self._lighten_surface(x_axis_texture)
@@ -94,7 +91,7 @@ class DebugRenderingServer:
             zoom = float(zoom)
         except Exception:
             zoom = 1.0
-        zoom = max(0.05, zoom)
+        zoom = max(0.001, zoom)
 
         camera_offset_node_position = (
             (world_pos[0] - camera.global_position[0] + camera.offset[0]) * zoom,
@@ -151,7 +148,7 @@ class DebugRenderingServer:
                             zoom = float(zoom)
                         except Exception:
                             zoom = 1.0
-                        zoom = max(0.05, zoom)
+                        zoom = max(0.001, zoom)
 
                         pos = self._world_to_screen(pos, camera)
 
