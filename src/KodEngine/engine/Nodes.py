@@ -290,13 +290,6 @@ class AnimatedSprite2D(Sprite2D):
             return pygame.transform.flip(frames[frame_index], self.flip_h, self.flip_v)
         return None
 
-class TileMap2D(Node2D):
-    def __init__(self) -> None:
-        super().__init__()
-
-
-
-
 class StaticBody2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
@@ -396,3 +389,26 @@ class AudioPlayer(Node):
         super().on_exit()
 
     
+class TileMap2D(Node2D):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tileset : Resources.Tileset2D | None = None
+        self.tile_data = []
+        self.bounds: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (1, 1))
+
+    def tile_to_world(self, tile_pos: tuple[int, int]) -> tuple[int, int]:
+        tw, th = self.tileset.tile_size if self.tileset and getattr(self.tileset, "tile_size", None) else (16, 16)
+        return (tile_pos[0] * tw, tile_pos[1] * th)
+
+    def world_to_tile(self, world_pos: tuple[int, int]) -> tuple[int, int]:
+        tw, th = self.tileset.tile_size if self.tileset and getattr(self.tileset, "tile_size", None) else (16, 16)
+        if tw <= 0 or th <= 0:
+            return (0, 0)
+        return (int(world_pos[0] // tw), int(world_pos[1] // th))
+
+    @property
+    def world_bounds(self) -> tuple[tuple[int, int], tuple[int, int]]:
+        (min_x, min_y), (max_x, max_y) = self.bounds
+        min_world = self.tile_to_world((min_x, min_y))
+        max_world = self.tile_to_world((max_x + 1, max_y + 1))
+        return (min_world, max_world)

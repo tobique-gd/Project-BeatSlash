@@ -19,7 +19,7 @@ class EditorUI:
         self.hierarchy = UIComp.HierarchyPanel(self)
         self.inspector = UIComp.InspectorPanel(self)
         self.console = UIComp.ConsolePanel(self)
-        self.dialogs = UIComp.NodeDialogs(self)
+        self.dialogs = UIComp.Dialogs.DialogManager(self, self.editor.editor_settings)
         self.menubar = UIComp.MenuBar(self)
         self.file_system = UIComp.FileSystem(self)
 
@@ -38,7 +38,8 @@ class EditorUI:
             with pygui.table(header_row=False, resizable=False, borders_innerV=False, height=20):
                 pygui.add_table_column(init_width_or_weight=0.2)
                 pygui.add_table_column(init_width_or_weight=0.6)
-                pygui.add_table_column(init_width_or_weight=0.2)
+                pygui.add_table_column(init_width_or_weight=0.1)
+                pygui.add_table_column(init_width_or_weight=0.1)
 
                 with pygui.table_row():
                     self.menubar.build()
@@ -102,9 +103,7 @@ class EditorUI:
         if pygui.is_item_hovered("file_system_tree"):
             self.file_system._show_context_menu()
 
-    # TODO: Implement file opening logic
-    def _open_file(self, file_path):
-        pass
+    
 
     def _handle_console_message(self, msg_type: str, message: str):
         if hasattr(self, "console"):

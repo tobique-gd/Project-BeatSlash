@@ -19,6 +19,11 @@ class EditorGizmoController:
             return self._drag_axis
         return self._hover_axis
 
+    def cancel_interaction(self):
+        self._drag_active = False
+        self._drag_axis = None
+        self._hover_axis = None
+
     def on_mouse_wheel(self, wheel_delta):
         if not self._is_mouse_over_viewport() or self._drag_active:
             return

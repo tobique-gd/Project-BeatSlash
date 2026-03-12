@@ -543,3 +543,21 @@ class SpriteAnimation(Resource):
         )
         obj.load_data(data)
         return obj
+
+class Tileset2D(Resource):
+    type_id = "Tileset"
+    extensions = (".tileset", ".json")
+
+    def __init__(self, name="Tileset", resource_path: str | None = None):
+        super().__init__(name=name, resource_path=resource_path)
+        self.tile_size = (16, 16)
+        self.tilesheet : Texture2D | None = None
+        self.tiles = []
+
+class Tile2D(Resource):
+    type_id = "Tile"
+
+    def __init__(self, name="Tile", resource_path: str | None = None):
+        super().__init__(name=name, resource_path=resource_path)
+        self.texture_region: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (16, 16))
+        self.collision_shape: CollisionShape | None = None

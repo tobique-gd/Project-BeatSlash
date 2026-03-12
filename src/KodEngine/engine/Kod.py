@@ -11,7 +11,21 @@ class Settings:
     def __init__(self) -> None:
         self.project_settings = {
             "file_management" : {
-                "project_directory" : "/"
+                "project_directory" : "/",
+                "file_extension_commands" : {
+                        ".kscn" : "--editor",
+                        ".py" : "--default",
+                        ".png" : "--default",
+                        ".jpg" : "--default",
+                        ".jpeg" : "--default",
+                        ".bmp" : "--default",
+                        ".tga" : "--default",
+                        ".gif" : "--default",
+                        ".wav" : "--default",
+                        ".ogg" : "--default",
+                        ".mp3" : "--default"
+
+                }
             },
 
             "window" : {
@@ -20,17 +34,21 @@ class Settings:
             },
             "physics" : {
                 "physics_substeps" : 4
+            },
+            "runtime" : {
+                "main_scene_path" : "src/BeatSlash/scenes/world.kscn",
+                "FPS" : 60
             }
+
         }
-        
-        self.runtime_settings = {
-            "FPS" : 60
-        }
+
         self.editor_settings = {
             "editor_resolution" : (1920, 1080),
             "default_background_color" : (50, 50, 50),
             "default_gizmo_color" : (255, 165, 0),
-            "default_collision_color" : (0, 162, 255)
+            "default_collision_color" : (0, 162, 255),
+            "default_x_axis_color" : (255, 0, 0),
+            "default_y_axis_color" : (0, 255, 0)
         }
 
 class App:
@@ -40,7 +58,7 @@ class App:
         self.configuration = _configuration
         self.internal_resolution = self.configuration.project_settings["window"]["internal_viewport_resolution"]
         self.resolution = self.configuration.project_settings["window"]["viewport_resolution"]
-        self.FPS = self.configuration.runtime_settings["FPS"]
+        self.FPS = self.configuration.project_settings["runtime"]["FPS"]
 
         if editor_mode:
             self.screen = pygame.display.set_mode(self.internal_resolution, pygame.HIDDEN)

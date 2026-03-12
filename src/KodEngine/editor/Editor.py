@@ -1,6 +1,7 @@
 # GENERAL IMPORTS
 import os
 import sys
+import platform
 import subprocess
 from collections import deque
 
@@ -13,17 +14,35 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 from . import DebugRenderingServer
 from .EditorGizmo import EditorGizmoController
-from .EditorModels import EditorCommand, EditorMode
+from .EditorModels import EditorCommand, EditorCommandType, EditorMode
 from .EditorOverlay import EditorOverlayRenderer
 from .EditorUI import EditorUI
 from ..engine import Kod, Nodes, ResourceServer
 from ..engine.ErrorHandler import ErrorHandler
 
 
+class EditorSettings:
+    def __init__(self):
+        self.editor_settings = {
+            "debug" : {
+                "editor_resolution": (1920, 1080),
+                "default_background_color": (50, 50, 50),
+                "default_gizmo_color": (255, 165, 0),
+                "default_camera_gizmo_color": (181, 102, 237),
+                "default_collision_color": (0, 162, 255),
+                "default_x_axis_color": (255, 0, 0),
+                "default_y_axis_color": (0, 255, 0),
+            }
+        }
+
+
+
+
 class KodEditor:
     def __init__(self):
         ErrorHandler.set_editor_mode(True)
         self.settings = Kod.Settings()
+        self.editor_settings = EditorSettings()
         self.initial_res = (640, 360)
         self.settings.project_settings["window"]["internal_viewport_resolution"] = self.initial_res
 
@@ -37,7 +56,8 @@ class KodEditor:
 
         ResourceServer.ResourceLoader.set_project_root(project_dir)
         self.app = Kod.App(self.settings, editor_mode=True)
-        self.app.debug_renderer = DebugRenderingServer.DebugRenderingServer(self.settings)
+        self.app.configuration.editor_settings = self.editor_settings.editor_settings["debug"]
+        self.app.debug_renderer = DebugRenderingServer.DebugRenderingServer(self.app.configuration)
         self.app.renderer.debug_renderer = self.app.debug_renderer
         self.mode = EditorMode.EDIT
         self.commands = deque()
@@ -57,17 +77,35 @@ class KodEditor:
         self.gizmo = EditorGizmoController(self)
         self.overlay = EditorOverlayRenderer(self)
         self.ui = EditorUI(self, self.app)
+        self.overlay_gizmo_nodes = []
 
     def queue_command(self, command_type, **payload):
+        if isinstance(command_type, str):
+            try:
+                command_type = EditorCommandType(command_type)
+            except Exception:
+                ErrorHandler.throw_error(f"Unknown editor command: {command_type}")
+                return
+
         self.commands.append(EditorCommand(type=command_type, payload=payload))
 
     def _dispatch_command(self, cmd: EditorCommand):
-        if cmd.type == "save_scene":
-            self.save_scene()
-        elif cmd.type == "load_scene":
-            self.load_scene(cmd.payload.get("path"))
-        elif cmd.type == "run_scene":
-            self.run_scene(cmd.payload.get("scene_path"))
+        match cmd.type:
+            case EditorCommandType.SAVE_SCENE:
+                self.save_scene()
+            case EditorCommandType.LOAD_SCENE:
+                self.load_scene(cmd.payload.get("path"))
+            case EditorCommandType.RUN_SCENE:
+                self.run_scene(cmd.payload.get("scene_path"))
+            case EditorCommandType.RUN_PROJECT:
+                main_scene_file_path = self.app.configuration.project_settings["runtime"]["main_scene_path"]
+                self.run_scene(main_scene_file_path)
+            case EditorCommandType.OPEN_FILE:
+                file_path = cmd.payload.get("file_path")
+                if file_path:
+                    self.open_file(file_path)
+            case EditorCommandType.OPEN_EDITOR_SETTINGS:
+                self.ui.dialogs.show_editor_settings_window()
 
     def _drain_commands(self):
         while self.commands:
@@ -106,6 +144,8 @@ class KodEditor:
         self.camera.zoom = max(self.min_zoom, min(self.max_zoom, value))
 
     def on_mouse_wheel(self, wheel_delta):
+        if hasattr(self, "ui") and self.ui.dialogs.is_any_dialog_open():
+            return
         self.gizmo.on_mouse_wheel(wheel_delta)
 
     def to_relative_path(self, path_str):
@@ -127,7 +167,7 @@ class KodEditor:
             ErrorHandler.throw_error("No screen supplied. Stopping rendering")
             return None
 
-        self.overlay.queue_debug_overlays()
+        self.overlay.queue_debug_overlays(self.overlay_gizmo_nodes)
 
         self.app.renderer.render_frame(self.app.current_scene, self.camera)
         self.app.scaled_surface = pygame.transform.scale(self.app.internal_surface, self.app.resolution)
@@ -228,6 +268,18 @@ class KodEditor:
 
         return None
 
+    def _collect_overlay_gizmo_nodes(self, node, out=None):
+        if out is None:
+            out = []
+
+        if self.overlay.should_draw_without_selection(node):
+            out.append(node)
+
+        for child in getattr(node, "_children", []):
+            self._collect_overlay_gizmo_nodes(child, out)
+
+        return out
+
     def run(self):
         last_frame_time = pygame.time.get_ticks()
         while pygui.is_dearpygui_running():
@@ -242,6 +294,9 @@ class KodEditor:
             root = getattr(self.app.current_scene, "root", None)
             if root:
                 self._update_node(root, delta)
+                self.overlay_gizmo_nodes = self._collect_overlay_gizmo_nodes(root, out=[])
+            else:
+                self.overlay_gizmo_nodes = []
 
             if self.app.current_scene:
                 nodes_were_deleted = self.app.current_scene._process_deletion_queue()
@@ -320,13 +375,9 @@ class KodEditor:
             ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
     
 
-
     def run_scene(self, scene_path=None):
         # This needs to run in a subprocess to avoid freezing the editor.
         try:
-            if scene_path is None:
-                scene_path = getattr(self.app.current_scene, "path", None)
-
             if scene_path is None:
                 ErrorHandler.throw_error("No scene path available to run")
                 return
@@ -344,7 +395,7 @@ class KodEditor:
             if "SDL_VIDEODRIVER" in env:
                 del env["SDL_VIDEODRIVER"]
 
-            subprocess.run(
+            result = subprocess.run(
                 [
                     sys.executable,
                     "-m",
@@ -355,20 +406,26 @@ class KodEditor:
                 cwd=src_root,
                 env=env,
             )
-            ErrorHandler.throw_success("Scene finished running")
+
+            if result.returncode != 0:
+                ErrorHandler.throw_error(f"Scene process exited with code {result.returncode}")
 
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to run scene: {e}")
 
     def update_events(self):
         self._drain_commands()
+
+        if hasattr(self, "ui") and self.ui.dialogs.is_any_dialog_open():
+            self.gizmo.cancel_interaction()
+            return
+
         self.gizmo.update_interaction()
 
         if pygui.is_mouse_button_clicked(pygui.mvMouseButton_Left):
             if not self.gizmo._is_mouse_over_viewport():
                 return
 
-            # If this click started gizmo dragging, keep the current selection.
             if self.gizmo._drag_active:
                 return
 
@@ -383,6 +440,30 @@ class KodEditor:
 
     def drag_file(self):
         pass
+
+    def open_file(self, file_path):
+        extension_command_list = self.settings.project_settings["file_management"]["file_extension_commands"]
+
+        _, extension = os.path.splitext(file_path)
+        command = extension_command_list.get(extension, "--default")
+
+        match command:
+            case "--editor":
+                if file_path.endswith(".kscn"):
+                    self.load_scene(file_path)
+
+
+            case "--default":
+                try:
+                    if platform.system() == "Windows":
+                        os.startfile(file_path)  # type: ignore # IGNORE
+                    elif platform.system() == "Darwin":
+                        subprocess.run(["open", file_path])
+                    else:
+                        subprocess.run(["xdg-open", file_path])
+                except Exception as e:
+                    ErrorHandler.throw_error(f"Failed to open file {file_path}: {e}")
+
 
 def main():
     KodEditor().run()

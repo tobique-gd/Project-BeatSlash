@@ -48,8 +48,8 @@
         "properties": {
           "name": "Bg",
           "position": [
-            0.0,
-            0.0
+            307.62487029198485,
+            264.7142325771209
           ],
           "rotation": [
             0,
@@ -60,7 +60,7 @@
           "flip_v": false,
           "offset": [
             -320.0,
-            -180.0
+            -320.0
           ],
           "texture": {
             "__resource__": {
@@ -80,8 +80,8 @@
         "properties": {
           "name": "Player",
           "position": [
-            3.8819276664838327,
-            89.39676037260469
+            358.7436979449261,
+            226.31522379183878
           ],
           "rotation": [
             0,
@@ -223,8 +223,8 @@
               ],
               "current_animation": {
                 "name": "Idle_Back",
-                "current_frame": 0,
-                "time_accumulator": 0.2280000000001252
+                "current_frame": 2,
+                "time_accumulator": 0.10000000000000522
               }
             },
             "children": []
@@ -258,8 +258,8 @@
             "properties": {
               "name": "RectangleCollisionShape2D",
               "position": [
-                -8.5,
-                -13.5
+                -6.5,
+                -13.0
               ],
               "rotation": [
                 0,
@@ -267,8 +267,8 @@
               ],
               "z_index": -2,
               "size": [
-                17.0,
-                27.0
+                13.0,
+                25.0
               ]
             },
             "children": []

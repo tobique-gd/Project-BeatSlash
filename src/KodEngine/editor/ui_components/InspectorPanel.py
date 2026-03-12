@@ -1,17 +1,35 @@
 import dearpygui.dearpygui as pygui
 import os
+from typing import Callable
 from ...engine import ErrorHandler
 from ...engine import Nodes
-from ...engine.Resources import *
+from ...engine.Resources import Resource, CollisionRectangleShape
+from ..ResourceEditors import create_default_resource_registry
 
 
 class InspectorPanel:
     def __init__(self, ui):
         self.ui = ui
+        self._resource_registry = create_default_resource_registry()
+        self._resource_slot_registry: dict[type, dict[str, type[Resource]]] = {
+            Nodes.Node: {"script": Resource},
+            Nodes.Sprite2D: {"texture": Resource},
+            Nodes.AnimatedSprite2D: {"current_animation": Resource},
+            Nodes.AudioPlayer: {"audio": Resource},
+            Nodes.TileMap2D: {"tileset": Resource},
+        }
+        self._custom_property_editors: dict[tuple[type, str], Callable[[object, str, object, str], None]] = {
+            (Nodes.AnimatedSprite2D, "animations"): self._draw_animations_property,
+        }
 
     def _resource_slot_info(self, node, attr, value):
         if isinstance(value, Resource):
             return True, value
+
+        for cls in type(node).mro():
+            attr_map = self._resource_slot_registry.get(cls)
+            if attr_map and attr in attr_map:
+                return True, None
 
         backing_candidates = [f"_{attr}_resource", f"_{attr}"]
         for backing_name in backing_candidates:
@@ -86,7 +104,7 @@ class InspectorPanel:
 
             self.draw_property(node, "name", getattr(node, "name", ""))
 
-        excluded = {"_children", "_parent", "runtime_script", "name"}
+        excluded = {"_children", "_parent", "runtime_script", "name", "global_position"}
         node_cls = type(node)
         mro = [cls for cls in node_cls.mro() if cls is not object]
         base_to_derived = list(reversed(mro))
@@ -185,6 +203,12 @@ class InspectorPanel:
         INT_MAX = 1000000
         label_text = attr.replace("_", " ").title()
 
+        for cls in type(node).mro():
+            editor = self._custom_property_editors.get((cls, attr))
+            if editor is not None:
+                editor(node, attr, value, label_text)
+                return
+
         is_resource_slot, resource_value = self._resource_slot_info(node, attr, value)
         if is_resource_slot:
             with pygui.table_row():
@@ -196,6 +220,7 @@ class InspectorPanel:
                     label=display_value,
                     tag=button_tag,
                     width=-1,
+                    callback=self._open_resource_editor,
                     user_data=(node, attr),
                     drop_callback=self._drop_resource_file,
                     payload_type="file_payload"
@@ -282,8 +307,6 @@ class InspectorPanel:
             
 
     def _draw_collision_shape_editor(self, node, attr, value):
-        from ...engine.Resources import CollisionRectangleShape
-        # Add a resource path field to signify this can be a file
         resource_path = getattr(value, "resource_path", None)
         display_path = self.ui.editor.to_relative_path(resource_path) if resource_path else "<Local>"
         
@@ -326,7 +349,7 @@ class InspectorPanel:
             if new_type == "RECTANGLE":
                 new_shape = CollisionRectangleShape(size=(32, 32))
             setattr(node, attr, new_shape)
-            ErrorHandler.throw_success(f"Changed shape to {new_type}")
+            
             self.update(node)
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to change shape: {e}")
@@ -335,6 +358,275 @@ class InspectorPanel:
         pygui.delete_item("inspector_panel", children_only=True)
         pygui.add_text("Inspector", parent="inspector_panel", color=(150, 150, 150))
         pygui.add_separator(parent="inspector_panel")
+
+    def _resource_classes(self):
+        classes = set()
+        for cls in Resource._type_registry.values():
+            if isinstance(cls, type) and issubclass(cls, Resource) and cls is not Resource:
+                classes.add(cls)
+        return sorted(classes, key=lambda c: c.__name__)
+
+    def _open_resource_editor(self, sender, app_data, user_data):
+        node, attr = user_data
+        self._show_resource_editor_window(node, attr)
+
+    def _draw_animations_property(self, node, attr, value, label_text):
+        count = len(value) if isinstance(value, list) else 0
+        with pygui.table_row():
+            pygui.add_text(label_text)
+            pygui.add_button(
+                label=f"Manage ({count})",
+                width=-1,
+                callback=lambda: self._show_animations_window(node),
+            )
+
+    def _show_animations_window(self, node):
+        window_tag = f"animations_editor_{id(node)}"
+        content_tag = f"animations_editor_content_{id(node)}"
+
+        if not pygui.does_item_exist(window_tag):
+            with pygui.window(
+                label="Animations",
+                tag=window_tag,
+                width=560,
+                height=520,
+                no_collapse=True,
+            ):
+                with pygui.child_window(tag=content_tag, border=False):
+                    pass
+
+        self._render_animations_content(node, content_tag)
+        pygui.show_item(window_tag)
+
+    def _render_animations_content(self, node, parent_tag):
+        if not pygui.does_item_exist(parent_tag):
+            return
+
+        pygui.delete_item(parent_tag, children_only=True)
+
+        animations = getattr(node, "animations", None)
+        if not isinstance(animations, list):
+            pygui.add_text("This node has no animations list.", parent=parent_tag)
+            return
+
+        pygui.add_text("AnimatedSprite2D Animations", parent=parent_tag, color=(140, 140, 140))
+        pygui.add_separator(parent=parent_tag)
+
+        pygui.add_button(
+            parent=parent_tag,
+            label="Add New Animation",
+            width=-1,
+            callback=lambda: self._add_animation(node, parent_tag),
+        )
+        pygui.add_separator(parent=parent_tag)
+
+        for index, anim in enumerate(animations):
+            name = getattr(anim, "name", f"Animation {index}")
+            current = getattr(node, "current_animation", None)
+            is_current = current is anim
+            label = f"{index}: {name}{' (Current)' if is_current else ''}"
+
+            with pygui.group(parent=parent_tag):
+                pygui.add_text(label)
+                with pygui.group(horizontal=True):
+                    pygui.add_button(
+                        label=f"Edit##anim_edit_{id(node)}_{index}",
+                        width=180,
+                        user_data=(node, index, parent_tag),
+                        callback=self._on_edit_animation_clicked,
+                    )
+                    pygui.add_button(
+                        label=f"Set Current##anim_set_{id(node)}_{index}",
+                        width=180,
+                        user_data=(node, index, parent_tag),
+                        callback=self._on_set_current_animation_clicked,
+                    )
+                    pygui.add_button(
+                        label=f"Remove##anim_remove_{id(node)}_{index}",
+                        width=180,
+                        user_data=(node, index, parent_tag),
+                        callback=self._on_remove_animation_clicked,
+                    )
+                pygui.add_separator()
+
+    def _on_edit_animation_clicked(self, sender, app_data, user_data):
+        node, index, parent_tag = user_data
+        self._open_animation_resource_editor(node, index, parent_tag)
+
+    def _on_set_current_animation_clicked(self, sender, app_data, user_data):
+        node, index, parent_tag = user_data
+        self._set_current_animation_by_index(node, index, parent_tag)
+
+    def _on_remove_animation_clicked(self, sender, app_data, user_data):
+        node, index, parent_tag = user_data
+        self._remove_animation_by_index(node, index, parent_tag)
+
+    def _add_animation(self, node, parent_tag):
+        try:
+            from ...engine import Resources as EngineResources
+            animation = EngineResources.SpriteAnimation(name=f"Animation{len(node.animations)}")
+            node.add_animation(animation)
+            if node.current_animation is None:
+                node.current_animation = animation
+            self.update(node)
+            self._render_animations_content(node, parent_tag)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to add animation: {e}")
+
+    def _set_current_animation_by_index(self, node, index, parent_tag):
+        try:
+            if index < 0 or index >= len(node.animations):
+                return
+            node.current_animation = node.animations[index]
+            self.update(node)
+            self._render_animations_content(node, parent_tag)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to set current animation: {e}")
+
+    def _remove_animation_by_index(self, node, index, parent_tag):
+        try:
+            if index < 0 or index >= len(node.animations):
+                return
+            removed = node.animations.pop(index)
+            if node.current_animation is removed:
+                node.current_animation = node.animations[0] if node.animations else None
+            self.update(node)
+            self._render_animations_content(node, parent_tag)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to remove animation: {e}")
+
+    def _open_animation_resource_editor(self, node, index, parent_tag):
+        if index < 0 or index >= len(node.animations):
+            return
+        attr = "current_animation"
+        node.current_animation = node.animations[index]
+        self._show_resource_editor_window(node, attr)
+        self._render_animations_content(node, parent_tag)
+
+    def _show_resource_editor_window(self, node, attr):
+        window_tag = f"resource_editor_{id(node)}_{attr}"
+        content_tag = f"resource_editor_content_{id(node)}_{attr}"
+
+        if not pygui.does_item_exist(window_tag):
+            with pygui.window(
+                label=f"Edit {attr}",
+                tag=window_tag,
+                width=520,
+                height=500,
+                no_collapse=True,
+            ):
+                with pygui.child_window(tag=content_tag, border=False):
+                    pass
+
+        self._render_resource_editor_content(node, attr, content_tag)
+        pygui.show_item(window_tag)
+
+    def _render_resource_editor_content(self, node, attr, parent_tag):
+        if not pygui.does_item_exist(parent_tag):
+            return
+
+        pygui.delete_item(parent_tag, children_only=True)
+
+        try:
+            current_value = getattr(node, attr)
+        except Exception:
+            current_value = None
+
+        is_resource_slot, resource_value = self._resource_slot_info(node, attr, current_value)
+        if not is_resource_slot:
+            pygui.add_text("This field is not a resource slot.", parent=parent_tag)
+            return
+
+        pygui.add_text(f"Property: {attr}", parent=parent_tag, color=(140, 140, 140))
+        pygui.add_separator(parent=parent_tag)
+
+        if resource_value is None:
+            classes = self._resource_classes()
+            class_names = [cls.__name__ for cls in classes]
+
+            if not class_names:
+                pygui.add_text("No resource classes registered.", parent=parent_tag)
+                return
+
+            default_name = class_names[0]
+
+            with pygui.group(parent=parent_tag):
+                pygui.add_text("Create Resource", color=(160, 160, 160))
+                selector_tag = f"resource_type_selector_{id(node)}_{attr}"
+                pygui.add_combo(
+                    items=class_names,
+                    default_value=default_name,
+                    tag=selector_tag,
+                    width=-1,
+                )
+                pygui.add_button(
+                    label="Create",
+                    width=-1,
+                    callback=lambda: self._create_resource_for_slot(node, attr, classes, selector_tag, parent_tag),
+                )
+
+            return
+
+        editor = self._resource_registry.get_editor(resource_value)
+        editor.draw(
+            parent=parent_tag,
+            resource=resource_value,
+            on_changed=lambda: self._on_resource_changed(node, attr, parent_tag),
+        )
+
+        pygui.add_separator(parent=parent_tag)
+        with pygui.group(parent=parent_tag, horizontal=True):
+            pygui.add_button(
+                label="Apply",
+                width=250,
+                callback=lambda: self._apply_resource_changes(node, attr, resource_value),
+            )
+            pygui.add_button(
+                label="Clear",
+                width=250,
+                callback=lambda: self._clear_resource_slot(node, attr, parent_tag),
+            )
+
+    def _create_resource_for_slot(self, node, attr, classes, selector_tag, parent_tag):
+        selected_name = pygui.get_value(selector_tag)
+        selected_cls = None
+        for cls in classes:
+            if cls.__name__ == selected_name:
+                selected_cls = cls
+                break
+
+        if selected_cls is None:
+            ErrorHandler.throw_error("Could not resolve selected resource type")
+            return
+
+        try:
+            resource_obj = selected_cls()
+            setattr(node, attr, resource_obj)
+            self.update(node)
+            self._render_resource_editor_content(node, attr, parent_tag)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to create resource: {e}")
+
+    def _apply_resource_changes(self, node, attr, resource_value):
+        try:
+            setattr(node, attr, resource_value)
+            
+            self.update(node)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed applying resource changes: {e}")
+
+    def _clear_resource_slot(self, node, attr, parent_tag):
+        try:
+            setattr(node, attr, None)
+            
+            self.update(node)
+            self._render_resource_editor_content(node, attr, parent_tag)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed clearing resource slot: {e}")
+
+    def _on_resource_changed(self, node, attr, parent_tag):
+        self.update(node)
+        self._render_resource_editor_content(node, attr, parent_tag)
 
     def _drop_resource_file(self, sender, app_data, user_data):
         try:
@@ -355,7 +647,6 @@ class InspectorPanel:
                 
                 setattr(node, attr, file_path)
                 display_path = self.ui.editor.to_relative_path(file_path)
-                ErrorHandler.throw_success(f"Set {attr} to: {display_path}")
                 
                 self.update(node)
             except Exception as e:

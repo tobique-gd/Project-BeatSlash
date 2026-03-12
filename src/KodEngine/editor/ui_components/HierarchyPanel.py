@@ -50,7 +50,7 @@ class HierarchyPanel:
 
         pygui.add_selectable(**kwargs)
         
-        with pygui.drag_payload(parent=tag, drag_data=tag, payload_type="collision_shape_payload"):
+        with pygui.drag_payload(parent=tag, drag_data=tag, payload_type="node_payload"):
             pygui.add_text(f"Drag {node.name}")
 
     def on_node_selected(self, sender, app_data):

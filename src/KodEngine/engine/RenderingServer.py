@@ -12,6 +12,9 @@ class Renderer:
     def render_frame(self, scene, _camera):
         self.camera = _camera
         self.screen.fill(self.configuration.editor_settings["default_background_color"])
+
+        if self.debug_renderer is not None:
+            self.debug_renderer.render(self.screen, self.pygame, self.camera, draw_pass="before_scene")
         
         if scene != None:
             nodes = self.create_node_structure(scene.root)
@@ -21,7 +24,7 @@ class Renderer:
                 self.render_node(sprite)
 
         if self.debug_renderer is not None:
-            self.debug_renderer.render(self.screen, self.pygame, self.camera)
+            self.debug_renderer.render(self.screen, self.pygame, self.camera, draw_pass="after_scene")
         
         self.pygame.display.flip()
 
