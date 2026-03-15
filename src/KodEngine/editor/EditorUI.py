@@ -1,20 +1,15 @@
 import dearpygui.dearpygui as pygui
 
 from . import ui_components as UIComp
+from .EditorModels import EditorSessionState
 from ..engine.ErrorHandler import ErrorHandler
-
-
-class UIState:
-    def __init__(self):
-        self.selected_node = None
-        self.selectables = {}
 
 
 class EditorUI:
     def __init__(self, editor, app):
         self.editor = editor
         self.app = app
-        self.state = UIState()
+        self.state = EditorSessionState()
         self.viewport = UIComp.ViewportPanel(self)
         self.hierarchy = UIComp.HierarchyPanel(self)
         self.inspector = UIComp.InspectorPanel(self)

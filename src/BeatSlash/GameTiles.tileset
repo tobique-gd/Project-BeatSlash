@@ -1,0 +1,102 @@
+{
+    "name": "Tileset",
+    "resource_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/GameTiles.tileset",
+    "tile_size": [
+        16,
+        16
+    ],
+    "tilesheet": {
+        "__resource__": {
+            "name": "Texture",
+            "resource_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/tilemaps/tilemap_test.png",
+            "texture_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/tilemaps/tilemap_test.png",
+            "type": "Texture2D",
+            "resource_type": "Texture2D"
+        }
+    },
+    "tilesheet_path": "/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/assets/textures/spritesheets/tilemaps/tilemap_test.png",
+    "tiles": [
+        {
+            "__resource__": {
+                "name": "Tile",
+                "resource_path": null,
+                "id": 0,
+                "texture_region": [
+                    [
+                        0,
+                        0
+                    ],
+                    [
+                        16,
+                        16
+                    ]
+                ],
+                "collision_shape": null,
+                "type": "Tile2D",
+                "resource_type": "Tile"
+            }
+        },
+        {
+            "__resource__": {
+                "name": "Tile1",
+                "resource_path": null,
+                "id": 1,
+                "texture_region": [
+                    [
+                        16,
+                        0
+                    ],
+                    [
+                        16,
+                        16
+                    ]
+                ],
+                "collision_shape": null,
+                "type": "Tile2D",
+                "resource_type": "Tile"
+            }
+        },
+        {
+            "__resource__": {
+                "name": "Tile2",
+                "resource_path": null,
+                "id": 2,
+                "texture_region": [
+                    [
+                        0,
+                        16
+                    ],
+                    [
+                        16,
+                        16
+                    ]
+                ],
+                "collision_shape": null,
+                "type": "Tile2D",
+                "resource_type": "Tile"
+            }
+        },
+        {
+            "__resource__": {
+                "name": "Tile3",
+                "resource_path": null,
+                "id": 3,
+                "texture_region": [
+                    [
+                        16,
+                        16
+                    ],
+                    [
+                        16,
+                        16
+                    ]
+                ],
+                "collision_shape": null,
+                "type": "Tile2D",
+                "resource_type": "Tile"
+            }
+        }
+    ],
+    "type": "Tileset2D",
+    "resource_type": "Tileset"
+}

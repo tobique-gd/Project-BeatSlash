@@ -7,12 +7,30 @@ import os
 from . import ErrorHandler
 
 
+def _coerce_int_pair(value, fallback=(0, 0)):
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        try:
+            return (int(value[0]), int(value[1]))
+        except Exception:
+            return fallback
+    return fallback
+
+
+def _coerce_texture_region(value, fallback=((0, 0), (16, 16))):
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        origin = _coerce_int_pair(value[0], fallback[0])
+        size = _coerce_int_pair(value[1], fallback[1])
+        return (origin, size)
+    return fallback
+
+
 #resource is a custom data structure that just hase a name and path with a template function for serializing data
 class Resource:
     type_id = "Resource"
     extensions: tuple[str, ...] = ()
     _type_registry: dict[str, type] = {}
     _extension_registry: dict[str, type] = {}
+    _resource_marker = "__resource__"
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -72,6 +90,36 @@ class Resource:
         data["type"] = self.__class__.__name__
         data["resource_type"] = getattr(self, "type_id", self.__class__.__name__)
         return data
+
+    @classmethod
+    def encode_value(cls, value):
+        if isinstance(value, Resource):
+            return {cls._resource_marker: value.to_dict()}
+
+        if isinstance(value, tuple):
+            return [cls.encode_value(item) for item in value]
+
+        if isinstance(value, list):
+            return [cls.encode_value(item) for item in value]
+
+        if isinstance(value, dict):
+            return {str(key): cls.encode_value(item) for key, item in value.items()}
+
+        return value
+
+    @classmethod
+    def decode_value(cls, value):
+        if isinstance(value, dict):
+            payload = value.get(cls._resource_marker)
+            if isinstance(payload, dict):
+                # Decode using the payload's declared resource type, not the caller class.
+                return Resource.from_dict(payload)
+            return {key: cls.decode_value(item) for key, item in value.items()}
+
+        if isinstance(value, list):
+            return [cls.decode_value(item) for item in value]
+
+        return value
 
     def save_data(self) -> dict:
         return {
@@ -398,6 +446,7 @@ class SpriteAnimation(Resource):
 
         self.frame_size = frame_size
         self.frames = frames
+        self.frame_regions: list[tuple[tuple[int, int], tuple[int, int]]] = []
         self.fps = fps
         self.loop = _loop
         
@@ -407,12 +456,21 @@ class SpriteAnimation(Resource):
 
         self.reload()
 
+    def _normalized_frame_regions(self):
+        normalized: list[tuple[tuple[int, int], tuple[int, int]]] = []
+        for item in self.frame_regions:
+            region = _coerce_texture_region(item, fallback=((0, 0), _coerce_int_pair(self.frame_size, (0, 0))))
+            (x, y), (w, h) = region
+            if w <= 0 or h <= 0:
+                continue
+            normalized.append(((int(x), int(y)), (int(w), int(h))))
+        return normalized
+
     def reload(self):
         spritesheet_surface = None
         if self.spritesheet:
             spritesheet_surface = self.spritesheet.get_texture()
         elif self.spritesheet_path:
-             # Fallback: create texture from path if we have path but no object
              self.spritesheet = Texture2D(resource_path=self.spritesheet_path)
              spritesheet_surface = self.spritesheet.get_texture()
 
@@ -422,25 +480,46 @@ class SpriteAnimation(Resource):
         if spritesheet_surface:
              sheet_width = spritesheet_surface.get_width()
              sheet_height = spritesheet_surface.get_height()
-             
-             for i in range(self.frames):
-                 if self.frame_size[0] <= 0 or self.frame_size[1] <= 0:
-                     continue
 
-                 x = (i * self.frame_size[0]) % sheet_width
-                 y = ((i * self.frame_size[0]) // sheet_width) * self.frame_size[1]
-                 
-                 if x + self.frame_size[0] > sheet_width or y + self.frame_size[1] > sheet_height:
-                     continue
-                 
-                 rect = pygame.Rect(x, y, *self.frame_size)
-                 try:
-                     surface = spritesheet_surface.subsurface(rect).copy()
-                     self.frames_surfaces.append(surface)
-                     w, h = surface.get_size()
-                     self.frames_local_rects.append(((-w / 2, -h / 2), (w, h)))
-                 except Exception as e:
-                     print(f"Error processing frame {i} of {self.name}: {e}")
+             explicit_regions = self._normalized_frame_regions()
+             if explicit_regions:
+                 self.frame_regions = explicit_regions
+                 self.frames = len(explicit_regions)
+                 for i, region in enumerate(explicit_regions):
+                     (x, y), (w, h) = region
+                     if x < 0 or y < 0:
+                         continue
+                     if x + w > sheet_width or y + h > sheet_height:
+                         continue
+                     rect = pygame.Rect(x, y, w, h)
+                     try:
+                         surface = spritesheet_surface.subsurface(rect).copy()
+                         self.frames_surfaces.append(surface)
+                         sw, sh = surface.get_size()
+                         self.frames_local_rects.append(((-sw / 2, -sh / 2), (sw, sh)))
+                     except Exception as e:
+                         print(f"Error processing explicit frame {i} of {self.name}: {e}")
+             else:
+                 frame_w, frame_h = _coerce_int_pair(self.frame_size, (0, 0))
+                 if frame_w <= 0 or frame_h <= 0:
+                     self.frames = 0
+                     return
+
+                 for i in range(self.frames):
+                     x = (i * frame_w) % sheet_width
+                     y = ((i * frame_w) // sheet_width) * frame_h
+
+                     if x + frame_w > sheet_width or y + frame_h > sheet_height:
+                         continue
+
+                     rect = pygame.Rect(x, y, frame_w, frame_h)
+                     try:
+                         surface = spritesheet_surface.subsurface(rect).copy()
+                         self.frames_surfaces.append(surface)
+                         w, h = surface.get_size()
+                         self.frames_local_rects.append(((-w / 2, -h / 2), (w, h)))
+                     except Exception as e:
+                         print(f"Error processing frame {i} of {self.name}: {e}")
 
     def update(self, delta: float):
         if self.finished or self.frames == 0 or not self.frames_surfaces:
@@ -469,6 +548,11 @@ class SpriteAnimation(Resource):
         if not tex:
             return pygame.Rect(0, 0, 0, 0)
 
+        if self.frame_regions:
+            frame_index = int(max(0, min(self.current_frame, len(self.frame_regions) - 1)))
+            (x, y), (w, h) = self.frame_regions[frame_index]
+            return pygame.Rect(int(x), int(y), int(w), int(h))
+
         sheet_width = tex.get_width()
         frame_x = (self.current_frame * self.frame_size[0]) % sheet_width
         frame_y = ((self.current_frame * self.frame_size[0]) // sheet_width) * self.frame_size[1]
@@ -485,6 +569,10 @@ class SpriteAnimation(Resource):
             "spritesheet": self.spritesheet, 
             "frame_size": self.frame_size,
             "frames": self.frames,
+            "frame_regions": [
+                [[int(region[0][0]), int(region[0][1])], [int(region[1][0]), int(region[1][1])]]
+                for region in self._normalized_frame_regions()
+            ],
             "fps": self.fps,
             "loop": self.loop
         })
@@ -517,6 +605,15 @@ class SpriteAnimation(Resource):
             self.frame_size = frame_size_raw
 
         self.frames = int(data.get("frames", self.frames))
+        raw_regions = data.get("frame_regions", self.frame_regions)
+        if isinstance(raw_regions, list):
+            self.frame_regions = []
+            for item in raw_regions:
+                region = _coerce_texture_region(item, fallback=((0, 0), _coerce_int_pair(self.frame_size, (0, 0))))
+                (x, y), (w, h) = region
+                if w <= 0 or h <= 0:
+                    continue
+                self.frame_regions.append(((int(x), int(y)), (int(w), int(h))))
         self.fps = int(data.get("fps", self.fps))
         self.loop = bool(data.get("loop", self.loop))
 
@@ -552,12 +649,192 @@ class Tileset2D(Resource):
         super().__init__(name=name, resource_path=resource_path)
         self.tile_size = (16, 16)
         self.tilesheet : Texture2D | None = None
-        self.tiles = []
+        self.tiles = [Tile2D(0)]
+        self._tile_surface_cache: dict[int, pygame.Surface] = {}
+
+    def clear_runtime_cache(self):
+        self._tile_surface_cache = {}
+
+    def ensure_default_tile(self):
+        if not isinstance(self.tiles, list):
+            self.tiles = []
+
+        valid_tiles = [tile for tile in self.tiles if isinstance(tile, Tile2D)]
+        if not valid_tiles:
+            valid_tiles = [Tile2D(0)]
+
+        valid_tiles.sort(key=lambda tile: tile.id)
+        self.tiles = valid_tiles
+
+    def next_available_tile_id(self) -> int:
+        self.ensure_default_tile()
+        existing_ids = {tile.id for tile in self.tiles}
+        new_id = 0
+        while new_id in existing_ids:
+            new_id += 1
+        return new_id
+
+    def get_tile_by_id(self, tile_id: int):
+        self.ensure_default_tile()
+        for tile in self.tiles:
+            if tile.id == tile_id:
+                return tile
+        return None
+
+    def add_tile(self, tile=None):
+        self.ensure_default_tile()
+        if tile is None:
+            tile = Tile2D(self.next_available_tile_id())
+            tile.texture_region = ((0, 0), _coerce_int_pair(self.tile_size, (16, 16)))
+
+        if not isinstance(tile, Tile2D):
+            return None
+
+        duplicate = self.get_tile_by_id(tile.id)
+        if duplicate is not None and duplicate is not tile:
+            tile.id = self.next_available_tile_id()
+
+        self.tiles.append(tile)
+        self.tiles.sort(key=lambda item: item.id)
+        self.clear_runtime_cache()
+        return tile
+
+    def remove_tile(self, tile_id: int):
+        self.ensure_default_tile()
+        self.tiles = [tile for tile in self.tiles if tile.id != tile_id]
+        if not self.tiles:
+            self.tiles = [Tile2D(0)]
+        self.clear_runtime_cache()
+
+    def get_tile_surface(self, tile_id: int):
+        if tile_id in self._tile_surface_cache:
+            return self._tile_surface_cache[tile_id]
+
+        tile = self.get_tile_by_id(tile_id)
+        if tile is None:
+            return None
+
+        if self.tilesheet is None and self.resource_path:
+            pass
+
+        sheet_surface = self.tilesheet.get_texture() if isinstance(self.tilesheet, Texture2D) else None
+        if sheet_surface is None:
+            return None
+
+        (origin_x, origin_y), (size_x, size_y) = _coerce_texture_region(tile.texture_region)
+        if size_x <= 0 or size_y <= 0:
+            return None
+
+        rect = pygame.Rect(origin_x, origin_y, size_x, size_y)
+        if rect.right > sheet_surface.get_width() or rect.bottom > sheet_surface.get_height():
+            return None
+
+        try:
+            surface = sheet_surface.subsurface(rect).copy()
+        except Exception:
+            return None
+
+        self._tile_surface_cache[tile_id] = surface
+        return surface
+
+    def save_data(self) -> dict:
+        self.ensure_default_tile()
+        data = super().save_data()
+        data["tile_size"] = list(_coerce_int_pair(self.tile_size, (16, 16)))
+        data["tilesheet"] = self.encode_value(self.tilesheet)
+        data["tilesheet_path"] = self.tilesheet.resource_path if isinstance(self.tilesheet, Texture2D) else None
+        data["tiles"] = [self.encode_value(tile) for tile in self.tiles]
+        return data
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        self.tile_size = _coerce_int_pair(data.get("tile_size"), self.tile_size)
+
+        tilesheet_value = data.get("tilesheet")
+        if tilesheet_value is not None:
+            tilesheet_value = self.decode_value(tilesheet_value)
+
+        if isinstance(tilesheet_value, Texture2D):
+            self.tilesheet = tilesheet_value
+        else:
+            tilesheet_path = data.get("tilesheet_path")
+            if isinstance(tilesheet_value, str):
+                tilesheet_path = tilesheet_value
+
+            if isinstance(tilesheet_path, str) and tilesheet_path:
+                self.tilesheet = Texture2D(resource_path=tilesheet_path)
+            else:
+                self.tilesheet = None
+
+        loaded_tiles = []
+        for item in data.get("tiles", []):
+            decoded = self.decode_value(item)
+            if isinstance(decoded, Tile2D):
+                loaded_tiles.append(decoded)
+            elif isinstance(decoded, dict):
+                tile = Tile2D(0)
+                tile.load_data(decoded)
+                loaded_tiles.append(tile)
+
+        self.tiles = loaded_tiles or [Tile2D(0)]
+        self.ensure_default_tile()
+        self.clear_runtime_cache()
+
+    @classmethod
+    def from_path(cls, path: str):
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                obj = cls.from_dict(data)
+                if obj is not None:
+                    obj.resource_path = path
+                    return obj
+            except Exception as e:
+                print(f"Failed to load tileset from {path}: {e}")
+        return cls(resource_path=path)
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        obj = cls(
+            name=data.get("name", "Tileset"),
+            resource_path=data.get("resource_path")
+        )
+        obj.load_data(data)
+        return obj
 
 class Tile2D(Resource):
     type_id = "Tile"
 
-    def __init__(self, name="Tile", resource_path: str | None = None):
+    def __init__(self, id: int, name="Tile", resource_path: str | None = None):
         super().__init__(name=name, resource_path=resource_path)
         self.texture_region: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (16, 16))
         self.collision_shape: CollisionShape | None = None
+        self.id = id
+
+    def save_data(self) -> dict:
+        data = super().save_data()
+        data["id"] = int(self.id)
+        data["texture_region"] = self.encode_value(self.texture_region)
+        data["collision_shape"] = self.encode_value(self.collision_shape)
+        return data
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        self.id = int(data.get("id", self.id))
+        self.texture_region = _coerce_texture_region(data.get("texture_region"), self.texture_region)
+
+        collision_shape = data.get("collision_shape")
+        if collision_shape is not None:
+            collision_shape = self.decode_value(collision_shape)
+        self.collision_shape = collision_shape if isinstance(collision_shape, CollisionShape) else None
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        obj = cls(
+            id=int(data.get("id", 0)),
+            name=data.get("name", "Tile"),
+            resource_path=data.get("resource_path")
+        )
+        obj.load_data(data)
+        return obj

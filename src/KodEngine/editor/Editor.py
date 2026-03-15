@@ -15,6 +15,7 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 from . import DebugRenderingServer
 from .EditorGizmo import EditorGizmoController
 from .EditorModels import EditorCommand, EditorCommandType, EditorMode
+from .EditorTools import EditorViewportToolController
 from .EditorOverlay import EditorOverlayRenderer
 from .EditorUI import EditorUI
 from ..engine import Kod, Nodes, ResourceServer
@@ -75,42 +76,15 @@ class KodEditor:
         self.max_zoom = 12.0
 
         self.gizmo = EditorGizmoController(self)
+        self.tools = EditorViewportToolController(self)
         self.overlay = EditorOverlayRenderer(self)
         self.ui = EditorUI(self, self.app)
         self.overlay_gizmo_nodes = []
-
-    def queue_command(self, command_type, **payload):
-        if isinstance(command_type, str):
-            try:
-                command_type = EditorCommandType(command_type)
-            except Exception:
-                ErrorHandler.throw_error(f"Unknown editor command: {command_type}")
-                return
-
-        self.commands.append(EditorCommand(type=command_type, payload=payload))
-
-    def _dispatch_command(self, cmd: EditorCommand):
-        match cmd.type:
-            case EditorCommandType.SAVE_SCENE:
-                self.save_scene()
-            case EditorCommandType.LOAD_SCENE:
-                self.load_scene(cmd.payload.get("path"))
-            case EditorCommandType.RUN_SCENE:
-                self.run_scene(cmd.payload.get("scene_path"))
-            case EditorCommandType.RUN_PROJECT:
-                main_scene_file_path = self.app.configuration.project_settings["runtime"]["main_scene_path"]
-                self.run_scene(main_scene_file_path)
-            case EditorCommandType.OPEN_FILE:
-                file_path = cmd.payload.get("file_path")
-                if file_path:
-                    self.open_file(file_path)
-            case EditorCommandType.OPEN_EDITOR_SETTINGS:
-                self.ui.dialogs.show_editor_settings_window()
-
-    def _drain_commands(self):
-        while self.commands:
-            cmd = self.commands.popleft()
-            self._dispatch_command(cmd)
+        self._pick_bounds_handlers = {
+            Nodes.Sprite2D: self._pick_bounds_sprite,
+            Nodes.RectangleCollisionShape2D: self._pick_bounds_rectangle_collision,
+            Nodes.Camera2D: self._pick_bounds_camera,
+        }
 
     def _screen_to_world(self, screen_x, screen_y):
         zoom = self._get_camera_zoom()
@@ -142,11 +116,6 @@ class KodEditor:
         except Exception:
             return
         self.camera.zoom = max(self.min_zoom, min(self.max_zoom, value))
-
-    def on_mouse_wheel(self, wheel_delta):
-        if hasattr(self, "ui") and self.ui.dialogs.is_any_dialog_open():
-            return
-        self.gizmo.on_mouse_wheel(wheel_delta)
 
     def to_relative_path(self, path_str):
         if not isinstance(path_str, str):
@@ -191,61 +160,51 @@ class KodEditor:
 
         return out
 
-    def _set_selected_node(self, node):
-        self.ui.state.selected_node = node
-
-        for tag, tag_node in list(self.ui.state.selectables.items()):
-            if pygui.does_item_exist(tag):
-                pygui.set_value(tag, node is not None and tag_node is node)
-
-        if node is None:
-            self.ui.inspector.clear()
-            if pygui.does_item_exist("add_node_btn"):
-                pygui.configure_item("add_node_btn", enabled=False)
-            return
-
-        self.ui.inspector.update(node)
-        if pygui.does_item_exist("add_node_btn"):
-            pygui.configure_item("add_node_btn", enabled=True)
-
-    def _get_pick_bounds(self, node):
-        if not isinstance(node, Nodes.Node2D):
+    def _pick_bounds_sprite(self, node):
+        image = node.image
+        if image is None:
             return None
 
-        if isinstance(node, Nodes.Sprite2D):
-            image = node.image
-            if image is None:
-                return None
+        return (
+            node.global_position[0] + node.offset[0],
+            node.global_position[1] + node.offset[1],
+            image.get_width(),
+            image.get_height(),
+        )
 
-            return (
-                node.global_position[0] + node.offset[0],
-                node.global_position[1] + node.offset[1],
-                image.get_width(),
-                image.get_height(),
-            )
+    def _pick_bounds_rectangle_collision(self, node):
+        return (
+            node.global_position[0],
+            node.global_position[1],
+            float(node.size[0]),
+            float(node.size[1]),
+        )
 
-        if isinstance(node, Nodes.RectangleCollisionShape2D):
-            return (
-                node.global_position[0],
-                node.global_position[1],
-                float(node.size[0]),
-                float(node.size[1]),
-            )
+    def _pick_bounds_camera(self, node):
+        return (
+            node.global_position[0] - node.offset[0] - self.initial_res[0] / 2.0,
+            node.global_position[1] - node.offset[1] - self.initial_res[1] / 2.0,
+            float(self.initial_res[0]),
+            float(self.initial_res[1]),
+        )
 
-        if isinstance(node, Nodes.Camera2D):
-            return (
-                node.global_position[0] - node.offset[0] - self.initial_res[0] / 2.0,
-                node.global_position[1] - node.offset[1] - self.initial_res[1] / 2.0,
-                float(self.initial_res[0]),
-                float(self.initial_res[1]),
-            )
-
+    def _pick_bounds_default(self, node):
         return (
             node.global_position[0] - 4.0,
             node.global_position[1] - 4.0,
             8.0,
             8.0,
         )
+
+    def _get_pick_bounds(self, node):
+        if not isinstance(node, Nodes.Node2D):
+            return None
+
+        for node_cls, handler in self._pick_bounds_handlers.items():
+            if isinstance(node, node_cls):
+                return handler(node)
+
+        return self._pick_bounds_default(node)
 
     def _pick_node_at_world(self, world_x, world_y):
         scene = getattr(self.app, "current_scene", None)
@@ -280,37 +239,43 @@ class KodEditor:
 
         return out
 
-    def run(self):
-        last_frame_time = pygame.time.get_ticks()
-        while pygui.is_dearpygui_running():
-            now = pygame.time.get_ticks()
-            delta = (now - last_frame_time) / 1000.0
-            last_frame_time = now
-            if not self.app.running:
-                self.ui.check_resize()
+    def _update_node(self, node, delta):
+        node.editor_update(delta)
 
-            self.update_events()
+        if getattr(node, "_queued_for_deletion", False):
+            if self.app.current_scene and node not in self.app.current_scene.deletion_queue:
+                self.app.current_scene.deletion_queue.append(node)
 
-            root = getattr(self.app.current_scene, "root", None)
-            if root:
-                self._update_node(root, delta)
-                self.overlay_gizmo_nodes = self._collect_overlay_gizmo_nodes(root, out=[])
-            else:
-                self.overlay_gizmo_nodes = []
+        for child in getattr(node, "_children", []):
+            self._update_node(child, delta)
 
-            if self.app.current_scene:
-                nodes_were_deleted = self.app.current_scene._process_deletion_queue()
-                if nodes_were_deleted and hasattr(self, "ui"):
-                    self.ui._update_hierarchy()
+    def _compute_frame_delta(self, last_frame_time):
+        now = pygame.time.get_ticks()
+        delta = (now - last_frame_time) / 1000.0
+        return delta, now
 
-            if not self.app.running:
-                frame = self.render_frame()
+    def _set_selected_node(self, node):
+        self.ui.state.selected_node = node
 
-            if not self.app.running:
-                self.ui.push_frame(frame)
-            pygui.render_dearpygui_frame()
+        for tag, tag_node in list(self.ui.state.selectables.items()):
+            if pygui.does_item_exist(tag):
+                pygui.set_value(tag, node is not None and tag_node is node)
 
-        pygui.destroy_context()
+        if node is None:
+            self.ui.inspector.clear()
+            if pygui.does_item_exist("add_node_btn"):
+                pygui.configure_item("add_node_btn", enabled=False)
+            return
+
+        self.ui.inspector.update(node)
+        if pygui.does_item_exist("add_node_btn"):
+            pygui.configure_item("add_node_btn", enabled=True)
+
+    def get_selected_paint_tile_id(self, node):
+        return self.ui.state.selected_paint_tile_ids.get(id(node))
+
+    def set_selected_paint_tile_id(self, node, tile_id: int):
+        self.ui.state.selected_paint_tile_ids[id(node)] = int(tile_id)
 
     def get_scene_hierarchy(self):
         root = getattr(self.app.current_scene, "root", None)
@@ -339,15 +304,15 @@ class KodEditor:
         self.app.renderer.screen = new_surface
         return True
 
-    def _update_node(self, node, delta):
-        node.editor_update(delta)
+    def queue_command(self, command_type, **payload):
+        if isinstance(command_type, str):
+            try:
+                command_type = EditorCommandType(command_type)
+            except Exception:
+                ErrorHandler.throw_error(f"Unknown editor command: {command_type}")
+                return
 
-        if getattr(node, "_queued_for_deletion", False):
-            if self.app.current_scene and node not in self.app.current_scene.deletion_queue:
-                self.app.current_scene.deletion_queue.append(node)
-
-        for child in getattr(node, "_children", []):
-            self._update_node(child, delta)
+        self.commands.append(EditorCommand(type=command_type, payload=payload))
 
     def save_scene(self, scene=None, scene_path=None):
         if scene is None:
@@ -368,12 +333,12 @@ class KodEditor:
             new_scene = ResourceServer.SceneLoader.load(scene_path)
             self.app.set_scene(new_scene)
             self.ui.state.selected_node = None
+            self.ui.state.selected_paint_tile_ids.clear()
             self.ui.inspector.clear()
             self.ui._update_hierarchy()
             self.ui.menubar.update()
         except Exception as e:
             ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
-    
 
     def run_scene(self, scene_path=None):
         # This needs to run in a subprocess to avoid freezing the editor.
@@ -413,31 +378,6 @@ class KodEditor:
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to run scene: {e}")
 
-    def update_events(self):
-        self._drain_commands()
-
-        if hasattr(self, "ui") and self.ui.dialogs.is_any_dialog_open():
-            self.gizmo.cancel_interaction()
-            return
-
-        self.gizmo.update_interaction()
-
-        if pygui.is_mouse_button_clicked(pygui.mvMouseButton_Left):
-            if not self.gizmo._is_mouse_over_viewport():
-                return
-
-            if self.gizmo._drag_active:
-                return
-
-            mouse_screen = self.gizmo._viewport_mouse_screen_position()
-            if mouse_screen is None:
-                return
-
-            world_x, world_y = self._screen_to_world(mouse_screen[0], mouse_screen[1])
-            picked_node = self._pick_node_at_world(world_x, world_y)
-            self._set_selected_node(picked_node)
-
-
     def drag_file(self):
         pass
 
@@ -452,7 +392,6 @@ class KodEditor:
                 if file_path.endswith(".kscn"):
                     self.load_scene(file_path)
 
-
             case "--default":
                 try:
                     if platform.system() == "Windows":
@@ -464,9 +403,110 @@ class KodEditor:
                 except Exception as e:
                     ErrorHandler.throw_error(f"Failed to open file {file_path}: {e}")
 
+    def on_mouse_wheel(self, wheel_delta):
+        if hasattr(self, "ui") and self.ui.dialogs.is_any_dialog_open():
+            return
+        self.gizmo.on_mouse_wheel(wheel_delta)
+
+    def _dispatch_command(self, cmd: EditorCommand):
+        match cmd.type:
+            case EditorCommandType.SAVE_SCENE:
+                self.save_scene()
+            case EditorCommandType.LOAD_SCENE:
+                self.load_scene(cmd.payload.get("path"))
+            case EditorCommandType.RUN_SCENE:
+                self.run_scene(cmd.payload.get("scene_path"))
+            case EditorCommandType.RUN_PROJECT:
+                main_scene_file_path = self.app.configuration.project_settings["runtime"]["main_scene_path"]
+                self.run_scene(main_scene_file_path)
+            case EditorCommandType.OPEN_FILE:
+                file_path = cmd.payload.get("file_path")
+                if file_path:
+                    self.open_file(file_path)
+            case EditorCommandType.OPEN_EDITOR_SETTINGS:
+                self.ui.dialogs.show_editor_settings_window()
+
+    def _drain_commands(self):
+        while self.commands:
+            cmd = self.commands.popleft()
+            self._dispatch_command(cmd)
+
+    def update_events(self):
+        self._drain_commands()
+
+        if self.ui.dialogs.is_any_dialog_open():
+            self.gizmo.cancel_interaction()
+            self.tools.reset()
+            return
+
+        self.gizmo.update_interaction()
+        self.tools.update()
+
+        if pygui.is_mouse_button_clicked(pygui.mvMouseButton_Left):
+            if not self.gizmo._is_mouse_over_viewport():
+                return
+
+            if self.tools.click_consumed:
+                return
+
+            if self.gizmo.drag_active:
+                return
+
+            mouse_screen = self.gizmo._viewport_mouse_screen_position()
+            if mouse_screen is None:
+                return
+
+            world_x, world_y = self._screen_to_world(mouse_screen[0], mouse_screen[1])
+            picked_node = self._pick_node_at_world(world_x, world_y)
+            self._set_selected_node(picked_node)
+
+    def _prepare_editor_frame(self):
+        if not self.app.running:
+            self.ui.check_resize()
+
+
+    def _update_editor_scene_state(self, delta):
+        root = getattr(self.app.current_scene, "root", None)
+        if root is None:
+            self.overlay_gizmo_nodes = []
+            return
+
+        self._update_node(root, delta)
+        self.overlay_gizmo_nodes = self._collect_overlay_gizmo_nodes(root, out=[])
+
+    def _sync_editor_scene_deletions(self):
+        if not self.app.current_scene:
+            return
+
+        nodes_were_deleted = self.app.current_scene._process_deletion_queue()
+        if nodes_were_deleted and hasattr(self, "ui"):
+            self.ui._update_hierarchy()
+
+    def _render_editor_viewport_frame(self):
+        if self.app.running:
+            return
+
+        frame = self.render_frame()
+        self.ui.push_frame(frame)
+
+    def _run_editor_frame(self, delta):
+        self.update_events()
+        self._prepare_editor_frame()
+        self._update_editor_scene_state(delta)
+        self._sync_editor_scene_deletions()
+        self._render_editor_viewport_frame()
+        
+
+    def run(self):
+        last_frame_time = pygame.time.get_ticks()
+
+        while pygui.is_dearpygui_running():
+            delta, last_frame_time = self._compute_frame_delta(last_frame_time)
+            self._run_editor_frame(delta)
+            pygui.render_dearpygui_frame()
+
+        pygui.destroy_context()
 
 def main():
-    KodEditor().run()
-
-if __name__ == "__main__":
-    main()
+    editor = KodEditor()
+    editor.run()

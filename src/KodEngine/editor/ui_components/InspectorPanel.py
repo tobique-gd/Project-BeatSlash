@@ -1,22 +1,33 @@
 import dearpygui.dearpygui as pygui
+import numpy as np
+import pygame
 import os
-from typing import Callable
+from typing import Any, Callable
 from ...engine import ErrorHandler
 from ...engine import Nodes
+from ...engine import ResourceServer
+from ...engine import Resources
 from ...engine.Resources import Resource, CollisionRectangleShape
 from ..ResourceEditors import create_default_resource_registry
+from .FileSystem import ignored_directory_list, ignored_file_list
 
 
 class InspectorPanel:
+    _texture_registry_tag = "inspector_texture_registry"
+
     def __init__(self, ui):
         self.ui = ui
         self._resource_registry = create_default_resource_registry()
+        self._file_picker_state: dict[str, Any] = {
+            "on_selected": None,
+            "extensions": None,
+        }
         self._resource_slot_registry: dict[type, dict[str, type[Resource]]] = {
             Nodes.Node: {"script": Resource},
             Nodes.Sprite2D: {"texture": Resource},
             Nodes.AnimatedSprite2D: {"current_animation": Resource},
             Nodes.AudioPlayer: {"audio": Resource},
-            Nodes.TileMap2D: {"tileset": Resource},
+            Nodes.TileMap2D: {"tileset": Resources.Tileset2D},
         }
         self._custom_property_editors: dict[tuple[type, str], Callable[[object, str, object, str], None]] = {
             (Nodes.AnimatedSprite2D, "animations"): self._draw_animations_property,
@@ -195,6 +206,9 @@ class InspectorPanel:
                 for attr, value, _ in items:
                     self.draw_property(node, attr, value)
 
+        if isinstance(node, Nodes.TileMap2D):
+            self._draw_tilemap_palette(node)
+
 
     def draw_property(self, node, attr, value):
         FLOAT_MIN = -1000000.0
@@ -343,6 +357,85 @@ class InspectorPanel:
                     callback=lambda s, v: setattr(value, "size", tuple(v))
                 )
 
+    def _draw_tilemap_palette(self, node: Nodes.TileMap2D):
+        pygui.add_separator(parent="inspector_panel")
+        pygui.add_text("Tile Palette", parent="inspector_panel", color=(130, 130, 130))
+
+        tileset = getattr(node, "tileset", None)
+        if not isinstance(tileset, Resources.Tileset2D):
+            pygui.add_text("Assign a Tileset resource to view available tiles.", parent="inspector_panel")
+            return
+
+        tileset.ensure_default_tile()
+        selected_tile_id = self._get_selected_tilemap_tile_id(node, tileset)
+        pygui.add_text(f"Selected Tile ID: {selected_tile_id}", parent="inspector_panel", color=(150, 150, 150))
+
+        list_tag = f"tilemap_palette_list_{id(node)}"
+        with pygui.child_window(parent="inspector_panel", tag=list_tag, border=True, height=240):
+            for tile in tileset.tiles:
+                surface = tileset.get_tile_surface(tile.id)
+                preview_tag = None
+                if surface is not None:
+                    preview_tag = f"tilemap_palette_preview_{id(node)}_{tile.id}"
+                    self._update_texture(preview_tag, surface)
+
+                with pygui.group(horizontal=True):
+                    if preview_tag is not None and surface is not None and pygui.does_item_exist(preview_tag):
+                        thumb = max(12, min(32, max(surface.get_width(), surface.get_height())))
+                        pygui.add_image(preview_tag, width=thumb, height=thumb)
+                    else:
+                        pygui.add_text("[ ]")
+
+                    label = f"{tile.id}: {tile.name}"
+                    if int(tile.id) == int(selected_tile_id):
+                        label = f"> {label}"
+
+                    pygui.add_button(
+                        label=label,
+                        width=-1,
+                        callback=lambda *_, tile_id=tile.id: self._select_tilemap_palette_tile(node, int(tile_id)),
+                    )
+
+    def _get_selected_tilemap_tile_id(self, node: Nodes.TileMap2D, tileset: Resources.Tileset2D):
+        selected_id = self.ui.editor.get_selected_paint_tile_id(node)
+        if isinstance(selected_id, int) and tileset.get_tile_by_id(selected_id) is not None:
+            return selected_id
+
+        fallback_tile = tileset.tiles[0] if tileset.tiles else None
+        fallback_id = int(fallback_tile.id) if fallback_tile is not None else 0
+        self.ui.editor.set_selected_paint_tile_id(node, fallback_id)
+        return fallback_id
+
+    def _select_tilemap_palette_tile(self, node: Nodes.TileMap2D, tile_id: int):
+        self.ui.editor.set_selected_paint_tile_id(node, int(tile_id))
+        self.update(node)
+
+    def _ensure_texture_registry(self):
+        if not pygui.does_item_exist(self._texture_registry_tag):
+            with pygui.texture_registry(tag=self._texture_registry_tag, show=False):
+                pass
+        return self._texture_registry_tag
+
+    def _update_texture(self, texture_tag: str, surface: pygame.Surface):
+        if surface is None:
+            return
+
+        registry_tag = self._ensure_texture_registry()
+        rgba = pygame.surfarray.array3d(surface).transpose((1, 0, 2))
+        alpha = pygame.surfarray.array_alpha(surface).transpose((1, 0))[..., np.newaxis]
+        texture_data = np.concatenate((rgba, alpha), axis=2).astype(np.float32) / 255.0
+
+        if pygui.does_item_exist(texture_tag):
+            pygui.delete_item(texture_tag)
+
+        pygui.add_static_texture(
+            width=surface.get_width(),
+            height=surface.get_height(),
+            default_value=texture_data.flatten().tolist(),
+            tag=texture_tag,
+            parent=registry_tag,
+        )
+
     def _on_shape_type_changed(self, sender, new_type, user_data):
         node, attr = user_data
         try:
@@ -365,6 +458,20 @@ class InspectorPanel:
             if isinstance(cls, type) and issubclass(cls, Resource) and cls is not Resource:
                 classes.add(cls)
         return sorted(classes, key=lambda c: c.__name__)
+
+    def _resource_slot_class(self, node, attr):
+        for cls in type(node).mro():
+            attr_map = self._resource_slot_registry.get(cls)
+            if attr_map and attr in attr_map:
+                resource_cls = attr_map[attr]
+                if isinstance(resource_cls, type) and issubclass(resource_cls, Resource):
+                    return resource_cls
+                return Resource
+        return Resource
+
+    def _resource_classes_for_slot(self, node, attr):
+        slot_cls = self._resource_slot_class(node, attr)
+        return [cls for cls in self._resource_classes() if issubclass(cls, slot_cls)]
 
     def _open_resource_editor(self, sender, app_data, user_data):
         node, attr = user_data
@@ -465,6 +572,20 @@ class InspectorPanel:
         try:
             from ...engine import Resources as EngineResources
             animation = EngineResources.SpriteAnimation(name=f"Animation{len(node.animations)}")
+
+            template = node.current_animation
+            if template is None and node.animations:
+                template = node.animations[0]
+
+            if isinstance(template, EngineResources.SpriteAnimation):
+                animation.frame_size = tuple(template.frame_size)
+                animation.fps = int(template.fps)
+                animation.loop = bool(template.loop)
+                if getattr(template, "spritesheet_path", None):
+                    animation.spritesheet_path = template.spritesheet_path
+                    animation.spritesheet = EngineResources.Texture2D(resource_path=template.spritesheet_path)
+                animation.reload()
+
             node.add_animation(animation)
             if node.current_animation is None:
                 node.current_animation = animation
@@ -541,7 +662,7 @@ class InspectorPanel:
         pygui.add_separator(parent=parent_tag)
 
         if resource_value is None:
-            classes = self._resource_classes()
+            classes = self._resource_classes_for_slot(node, attr)
             class_names = [cls.__name__ for cls in classes]
 
             if not class_names:
@@ -572,6 +693,11 @@ class InspectorPanel:
             parent=parent_tag,
             resource=resource_value,
             on_changed=lambda: self._on_resource_changed(node, attr, parent_tag),
+            editor_context={
+                "to_relative_path": self.ui.editor.to_relative_path,
+                "from_relative_path": self._from_relative_path,
+                "open_file_picker": self._show_project_file_picker,
+            },
         )
 
         pygui.add_separator(parent=parent_tag)
@@ -628,9 +754,101 @@ class InspectorPanel:
         self.update(node)
         self._render_resource_editor_content(node, attr, parent_tag)
 
+    def _show_project_file_picker(self, title, on_selected, extensions=None, initial_path=None):
+        if not callable(on_selected):
+            return
+
+        window_tag = "inspector_resource_file_picker"
+        tree_tag = "inspector_resource_file_picker_tree"
+        project_directory = self.ui.editor.settings.project_settings["file_management"]["project_directory"]
+
+        normalized_extensions = None
+        if isinstance(extensions, (tuple, list)) and extensions:
+            normalized_extensions = tuple(str(ext).lower() for ext in extensions if isinstance(ext, str) and ext)
+
+        self._file_picker_state["on_selected"] = on_selected
+        self._file_picker_state["extensions"] = normalized_extensions
+
+        if pygui.does_item_exist(window_tag):
+            pygui.delete_item(window_tag)
+
+        with pygui.window(
+            label=title or "Select File",
+            tag=window_tag,
+            width=620,
+            height=520,
+            no_collapse=True,
+            modal=False,
+        ):
+            pygui.add_text("Project Files", color=(150, 150, 150))
+            pygui.add_separator()
+            with pygui.child_window(tag=tree_tag, border=True, height=-52):
+                self._build_picker_tree(project_directory)
+
+            pygui.add_separator()
+            with pygui.group(horizontal=True):
+                pygui.add_button(
+                    label="Cancel",
+                    width=-1,
+                    callback=lambda: pygui.delete_item(window_tag),
+                )
+
+        main_width = pygui.get_item_width("Primary Window") or 1400
+        main_height = pygui.get_item_height("Primary Window") or 900
+        picker_x = int((main_width / 2 - 620 / 2))
+        picker_y = int((main_height / 2 - 520 / 2))
+        pygui.set_item_pos(window_tag, [picker_x, picker_y])
+
+    def _build_picker_tree(self, path):
+        try:
+            items = sorted(os.listdir(path))
+            for item in items:
+                if item.startswith(".") or item in ignored_file_list or item in ignored_directory_list:
+                    continue
+
+                full_path = os.path.join(path, item)
+                if os.path.isdir(full_path):
+                    with pygui.tree_node(label=item, default_open=False):
+                        self._build_picker_tree(full_path)
+                    continue
+
+                if not self._matches_picker_extensions(full_path):
+                    continue
+
+                pygui.add_selectable(
+                    label=item,
+                    user_data=full_path,
+                    callback=self._on_picker_file_selected,
+                    span_columns=True,
+                )
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to build file picker: {e}")
+
+    def _matches_picker_extensions(self, full_path: str):
+        extensions = self._file_picker_state.get("extensions")
+        if not extensions:
+            return True
+
+        _, ext = os.path.splitext(full_path)
+        return ext.lower() in extensions
+
+    def _on_picker_file_selected(self, sender, app_data, user_data):
+        selected_path = user_data
+        callback = self._file_picker_state.get("on_selected")
+        if not callable(callback):
+            return
+
+        try:
+            callback(selected_path)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to set selected file: {e}")
+            return
+
+        if pygui.does_item_exist("inspector_resource_file_picker"):
+            pygui.delete_item("inspector_resource_file_picker")
+
     def _drop_resource_file(self, sender, app_data, user_data):
         try:
-            
             button_user_data = pygui.get_item_user_data(sender)
             if button_user_data is None:
                 ErrorHandler.throw_error("No user data found on button")
@@ -642,12 +860,32 @@ class InspectorPanel:
             if file_path is None or not isinstance(file_path, str):
                 ErrorHandler.throw_error("No valid file path in drop event")
                 return
+
+            is_resource_slot, _ = self._resource_slot_info(node, attr, getattr(node, attr, None))
+            if is_resource_slot:
+                slot_cls = self._resource_slot_class(node, attr)
+                resource_value = ResourceServer.ResourceLoader.load(file_path)
+
+                if resource_value is None and isinstance(slot_cls, type) and issubclass(slot_cls, Resource):
+                    try:
+                        resource_value = slot_cls.from_path(file_path)
+                    except Exception:
+                        resource_value = None
+
+                if resource_value is None:
+                    ErrorHandler.throw_error(f"Failed to load resource from {file_path}")
+                    return
+
+                if slot_cls is not Resource and not isinstance(resource_value, slot_cls):
+                    ErrorHandler.throw_error(f"{attr} expects {slot_cls.__name__}, got {type(resource_value).__name__}")
+                    return
+
+                setattr(node, attr, resource_value)
+                self.update(node)
+                return
             
             try:
-                
                 setattr(node, attr, file_path)
-                display_path = self.ui.editor.to_relative_path(file_path)
-                
                 self.update(node)
             except Exception as e:
                 ErrorHandler.throw_error(f"Failed to set {attr}: {e}")

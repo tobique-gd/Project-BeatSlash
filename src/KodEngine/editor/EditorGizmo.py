@@ -19,6 +19,14 @@ class EditorGizmoController:
             return self._drag_axis
         return self._hover_axis
 
+    @property
+    def drag_active(self):
+        return self._drag_active
+
+    @property
+    def left_mouse_was_down(self):
+        return self._left_mouse_was_down
+
     def cancel_interaction(self):
         self._drag_active = False
         self._drag_axis = None

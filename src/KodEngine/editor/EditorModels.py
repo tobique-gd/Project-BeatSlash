@@ -22,3 +22,10 @@ class EditorCommandType(str, Enum):
 class EditorCommand:
     type: EditorCommandType
     payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class EditorSessionState:
+    selected_node: object | None = None
+    selectables: dict[str, object] = field(default_factory=dict)
+    selected_paint_tile_ids: dict[int, int] = field(default_factory=dict)

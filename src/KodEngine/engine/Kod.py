@@ -130,6 +130,22 @@ class App:
 
         return self.fallback_camera
 
+    def resolve_events(self, events):
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.running = False
+
+            elif event.type == pygame.VIDEORESIZE:
+                self.handle_resize(event.size)
+
+            if self.current_scene:
+                self.current_scene._input(event)
+
+    def calculate_delta(self, last_frame_time):
+        now = pygame.time.get_ticks()
+        delta = (now - last_frame_time) / 1000.0
+        return delta
+
     def run(self):
         if not self.screen:
             ErrorHandler.throw_error("No screen set. Stopping running.")
@@ -144,30 +160,20 @@ class App:
         last_frame_time = pygame.time.get_ticks()
 
         while self.running:
-            now = pygame.time.get_ticks()
-            delta = (now - last_frame_time) / 1000.0
-            last_frame_time = now
+            delta = self.calculate_delta(last_frame_time)
+            last_frame_time = pygame.time.get_ticks()
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-
-                elif event.type == pygame.VIDEORESIZE:
-                    self.handle_resize(event.size)
-
-                if self.current_scene:
-                    self.current_scene._input(event)
-
-            if self.current_scene:
-                self.current_scene._process(delta)
+            self.resolve_events(pygame.event.get())
+            self.current_scene._process(delta)
 
             camera = self.resolve_camera()
             self.renderer.render_frame(self.current_scene, camera)
-
             self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
             self.screen.blit(self.scaled_surface, (0, 0))
 
             self.clock.tick(self.FPS)
+    
+
 
     def kill(self):
         pygame.quit()

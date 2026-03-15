@@ -33,42 +33,10 @@
           "audio": {
             "__resource__": {
               "name": "Audio",
-              "resource_path": "assets/audio/IMissYou.mp3",
-              "file_path": "assets/audio/IMissYou.mp3",
+              "resource_path": "assets/audio/BossfightOST.mp3",
+              "file_path": "assets/audio/BossfightOST.mp3",
               "type": "AudioStream",
               "resource_type": "AudioStream"
-            }
-          }
-        },
-        "children": []
-      },
-      {
-        "type": "Sprite2D",
-        "name": "Bg",
-        "properties": {
-          "name": "Bg",
-          "position": [
-            307.62487029198485,
-            264.7142325771209
-          ],
-          "rotation": [
-            0,
-            0
-          ],
-          "z_index": -1.0,
-          "flip_h": false,
-          "flip_v": false,
-          "offset": [
-            -320.0,
-            -320.0
-          ],
-          "texture": {
-            "__resource__": {
-              "name": "Texture",
-              "resource_path": "assets/textures/dmimage.png",
-              "texture_path": "assets/textures/dmimage.png",
-              "type": "Texture2D",
-              "resource_type": "Texture2D"
             }
           }
         },
@@ -80,8 +48,8 @@
         "properties": {
           "name": "Player",
           "position": [
-            358.7436979449261,
-            226.31522379183878
+            92.476777943618,
+            -29.504567073947044
           ],
           "rotation": [
             0,
@@ -142,6 +110,7 @@
                       27
                     ],
                     "frames": 4,
+                    "frame_regions": [],
                     "fps": 4,
                     "loop": true,
                     "type": "SpriteAnimation",
@@ -166,6 +135,7 @@
                       27
                     ],
                     "frames": 4,
+                    "frame_regions": [],
                     "fps": 4,
                     "loop": true,
                     "type": "SpriteAnimation",
@@ -190,6 +160,7 @@
                       27
                     ],
                     "frames": 4,
+                    "frame_regions": [],
                     "fps": 4,
                     "loop": true,
                     "type": "SpriteAnimation",
@@ -214,6 +185,7 @@
                       27
                     ],
                     "frames": 8,
+                    "frame_regions": [],
                     "fps": 12,
                     "loop": true,
                     "type": "SpriteAnimation",
@@ -222,9 +194,9 @@
                 }
               ],
               "current_animation": {
-                "name": "Idle_Back",
-                "current_frame": 2,
-                "time_accumulator": 0.10000000000000522
+                "name": "Idle_Front",
+                "current_frame": 1,
+                "time_accumulator": 0.10500000000002432
               }
             },
             "children": []
@@ -274,6 +246,156 @@
             "children": []
           }
         ]
+      },
+      {
+        "type": "TileMap2D",
+        "name": "TileMap2D",
+        "properties": {
+          "name": "TileMap2D",
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0
+          ],
+          "z_index": 0,
+          "bounds": [
+            [
+              -6,
+              -8
+            ],
+            [
+              20,
+              8
+            ]
+          ],
+          "tile_data": [
+            [-1, -1, -1, -1, 3, 3, 3, 3, 3, 3, 3, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+            [-1, -1, 3, -1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+            [-1, -1, -1, -1, 0, 1, 1, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, -1, -1],
+            [-1, -1, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, -1],
+            [-1, -1, 0, -1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 0],
+            [-1, 3, -1, -1, 3, 3, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 0],
+            [-1, -1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 3, 3, 0, 0, 0],
+            [-1, -1, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 3, 3, 3, 3, 0, 0, 0, 0, 0, 3, 3, -1],
+            [3, -1, -1, -1, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 0, 0, 3, 3, -1],
+            [-1, -1, 0, -1, 0, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, -1],
+            [-1, -1, -1, 0, 1, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, -1],
+            [-1, -1, -1, -1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, -1, -1],
+            [-1, -1, -1, -1, -1, -1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0, -1, -1],
+            [-1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 0, 0, -1, -1],
+            [-1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1],
+            [-1, -1, -1, -1, -1, -1, -1, -1, 0, 0, -1, 0, -1, -1, -1, 1, 1, 1, 0, 0, 0, 0, 0, 0, -1, -1, -1],
+            [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1]
+          ],
+          "tileset": {
+            "__resource__": {
+              "name": "Tileset",
+              "resource_path": "GameTiles.tileset",
+              "tile_size": [
+                16,
+                16
+              ],
+              "tilesheet": {
+                "__resource__": {
+                  "name": "Texture",
+                  "resource_path": "assets/textures/spritesheets/tilemaps/tilemap_test.png",
+                  "texture_path": "assets/textures/spritesheets/tilemaps/tilemap_test.png",
+                  "type": "Texture2D",
+                  "resource_type": "Texture2D"
+                }
+              },
+              "tilesheet_path": "assets/textures/spritesheets/tilemaps/tilemap_test.png",
+              "tiles": [
+                {
+                  "__resource__": {
+                    "name": "Tile",
+                    "resource_path": null,
+                    "id": 0,
+                    "texture_region": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        16,
+                        16
+                      ]
+                    ],
+                    "collision_shape": null,
+                    "type": "Tile2D",
+                    "resource_type": "Tile"
+                  }
+                },
+                {
+                  "__resource__": {
+                    "name": "Tile1",
+                    "resource_path": null,
+                    "id": 1,
+                    "texture_region": [
+                      [
+                        16,
+                        0
+                      ],
+                      [
+                        16,
+                        16
+                      ]
+                    ],
+                    "collision_shape": null,
+                    "type": "Tile2D",
+                    "resource_type": "Tile"
+                  }
+                },
+                {
+                  "__resource__": {
+                    "name": "Tile2",
+                    "resource_path": null,
+                    "id": 2,
+                    "texture_region": [
+                      [
+                        0,
+                        16
+                      ],
+                      [
+                        16,
+                        16
+                      ]
+                    ],
+                    "collision_shape": null,
+                    "type": "Tile2D",
+                    "resource_type": "Tile"
+                  }
+                },
+                {
+                  "__resource__": {
+                    "name": "Tile3",
+                    "resource_path": null,
+                    "id": 3,
+                    "texture_region": [
+                      [
+                        16,
+                        16
+                      ],
+                      [
+                        16,
+                        16
+                      ]
+                    ],
+                    "collision_shape": null,
+                    "type": "Tile2D",
+                    "resource_type": "Tile"
+                  }
+                }
+              ],
+              "type": "Tileset2D",
+              "resource_type": "Tileset"
+            }
+          }
+        },
+        "children": []
       }
     ]
   }

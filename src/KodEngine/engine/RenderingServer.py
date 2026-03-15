@@ -43,6 +43,10 @@ class Renderer:
         return max(0.05, zoom)
 
     def render_node(self, node):
+        if isinstance(node, Nodes.TileMap2D):
+            self.render_tilemap(node)
+            return
+
         #only render nodes that inherit from Sprite2D
         if isinstance(node, Nodes.Sprite2D):
             tex = node.image
@@ -74,12 +78,61 @@ class Renderer:
 
             self.screen.blit(tex, camera_space_translation)
 
+    def render_tilemap(self, node):
+        tileset = getattr(node, "tileset", None)
+        tile_data = getattr(node, "tile_data", getattr(node, "_tile_data", None))
+        bounds = getattr(node, "bounds", getattr(node, "_bounds", ((0, 0), (-1, -1))))
+
+        if tileset is None or not isinstance(tile_data, list):
+            return
+
+        zoom = self._get_camera_zoom()
+        (min_x, min_y), _ = bounds
+
+        for row_index, row in enumerate(tile_data):
+            if not isinstance(row, (list, tuple)):
+                continue
+
+            for column_index, tile_id in enumerate(row):
+                try:
+                    tile_id = int(tile_id)
+                except Exception:
+                    continue
+
+                if tile_id < 0:
+                    continue
+
+                tex = tileset.get_tile_surface(tile_id)
+                if tex is None:
+                    continue
+
+                tile_x = min_x + column_index
+                tile_y = min_y + row_index
+                world_x, world_y = node.tile_to_world((tile_x, tile_y))
+
+                camera_offset_node_position = (
+                    (node.global_position[0] + world_x - self.camera.global_position[0] + self.camera.offset[0]) * zoom,
+                    (node.global_position[1] + world_y - self.camera.global_position[1] + self.camera.offset[1]) * zoom,
+                )
+
+                camera_offset_centered = (
+                    camera_offset_node_position[0] + self.configuration.project_settings["window"]["internal_viewport_resolution"][0] / 2.0,
+                    camera_offset_node_position[1] + self.configuration.project_settings["window"]["internal_viewport_resolution"][1] / 2.0,
+                )
+
+                if abs(zoom - 1.0) > 0.001:
+                    target_w = max(1, int(tex.get_width() * zoom))
+                    target_h = max(1, int(tex.get_height() * zoom))
+                    tex = self.pygame.transform.scale(tex, (target_w, target_h))
+
+                self.screen.blit(tex, camera_offset_centered)
+
 
     def create_node_structure(self, node, nodes_array=None):
         if nodes_array is None:
             nodes_array = []
 
-        if isinstance(node, Nodes.Sprite2D):
+        if isinstance(node, (Nodes.Sprite2D, Nodes.TileMap2D)):
             nodes_array.append(node)
 
         for child in getattr(node, '_children', []):

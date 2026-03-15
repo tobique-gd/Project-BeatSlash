@@ -176,6 +176,62 @@ class SceneLoader:
 
     #reading scene files (.kscn) that are basically json
     @staticmethod
+    def _json_pretty_with_compact_tile_rows(value, indent=2, level=0, parent_key=None):
+        pad = " " * (indent * level)
+        child_pad = " " * (indent * (level + 1))
+
+        if isinstance(value, dict):
+            if not value:
+                return "{}"
+
+            lines = ["{"]
+            items = list(value.items())
+            for index, (key, item) in enumerate(items):
+                key_text = json.dumps(str(key), ensure_ascii=False)
+                item_text = SceneLoader._json_pretty_with_compact_tile_rows(
+                    item,
+                    indent=indent,
+                    level=level + 1,
+                    parent_key=str(key),
+                )
+                comma = "," if index < len(items) - 1 else ""
+                lines.append(f"{child_pad}{key_text}: {item_text}{comma}")
+
+            lines.append(f"{pad}}}")
+            return "\n".join(lines)
+
+        if isinstance(value, list):
+            if not value:
+                return "[]"
+
+            if parent_key in {"tile_data", "_tile_data"} and all(
+                isinstance(row, (list, tuple)) and all(isinstance(cell, (int, float, str, bool)) or cell is None for cell in row)
+                for row in value
+            ):
+                lines = ["["]
+                for index, row in enumerate(value):
+                    row_text = json.dumps(list(row), ensure_ascii=False, separators=(", ", ": "))
+                    comma = "," if index < len(value) - 1 else ""
+                    lines.append(f"{child_pad}{row_text}{comma}")
+                lines.append(f"{pad}]")
+                return "\n".join(lines)
+
+            lines = ["["]
+            for index, item in enumerate(value):
+                item_text = SceneLoader._json_pretty_with_compact_tile_rows(
+                    item,
+                    indent=indent,
+                    level=level + 1,
+                    parent_key=None,
+                )
+                comma = "," if index < len(value) - 1 else ""
+                lines.append(f"{child_pad}{item_text}{comma}")
+            lines.append(f"{pad}]")
+            return "\n".join(lines)
+
+        return json.dumps(value, ensure_ascii=False)
+
+    @staticmethod
     def _read_json(file_path):
         try:
             with open(file_path, "r") as f:
@@ -191,8 +247,10 @@ class SceneLoader:
     @staticmethod
     def _write_json(file_path, data):
         try:
+            serialized = SceneLoader._json_pretty_with_compact_tile_rows(data, indent=2)
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, default=str, indent=2)
+                f.write(serialized)
+                f.write("\n")
             return True
         except Exception as e:
             SceneLoader._error(f"Failed to write scene to '{file_path}': {e}")

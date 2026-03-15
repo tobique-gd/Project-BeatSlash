@@ -1,4 +1,5 @@
 from ..engine import Nodes
+import math
 
 
 class EditorOverlayRenderer:
@@ -164,6 +165,9 @@ class EditorOverlayRenderer:
             self._draw_node_shape_gizmo(debug, node, camera_is_active=(node is active_camera))
 
         if selected_node and hasattr(selected_node, "global_position"):
+            if isinstance(selected_node, Nodes.TileMap2D):
+                self._draw_tilemap_grid(debug, selected_node, view_min_x, view_max_x, view_min_y, view_max_y)
+
             self._draw_node_shape_gizmo(
                 debug,
                 selected_node,
@@ -176,4 +180,70 @@ class EditorOverlayRenderer:
                 spacing_scale=1.0,
                 draw_pass="after_scene",
                 z_index=30,
+            )
+
+    def _draw_tilemap_grid(self, debug, tilemap_node, view_min_x, view_max_x, view_min_y, view_max_y):
+        tileset = getattr(tilemap_node, "tileset", None)
+        tile_size = getattr(tileset, "tile_size", None)
+        if not isinstance(tile_size, (list, tuple)) or len(tile_size) < 2:
+            return
+
+        try:
+            cell_w = max(1, int(tile_size[0]))
+            cell_h = max(1, int(tile_size[1]))
+        except Exception:
+            return
+
+        origin_x = float(tilemap_node.global_position[0])
+        origin_y = float(tilemap_node.global_position[1])
+
+        min_col = int((view_min_x - origin_x) // cell_w) - 1
+        max_col = int((view_max_x - origin_x) // cell_w) + 1
+        min_row = int((view_min_y - origin_y) // cell_h) - 1
+        max_row = int((view_max_y - origin_y) // cell_h) + 1
+
+        # Keep grid density bounded when zoomed out to avoid per-frame spikes.
+        zoom = max(0.001, float(self.editor._get_camera_zoom()))
+        screen_cell_w = max(0.001, cell_w * zoom)
+        screen_cell_h = max(0.001, cell_h * zoom)
+
+        # Draw every Nth line when cells become tiny on screen.
+        min_pixels_between_lines = 10.0
+        col_step = max(1, int(math.ceil(min_pixels_between_lines / screen_cell_w)))
+        row_step = max(1, int(math.ceil(min_pixels_between_lines / screen_cell_h)))
+
+        visible_cols = max(1, max_col - min_col + 1)
+        visible_rows = max(1, max_row - min_row + 1)
+        max_lines_per_axis = 220
+        if visible_cols // col_step > max_lines_per_axis:
+            col_step = max(col_step, int(math.ceil(visible_cols / max_lines_per_axis)))
+        if visible_rows // row_step > max_lines_per_axis:
+            row_step = max(row_step, int(math.ceil(visible_rows / max_lines_per_axis)))
+
+        grid_color = (95, 95, 95)
+
+        start_col = min_col - (min_col % col_step)
+        for col in range(start_col, max_col + 1, col_step):
+            world_x = origin_x + col * cell_w
+            debug.draw_line(
+                (world_x, view_min_y),
+                (world_x, view_max_y),
+                color=grid_color,
+                width=1,
+                space="world",
+                draw_pass="after_scene",
+                z_index=15,
+            )
+
+        start_row = min_row - (min_row % row_step)
+        for row in range(start_row, max_row + 1, row_step):
+            world_y = origin_y + row * cell_h
+            debug.draw_line(
+                (view_min_x, world_y),
+                (view_max_x, world_y),
+                color=grid_color,
+                width=1,
+                space="world",
+                draw_pass="after_scene",
+                z_index=15,
             )
