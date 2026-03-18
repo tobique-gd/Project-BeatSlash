@@ -2,6 +2,7 @@
   "name": "new_scene.kscn",
   "root": {
     "type": "Node2D",
+    "name": "Root",
     "properties": {
       "name": "Root",
       "position": [

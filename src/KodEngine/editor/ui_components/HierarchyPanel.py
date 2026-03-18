@@ -6,6 +6,14 @@ class HierarchyPanel:
     def __init__(self, ui):
         self.ui = ui
 
+    def _is_descendant_of(self, node, potential_ancestor):
+        current = getattr(node, "_parent", None)
+        while current is not None:
+            if current is potential_ancestor:
+                return True
+            current = getattr(current, "_parent", None)
+        return False
+
     
     def build(self):
         pygui.add_text("Hierarchy", color=(150, 150, 150))
@@ -43,7 +51,11 @@ class HierarchyPanel:
             "tag": tag,
             "callback": self.on_node_selected,
             "user_data": node,
-            "drag_callback": self._on_node_drag
+            "drag_callback": self._on_node_drag,
+            "drop_callback": self._on_node_drop,
+            "payload_type": "node_payload",
+            "user_data": node,
+ 
         }
         if _parent is not None:
             kwargs["parent"] = _parent
@@ -68,6 +80,42 @@ class HierarchyPanel:
         if pygui.does_item_exist("add_node_btn"):
             pygui.configure_item("add_node_btn", enabled=True)
 
+    def _on_node_drop(self, sender, app_data, user_data):
+        payload_tag = app_data
+        if isinstance(app_data, dict) and "data" in app_data:
+            payload_tag = app_data.get("data")
+
+        dragged_node = self.ui.state.selectables.get(payload_tag)
+        target_node = self.ui.state.selectables.get(sender)
+
+        if dragged_node is None or target_node is None:
+            return
+
+        if dragged_node is target_node:
+            return
+
+        if getattr(dragged_node, "_parent", None) is None:
+            return
+
+        if self._is_descendant_of(target_node, dragged_node):
+            return
+
+        old_parent = getattr(dragged_node, "_parent", None)
+        if old_parent is target_node:
+            return
+
+        old_global_position = getattr(dragged_node, "global_position", None)
+        dragged_node.reparent_to(target_node)
+
+        if old_global_position is not None:
+            try:
+                dragged_node.global_position = old_global_position
+            except Exception:
+                pass
+
+        self.update_hierarchy()
+        self.ui.editor._set_selected_node(dragged_node)
+
     def _on_node_drag(self, sender, app_data, user_data):
         pass
 
@@ -85,3 +133,4 @@ class HierarchyPanel:
                 self.ui.inspector.clear()
                 if pygui.does_item_exist("add_node_btn"):
                     pygui.configure_item("add_node_btn", enabled=False)
+

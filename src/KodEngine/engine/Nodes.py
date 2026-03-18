@@ -52,9 +52,31 @@ class Node:
                 return None
             current_node = found
         return current_node
+    
+    def get_child(self, index: int):
+        if index < 0 or index >= len(self._children):
+            return None
+        return self._children[index]
+
+    def get_nodes_by_type(self, node_type):
+        found_nodes = []
+        for child in self._children:
+            if isinstance(child, node_type):
+                found_nodes.append(child)
+
+            found = child.get_nodes_by_type(node_type)
+            if found is not None:
+                found_nodes.extend(found)
+
+        return found_nodes
 
     def set_script(self, module_name: str):
         self.script = module_name
+
+    def reparent_to(self, new_parent: 'Node'):
+        if self._parent is not None:
+            self._parent.remove_child(self)
+        new_parent.add_child(self)
 
     @property
     def script(self):
@@ -573,3 +595,7 @@ class TileMap2D(Node2D):
         min_world = self.tile_to_world((min_x, min_y))
         max_world = self.tile_to_world((max_x + 1, max_y + 1))
         return (min_world, max_world)
+
+class YSort2D(Node2D):
+    def __init__(self) -> None:
+        super().__init__()

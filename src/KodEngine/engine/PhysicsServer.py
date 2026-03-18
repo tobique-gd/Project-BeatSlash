@@ -1,115 +1,136 @@
-import pygame
-from .Resources import CollisionRectangleShape
 from . import Nodes
 
-class PhysicsServer:
-    def __init__(self, _configuration, _physics_objects) -> None:
-        self.physics_bodies = _physics_objects
-        self.substeps = _configuration.project_settings["physics"]["physics_substeps"]
-        self.delta = 0
-    
-    def physics_process(self, delta):
-        self.delta = delta / self.substeps
-        
-        for substep in range(self.substeps):
+# https://gamedev.stackexchange.com/questions/32545/what-is-the-mtv-minimum-translation-vector-in-sat-seperation-of-axis
+# https://dyn4j.org/2010/01/sat/
+
+class PhysicsSolver2D:
+    def __init__(self, configuration) -> None:
+        self.substeps = configuration.project_settings["physics"]["physics_substeps"]
+        self.delta = 0.0
+        self.physics_bodies = []
+
+    def physics_process(self, physics_bodies, delta):
+        self.physics_bodies = physics_bodies or []
+        if self.substeps <= 0:
+            self.substeps = 1
+
+        self.delta = float(delta) / float(self.substeps)
+
+        for substep_index in range(self.substeps):
             for body in self.physics_bodies:
                 self.resolve_physics_step_x(body)
-            
+
             for body in self.physics_bodies:
-                self.resolve_physics_step_y(body)            
-            
-    
+                self.resolve_physics_step_y(body)
+
+    def _is_moving_body(self, body):
+        return isinstance(body, (Nodes.DynamicBody2D, Nodes.KinematicBody2D))
+
+    def _get_rect_shape(self, body):
+        if body is None:
+            return None
+        try:
+            shapes = body.get_nodes_by_type(Nodes.RectangleCollisionShape2D)
+        except Exception:
+            return None
+        if not shapes:
+            return None
+        return shapes[0]
+
+    def _get_shape_world_position(self, body, shape):
+        return (
+            body.global_position[0] + shape.position[0],
+            body.global_position[1] + shape.position[1],
+        )
+
+    def check_collision(self, body1, body2):
+        shape1 = self._get_rect_shape(body1)
+        shape2 = self._get_rect_shape(body2)
+        if shape1 is None or shape2 is None:
+            return False
+
+        pos1 = self._get_shape_world_position(body1, shape1)
+        pos2 = self._get_shape_world_position(body2, shape2)
+
+        return (
+            pos1[0] < pos2[0] + shape2.size[0]
+            and pos1[0] + shape1.size[0] > pos2[0]
+            and pos1[1] < pos2[1] + shape2.size[1]
+            and pos1[1] + shape1.size[1] > pos2[1]
+        )
+
+    def _get_mtv(self, body, shape, other, other_shape):
+        pos1 = self._get_shape_world_position(body, shape)
+        pos2 = self._get_shape_world_position(other, other_shape)
+
+        b1_left, b1_right = pos1[0], pos1[0] + shape.size[0]
+        b1_top, b1_bottom = pos1[1], pos1[1] + shape.size[1]
+
+        b2_left, b2_right = pos2[0], pos2[0] + other_shape.size[0]
+        b2_top, b2_bottom = pos2[1], pos2[1] + other_shape.size[1]
+
+        push_left = b2_left - b1_right
+        push_right = b2_right - b1_left
+        overlap_x = push_left if abs(push_left) < abs(push_right) else push_right
+
+        push_up = b2_top - b1_bottom
+        push_down = b2_bottom - b1_top
+        overlap_y = push_up if abs(push_up) < abs(push_down) else push_down
+
+        return overlap_x, overlap_y
+
     def resolve_physics_step_x(self, body):
-        if body.collision_shape is None or not isinstance(body, (Nodes.DynamicBody2D, Nodes.KinematicBody2D)):
+        if body is None or not self._is_moving_body(body):
             return
-        
-       
+
+        shape = self._get_rect_shape(body)
+        if shape is None:
+            return
+
         if isinstance(body, Nodes.DynamicBody2D):
             body.position = (body.position[0] + body.velocity[0] * self.delta, body.position[1])
-        
+
+
         for other in self.physics_bodies:
-            if other == body or other.collision_shape is None:
+            if other is body:
                 continue
-                
+
+            other_shape = self._get_rect_shape(other)
+            if other_shape is None:
+                continue
+
             if self.check_collision(body, other):
-                self.resolve_collision_x(body, other)
+                overlap_x, overlap_y = self._get_mtv(body, shape, other, other_shape)
+                if abs(overlap_x) <= abs(overlap_y):
+                    body.position = (body.position[0] + overlap_x, body.position[1])
+                    if hasattr(body, 'velocity'):
+                        body.velocity = (0, body.velocity[1])
 
     def resolve_physics_step_y(self, body):
-        if body.collision_shape is None or not isinstance(body, (Nodes.DynamicBody2D, Nodes.KinematicBody2D)):
+        if body is None or not self._is_moving_body(body):
             return
+
+        shape = self._get_rect_shape(body)
+        if shape is None:
+            return
+
 
         if isinstance(body, Nodes.DynamicBody2D):
             body.position = (body.position[0], body.position[1] + body.velocity[1] * self.delta)
 
         for other in self.physics_bodies:
-            if other == body or other.collision_shape is None:
+            if other is body:
                 continue
-                
+
+            other_shape = self._get_rect_shape(other)
+            if other_shape is None:
+                continue
+
             if self.check_collision(body, other):
-                self.resolve_collision_y(body, other)
+                overlap_x, overlap_y = self._get_mtv(body, shape, other, other_shape)
 
-    def check_collision(self, body1, body2):
-        shape1 = body1.collision_shape.shape
-        shape2 = body2.collision_shape.shape
         
-        if isinstance(shape1, CollisionRectangleShape) and isinstance(shape2, CollisionRectangleShape):
-            pos1 = (
-                body1.global_position[0] + body1.collision_shape.position[0],
-                body1.global_position[1] + body1.collision_shape.position[1]
-            )
-            pos2 = (
-                body2.global_position[0] + body2.collision_shape.position[0],
-                body2.global_position[1] + body2.collision_shape.position[1]
-            )
-            
-            return (pos1[0] < pos2[0] + shape2.size[0] and
-                    pos1[0] + shape1.size[0] > pos2[0] and
-                    pos1[1] < pos2[1] + shape2.size[1] and
-                    pos1[1] + shape1.size[1] > pos2[1])
-        return False
-
-    def resolve_collision_x(self, body, other):
-        shape = body.collision_shape.shape
-        other_shape = other.collision_shape.shape
-        
-        if isinstance(shape, CollisionRectangleShape) and isinstance(other_shape, CollisionRectangleShape):
-            pos = body.global_position
-            other_pos = other.global_position
-            
-            
-            if body.velocity[0] > 0:
-                body.position = (
-                    other_pos[0] - shape.size[0] - body.collision_shape.position[0],
-                    body.position[1]
-                )
-            else: 
-                body.position = (
-                    other_pos[0] + other_shape.size[0] - body.collision_shape.position[0],
-                    body.position[1]
-                )
-            
-            body.velocity = (0, body.velocity[1])
-
-    def resolve_collision_y(self, body, other):
-        shape = body.collision_shape.shape
-        other_shape = other.collision_shape.shape
-        
-        if isinstance(shape, CollisionRectangleShape) and isinstance(other_shape, CollisionRectangleShape):
-            pos = body.global_position
-            other_pos = other.global_position
-            
-            
-            if body.velocity[1] > 0:
-                body.position = (
-                    body.position[0],
-                    other_pos[1] - shape.size[1] - body.collision_shape.position[1]
-                )
-            else:
-                body.position = (
-                    body.position[0],
-                    other_pos[1] + other_shape.size[1] - body.collision_shape.position[1]
-                )
-            
-            body.velocity = (body.velocity[0], 0)
-
-    
+                if abs(overlap_y) <= abs(overlap_x):
+                    body.position = (body.position[0], body.position[1] + overlap_y)
+                    if hasattr(body, 'velocity'):
+                        body.velocity = (body.velocity[0], 0)

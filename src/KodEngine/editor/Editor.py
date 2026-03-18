@@ -1,4 +1,5 @@
 # GENERAL IMPORTS
+import json
 import os
 import sys
 import platform
@@ -57,7 +58,7 @@ class KodEditor:
 
         ResourceServer.ResourceLoader.set_project_root(project_dir)
         self.app = Kod.App(self.settings, editor_mode=True)
-        self.app.configuration.editor_settings = self.editor_settings.editor_settings["debug"]
+        self.app.configuration.editor_settings = self.editor_settings.editor_settings
         self.app.debug_renderer = DebugRenderingServer.DebugRenderingServer(self.app.configuration)
         self.app.renderer.debug_renderer = self.app.debug_renderer
         self.mode = EditorMode.EDIT
@@ -138,7 +139,9 @@ class KodEditor:
 
         self.overlay.queue_debug_overlays(self.overlay_gizmo_nodes)
 
-        self.app.renderer.render_frame(self.app.current_scene, self.camera)
+        node_buckets = self.app.distribute_node_buckets() or {}
+        renderable_nodes = node_buckets.get("rendering", [])
+        self.app.renderer.render_frame(self.app.current_scene, self.camera, renderable_nodes)
         self.app.scaled_surface = pygame.transform.scale(self.app.internal_surface, self.app.resolution)
         self.app.screen.blit(self.app.scaled_surface, (0, 0))
 
@@ -337,6 +340,7 @@ class KodEditor:
             self.ui.inspector.clear()
             self.ui._update_hierarchy()
             self.ui.menubar.update()
+
         except Exception as e:
             ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
 
@@ -367,6 +371,10 @@ class KodEditor:
                     "KodEngine.editor.subprocess.runtime",
                     "--scene",
                     scene_path,
+                    "--project-settings-json",
+                    json.dumps(self.settings.project_settings),
+                    "--editor-settings-json",
+                    json.dumps(self.editor_settings.editor_settings),
                 ],
                 cwd=src_root,
                 env=env,
@@ -395,7 +403,7 @@ class KodEditor:
             case "--default":
                 try:
                     if platform.system() == "Windows":
-                        os.startfile(file_path)  # type: ignore # IGNORE
+                        os.startfile(file_path)  # type: ignore
                     elif platform.system() == "Darwin":
                         subprocess.run(["open", file_path])
                     else:
