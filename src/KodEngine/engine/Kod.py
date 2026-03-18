@@ -1,6 +1,9 @@
 import pygame
 from typing import Any
 
+
+
+from . import PhysicsServer
 from . import RenderingServer
 from . import Nodes
 from . import Scenes
@@ -11,27 +14,38 @@ class Settings:
     def __init__(self) -> None:
         self.project_settings = {
             "file_management" : {
-                "project_directory" : "/"
+                "project_directory" : "/",
+                "file_extension_commands" : {
+                    ".kscn" : "--editor",
+                    ".py" : "--default",
+                    ".png" : "--default",
+                    ".jpg" : "--default",
+                    ".jpeg" : "--default",
+                    ".bmp" : "--default",
+                    ".tga" : "--default",
+                    ".gif" : "--default",
+                    ".wav" : "--default",
+                    ".ogg" : "--default",
+                    ".mp3" : "--default"
+
+                }
             },
 
             "window" : {
-                "viewport_resolution" : (1280, 720),
+                "viewport_resolution" : (640, 360),
                 "internal_viewport_resolution" : (640, 360)
             },
             "physics" : {
                 "physics_substeps" : 4
+            },
+            "runtime" : {
+                "main_scene_path" : "src/BeatSlash/scenes/world.kscn",
+                "FPS" : 60
             }
+
         }
-        
-        self.runtime_settings = {
-            "FPS" : 60
-        }
-        self.editor_settings = {
-            "editor_resolution" : (1920, 1080),
-            "default_background_color" : (50, 50, 50),
-            "default_gizmo_color" : (255, 165, 0),
-            "default_collision_color" : (0, 162, 255)
-        }
+
+        self.editor_settings = {}
 
 class App:
     def __init__(self, _configuration: Settings, editor_mode = False):
@@ -40,7 +54,7 @@ class App:
         self.configuration = _configuration
         self.internal_resolution = self.configuration.project_settings["window"]["internal_viewport_resolution"]
         self.resolution = self.configuration.project_settings["window"]["viewport_resolution"]
-        self.FPS = self.configuration.runtime_settings["FPS"]
+        self.FPS = self.configuration.project_settings["runtime"]["FPS"]
 
         if editor_mode:
             self.screen = pygame.display.set_mode(self.internal_resolution, pygame.HIDDEN)
@@ -53,11 +67,14 @@ class App:
 
         self.clock = pygame.time.Clock()
         self.debug_renderer: Any | None = None
-        self.renderer = RenderingServer.Renderer(
+        self.renderer = RenderingServer.Renderer2D(
             self.configuration,
             pygame,
             self.internal_surface,
             self.debug_renderer,
+        )
+        self.physics_solver = PhysicsServer.PhysicsSolver2D(
+            self.configuration
         )
 
         self.running = False
@@ -112,6 +129,52 @@ class App:
 
         return self.fallback_camera
 
+    def resolve_editor_events(self, events):
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.running = False
+
+            elif event.type == pygame.VIDEORESIZE:
+                self.handle_resize(event.size)
+
+            if self.current_scene:
+                self.current_scene._input(event)
+
+    def calculate_delta(self, last_frame_time):
+        now = pygame.time.get_ticks()
+        delta = (now - last_frame_time) / 1000.0
+        return delta
+
+    def distribute_node_buckets(self):
+        buckets = {
+            "rendering": [],
+            "physics": [],
+        }
+
+        if not self.current_scene or not getattr(self.current_scene, "root", None):
+            return buckets
+
+        rendering_types = (Nodes.Sprite2D, Nodes.AnimatedSprite2D, Nodes.TileMap2D)
+        physics_types = (Nodes.DynamicBody2D, Nodes.KinematicBody2D, Nodes.StaticBody2D)
+
+        def traverse(node, inside_ysort=False):
+            is_ysort = isinstance(node, Nodes.YSort2D)
+
+            if isinstance(node, physics_types):
+                buckets["physics"].append(node)
+
+            if is_ysort:
+                buckets["rendering"].append(node)
+            elif isinstance(node, rendering_types) and not inside_ysort:
+                buckets["rendering"].append(node)
+
+            child_inside_ysort = inside_ysort or is_ysort
+            for child in getattr(node, "_children", []):
+                traverse(child, child_inside_ysort)
+
+        traverse(self.current_scene.root)
+        return buckets
+
     def run(self):
         if not self.screen:
             ErrorHandler.throw_error("No screen set. Stopping running.")
@@ -126,30 +189,24 @@ class App:
         last_frame_time = pygame.time.get_ticks()
 
         while self.running:
-            now = pygame.time.get_ticks()
-            delta = (now - last_frame_time) / 1000.0
-            last_frame_time = now
+            delta = self.calculate_delta(last_frame_time)
+            last_frame_time = pygame.time.get_ticks()
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
+            self.resolve_editor_events(pygame.event.get())
+            self.current_scene._process(delta)
 
-                elif event.type == pygame.VIDEORESIZE:
-                    self.handle_resize(event.size)
-
-                if self.current_scene:
-                    self.current_scene._input(event)
-
-            if self.current_scene:
-                self.current_scene._process(delta)
+            self.node_buckets = self.distribute_node_buckets()
 
             camera = self.resolve_camera()
-            self.renderer.render_frame(self.current_scene, camera)
-
+            
+            self.physics_solver.physics_process(self.node_buckets["physics"], delta)
+            self.renderer.render_frame(self.current_scene, camera, self.node_buckets["rendering"])
             self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
             self.screen.blit(self.scaled_surface, (0, 0))
 
             self.clock.tick(self.FPS)
+    
+
 
     def kill(self):
         pygame.quit()

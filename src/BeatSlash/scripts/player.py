@@ -27,12 +27,13 @@ def _process(self, delta):
     if x != 0 or y != 0:
         self.animated_sprite.play("Run_Front")
         direction = mathlib.normalized((x, y))
-        self.node.position = (
-            self.node.position[0] + direction[0] * SPEED * delta,
-            self.node.position[1] + direction[1] * SPEED * delta
+        self.node.velocity = (
+            direction[0] * SPEED * delta,
+            direction[1] * SPEED * delta
         )
         self.last_direction = direction
     else:
+        self.node.velocity = (0, 0)
         dx, dy = self.last_direction
 
         if abs(dx) > 0:
@@ -41,4 +42,6 @@ def _process(self, delta):
             self.animated_sprite.play("Idle_Back")
         else:
             self.animated_sprite.play("Idle_Front")
+
+    self.node.move_and_slide()
 

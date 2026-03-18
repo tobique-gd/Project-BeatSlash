@@ -2,6 +2,7 @@ import dearpygui.dearpygui as pygui
 from ...engine import ErrorHandler, ResourceServer
 import os
 import time
+from ..EditorModels import EditorCommandType
 
 from ...engine import Nodes, Scenes
 
@@ -88,8 +89,7 @@ class FileSystem:
         self._last_click_time[file_path] = current_time
         
         if time_diff < self._double_click_threshold:
-            if file_path.endswith(".kscn"):
-                self.ui.editor.queue_command("load_scene", path=file_path)
+            self.ui.editor.queue_command(EditorCommandType.OPEN_FILE, file_path=file_path)
     
     def _on_directory_select(self, sender, app_data, user_data):
         directory_path = user_data
@@ -181,7 +181,7 @@ class FileSystem:
         modal_width = 400
         modal_height = 150
         
-        with pygui.window(label="New Script", tag="new_script_window", modal=True, show=True, width=modal_width, height=modal_height):
+        with pygui.window(label="New Script", tag="new_script_window", modal=False, show=True, width=modal_width, height=modal_height, no_collapse=True):
             pygui.add_text("Enter script name:")
             pygui.add_input_text(tag="new_script_name_input", default_value="new_script.py", width=-1)
             pygui.add_separator()
@@ -249,7 +249,7 @@ def _input(self, events):
         modal_width = 400
         modal_height = 150
         
-        with pygui.window(label="New Scene", tag="new_scene_window", modal=True, show=True, width=modal_width, height=modal_height):
+        with pygui.window(label="New Scene", tag="new_scene_window", modal=False, show=True, width=modal_width, height=modal_height, no_collapse=True):
             pygui.add_text("Enter scene name:")
             pygui.add_input_text(tag="new_scene_name_input", default_value="new_scene.kscn", width=-1)
             pygui.add_separator()

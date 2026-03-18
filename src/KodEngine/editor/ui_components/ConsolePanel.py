@@ -38,6 +38,12 @@ class ConsolePanel:
                     callback=lambda s, a: self._toggle_filter("INFO", a),
                     tag="filter_info"
                 )
+                pygui.add_checkbox(
+                    label="Success",
+                    default_value=True,
+                    callback=lambda s, a: self._toggle_filter("SUCCESS", a),
+                    tag="filter_success"
+                )
             
             pygui.add_separator()
             

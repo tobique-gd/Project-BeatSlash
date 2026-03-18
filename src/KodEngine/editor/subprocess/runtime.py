@@ -1,13 +1,30 @@
 import argparse
+import json
 import os
 import sys
 
 from KodEngine.engine import ResourceServer
 
 
+def _merge_settings_dict(target, override):
+    if not isinstance(target, dict) or not isinstance(override, dict):
+        return target
+
+    for key, value in override.items():
+        current = target.get(key)
+        if isinstance(current, dict) and isinstance(value, dict):
+            _merge_settings_dict(current, value)
+            continue
+        target[key] = value
+
+    return target
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scene", required=True)
+    parser.add_argument("--project-settings-json")
+    parser.add_argument("--editor-settings-json")
     args = parser.parse_args()
 
     runtime_file = os.path.abspath(__file__)
@@ -23,6 +40,11 @@ def main():
 
     try:
         settings = Kod.Settings()
+        if args.project_settings_json:
+            _merge_settings_dict(settings.project_settings, json.loads(args.project_settings_json))
+        if args.editor_settings_json:
+            _merge_settings_dict(settings.editor_settings, json.loads(args.editor_settings_json))
+
         scene_dir = os.path.dirname(scene_path)
         project_dir = os.path.dirname(scene_dir)
         settings.project_settings["file_management"]["project_directory"] = project_dir
