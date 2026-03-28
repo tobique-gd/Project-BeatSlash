@@ -148,12 +148,6 @@ class DebugRenderingServer:
 
     def _world_to_screen(self, world_pos, camera):
         zoom = getattr(camera, "zoom", 1.0)
-        if isinstance(zoom, (list, tuple)):
-            zoom = zoom[0] if len(zoom) > 0 else 1.0
-        try:
-            zoom = float(zoom)
-        except Exception:
-            zoom = 1.0
         zoom = max(0.001, zoom)
 
         camera_offset_node_position = (
@@ -198,13 +192,7 @@ class DebugRenderingServer:
 
                     if space == "world":
                         zoom = getattr(camera, "zoom", 1.0)
-                        if isinstance(zoom, (list, tuple)):
-                            zoom = zoom[0] if len(zoom) > 0 else 1.0
-                        try:
-                            zoom = float(zoom)
-                        except Exception:
-                            zoom = 1.0
-                        zoom = max(0.05, zoom)
+                        zoom = max(0.001, zoom)
                         sx, sy = self._world_to_screen((x, y), camera)
                         w = max(1, int(w * zoom))
                         h = max(1, int(h * zoom))

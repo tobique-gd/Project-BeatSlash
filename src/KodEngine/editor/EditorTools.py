@@ -50,6 +50,13 @@ class TileMapPaintTool:
         if mouse_screen is None or not mouse_down:
             return
 
+        selected_layer = self.editor.get_selected_paint_tile_layer(node)
+        if not isinstance(selected_layer, int):
+            try:
+                selected_layer = int(selected_layer)
+            except Exception:
+                selected_layer = 0
+
         if erase_mode:
             selected_tile_id = -1
         else:
@@ -72,13 +79,13 @@ class TileMapPaintTool:
         local_world = (world_pos[0] - node_world[0], world_pos[1] - node_world[1])
         tile_pos = node.world_to_tile(local_world)
 
-        paint_key = (int(tile_pos[0]), int(tile_pos[1]), int(selected_tile_id))
+        paint_key = (int(tile_pos[0]), int(tile_pos[1]), int(selected_layer), int(selected_tile_id))
         if paint_key == self._last_painted_key:
             if just_pressed:
                 self._click_consumed = True
             return
 
-        changed = node.set_tile_id(tile_pos, int(selected_tile_id))
+        changed = node.set_tile_id(tile_pos, int(selected_tile_id), layer=int(selected_layer))
         if changed:
             self._last_painted_key = paint_key
             self._click_consumed = True

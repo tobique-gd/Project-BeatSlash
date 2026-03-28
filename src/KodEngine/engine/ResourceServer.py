@@ -175,61 +175,11 @@ class SceneLoader:
         return value
 
     #reading scene files (.kscn) that are basically json
+    import json
+
     @staticmethod
-    def _json_pretty_with_compact_tile_rows(value, indent=2, level=0, parent_key=None):
-        pad = " " * (indent * level)
-        child_pad = " " * (indent * (level + 1))
-
-        if isinstance(value, dict):
-            if not value:
-                return "{}"
-
-            lines = ["{"]
-            items = list(value.items())
-            for index, (key, item) in enumerate(items):
-                key_text = json.dumps(str(key), ensure_ascii=False)
-                item_text = SceneLoader._json_pretty_with_compact_tile_rows(
-                    item,
-                    indent=indent,
-                    level=level + 1,
-                    parent_key=str(key),
-                )
-                comma = "," if index < len(items) - 1 else ""
-                lines.append(f"{child_pad}{key_text}: {item_text}{comma}")
-
-            lines.append(f"{pad}}}")
-            return "\n".join(lines)
-
-        if isinstance(value, list):
-            if not value:
-                return "[]"
-
-            if parent_key in {"tile_data", "_tile_data"} and all(
-                isinstance(row, (list, tuple)) and all(isinstance(cell, (int, float, str, bool)) or cell is None for cell in row)
-                for row in value
-            ):
-                lines = ["["]
-                for index, row in enumerate(value):
-                    row_text = json.dumps(list(row), ensure_ascii=False, separators=(", ", ": "))
-                    comma = "," if index < len(value) - 1 else ""
-                    lines.append(f"{child_pad}{row_text}{comma}")
-                lines.append(f"{pad}]")
-                return "\n".join(lines)
-
-            lines = ["["]
-            for index, item in enumerate(value):
-                item_text = SceneLoader._json_pretty_with_compact_tile_rows(
-                    item,
-                    indent=indent,
-                    level=level + 1,
-                    parent_key=None,
-                )
-                comma = "," if index < len(value) - 1 else ""
-                lines.append(f"{child_pad}{item_text}{comma}")
-            lines.append(f"{pad}]")
-            return "\n".join(lines)
-
-        return json.dumps(value, ensure_ascii=False)
+    def _json_pretty_with_compact_tile_rows(value):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"), indent=4)
 
     @staticmethod
     def _read_json(file_path):
@@ -247,7 +197,7 @@ class SceneLoader:
     @staticmethod
     def _write_json(file_path, data):
         try:
-            serialized = SceneLoader._json_pretty_with_compact_tile_rows(data, indent=2)
+            serialized = SceneLoader._json_pretty_with_compact_tile_rows(data)
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(serialized)
                 f.write("\n")
@@ -290,40 +240,72 @@ class SceneLoader:
             return None
 
         def build_node(node_data):
-            tname = node_data.get("type")
-            cls = getattr(Nodes, tname, getattr(Nodes, "Node", None))
-            if cls is None:
-                raise RuntimeError(f"Unknown node class: {tname}")
-
-            node = cls()
+            props = node_data.get("properties", {})
             
-            # Name handling (kept explicit as it's often special)
+
+            try:
+                decoded_props = SceneLoader._decode_value(props)
+            except Exception as e:
+                decoded_props = {}
+                SceneLoader._warn(f"Failed to decode properties for '{node_data.get('name', 'Unknown')}': {e}")
+
+            is_linked = isinstance(decoded_props, dict) and decoded_props.get("_is_linked_scene", False)
+
+            if is_linked:
+                linked_path = decoded_props.get("_linked_scene_path")
+                if not linked_path:
+                    raise RuntimeError(f"Linked scene '{node_data.get('name')}' is missing '_linked_scene_path'.")
+                
+                resolved_path = ResourceLoader.resolve_path(linked_path)
+                linked_scene = SceneLoader.load(resolved_path)
+                
+                if not linked_scene or not linked_scene.root:
+                    raise RuntimeError(f"Failed to load linked scene from '{resolved_path}'.")
+                
+                node = linked_scene.root
+                
+                node._is_linked_scene = True
+                node._linked_scene_path = linked_path
+            else:
+                # --- Standard Node Logic ---
+                tname = node_data.get("type")
+                cls = getattr(Nodes, tname, getattr(Nodes, "Node", None))
+                if cls is None:
+                    raise RuntimeError(f"Unknown node class: {tname}")
+                node = cls()
+
+            # Apply Name
             if "name" in node_data:
                 node.name = node_data["name"]
 
-            # Load properties via data-oriented method
-            props = node_data.get("properties", {})
-            try:
-                decoded_props = SceneLoader._decode_value(props)
-                if isinstance(decoded_props, dict):
-                     node.load_data(decoded_props)
-            except Exception as e:
-                SceneLoader._warn(f"Failed to load data for node '{node.name}': {e}")
-            
-            # Recurse children
-            for child_data in node_data.get("children", []):
+            # Apply Properties (For linked scenes, these act as instance overrides)
+            if isinstance(decoded_props, dict):
                 try:
-                    child = build_node(child_data)
-                    node.add_child(child)
+                    node.load_data(decoded_props)
                 except Exception as e:
-                    SceneLoader._warn(f"Failed to add child: {e}")
+                    SceneLoader._warn(f"Failed to load data for node '{node.name}': {e}")
             
+            # Only process children from the JSON if this is NOT a linked scene.
+            # (Linked scenes already populated their children when SceneLoader.load was called above)
+            if not is_linked:
+                for child_data in node_data.get("children", []):
+                    try:
+                        child = build_node(child_data)
+                        if child:
+                            node.add_child(child)
+                    except Exception as e:
+                        SceneLoader._warn(f"Failed to add child: {e}")
+                        
             return node
 
-        root_node = build_node(scene.get("root"))
-        if Scenes.Scene is not None:
-            return Scenes.Scene(scene.get("name"), root_node)
-        return root_node
+        try:
+            root_node = build_node(scene.get("root"))
+            if Scenes.Scene is not None:
+                return Scenes.Scene(scene.get("name"), root_node)
+            return root_node
+        except Exception as e:
+            SceneLoader._error(f"Error building scene tree: {e}")
+            return None
 
     @staticmethod
     def serialize_scene(scene):
@@ -336,13 +318,17 @@ class SceneLoader:
             }
 
             try:
-                 # Data-oriented saving: Resource says how it is saved
                  raw_data = node.save_data()
                  encoded_data = SceneLoader._encode_value(raw_data)
                  if isinstance(encoded_data, dict):
                      node_dict["properties"] = encoded_data
             except Exception as e:
                 SceneLoader._warn(f"Failed to save data for node '{node.name}': {e}")
+
+            if getattr(node, "_is_linked_scene", False):
+                node_dict["properties"]["_is_linked_scene"] = True
+                node_dict["properties"]["_linked_scene_path"] = SceneLoader._to_project_relative(node._linked_scene_path)
+                return node_dict
 
             for child in getattr(node, "_children", []):
                 node_dict["children"].append(serialize_node(child))

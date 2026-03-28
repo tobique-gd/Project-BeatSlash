@@ -1,6 +1,7 @@
 from . import Resources
 import pygame
 import os
+from . import ResourceServer
 
 
 class Node:
@@ -12,6 +13,9 @@ class Node:
         self.runtime_script: object | None = None
         self.script = None
         self._queued_for_deletion = False
+        self._is_linked_scene = False
+        self._linked_scene_path = None
+        
 
     def _on_enter(self):
         for child in getattr(self, "_children", []):
@@ -114,18 +118,20 @@ class Node:
 
     def save_data(self) -> dict:
         data = {}
+
         for name, value in vars(self).items():
             if name.startswith("_"):
                 continue
-            if name == "script" or name == "runtime_script":
+            if name in ("script", "runtime_script"):
                 continue
             if callable(value):
                 continue
+
             data[name] = value
-        
+
         if self._script_resource:
             data["script"] = self._script_resource
-            
+
         return data
 
     def load_data(self, data: dict):
@@ -135,6 +141,14 @@ class Node:
                     setattr(self, name, value)
                 except Exception as e:
                     print(f"Error setting {name} on {self.name}: {e}")
+
+            children_data = data.get("_children", [])
+            for child_data in children_data:
+                child = Node()
+                self.add_child(child)
+                child.load_data(child_data)
+
+
 
 class Node2D(Node):
     def __init__(self) -> None:
@@ -422,7 +436,30 @@ class TileMap2D(Node2D):
         super().__init__()
         self._tileset_resource: Resources.Tileset2D | None = None
         self._bounds: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (1, 1))
-        self._tile_data: list[list[int]] = [[-1]]
+        self._tile_layers: dict[int, list[list[int]]] = {0: self._empty_grid(self._bounds, fill_value=-1)}
+        self._tile_data: list[list[int]] = self._tile_layers[0]
+
+    def shrink_to_fit(self, fill_value: int = -1):
+        min_x, min_y = None, None
+        max_x, max_y = None, None
+        for layer in self._tile_layers.values():
+            for y, row in enumerate(layer):
+                for x, val in enumerate(row):
+                    if val != fill_value:
+                        abs_x = x + self._bounds[0][0]
+                        abs_y = y + self._bounds[0][1]
+                        if min_x is None or abs_x < min_x:
+                            min_x = abs_x
+                        if min_y is None or abs_y < min_y:
+                            min_y = abs_y
+                        if max_x is None or abs_x > max_x:
+                            max_x = abs_x
+                        if max_y is None or abs_y > max_y:
+                            max_y = abs_y
+        if min_x is not None and min_y is not None and max_x is not None and max_y is not None:
+            self.set_bounds(((min_x, min_y), (max_x, max_y)), preserve=True, fill_value=fill_value)
+        else:
+            self.set_bounds(((0, 0), (0, 0)), preserve=False, fill_value=fill_value)
 
     @staticmethod
     def _normalize_bounds(bounds) -> tuple[tuple[int, int], tuple[int, int]]:
@@ -469,6 +506,33 @@ class TileMap2D(Node2D):
 
         return normalized
 
+    @staticmethod
+    def _normalize_layer_index(layer) -> int:
+        try:
+            return int(layer)
+        except Exception:
+            return 0
+
+    def _normalize_tile_layers(self, value, bounds=None, fill_value: int = -1):
+        target_bounds = self._bounds if bounds is None else self._normalize_bounds(bounds)
+        normalized_layers: dict[int, list[list[int]]] = {}
+
+        if isinstance(value, dict):
+            for layer_key, layer_data in value.items():
+                layer_index = self._normalize_layer_index(layer_key)
+                normalized_layers[layer_index] = self._normalize_tile_data(
+                    layer_data,
+                    bounds=target_bounds,
+                    fill_value=fill_value,
+                )
+        elif isinstance(value, (list, tuple)):
+            normalized_layers[0] = self._normalize_tile_data(value, bounds=target_bounds, fill_value=fill_value)
+
+        if 0 not in normalized_layers:
+            normalized_layers[0] = self._empty_grid(target_bounds, fill_value=fill_value)
+
+        return {layer: normalized_layers[layer] for layer in sorted(normalized_layers.keys())}
+
     @property
     def tileset(self):
         return self._tileset_resource
@@ -482,12 +546,13 @@ class TileMap2D(Node2D):
         self.set_bounds(value, preserve=True, fill_value=-1)
 
     @property
-    def tile_data(self):
-        return self._tile_data
+    def tile_layers(self):
+        return self._tile_layers
 
-    @tile_data.setter
-    def tile_data(self, value):
-        self._tile_data = self._normalize_tile_data(value, bounds=self._bounds)
+    @tile_layers.setter
+    def tile_layers(self, value):
+        self._tile_layers = self._normalize_tile_layers(value, bounds=self._bounds)
+        self.shrink_to_fit()
 
     @tileset.setter
     def tileset(self, value):
@@ -510,12 +575,13 @@ class TileMap2D(Node2D):
     def set_bounds(self, bounds, preserve: bool = True, fill_value: int = -1):
         normalized_bounds = self._normalize_bounds(bounds)
         previous_bounds = self._bounds
-        previous_data = self._tile_data
+        previous_layers = self._normalize_tile_layers(self._tile_layers, bounds=previous_bounds, fill_value=fill_value)
 
         self._bounds = normalized_bounds
-        self._tile_data = self._empty_grid(normalized_bounds, fill_value=fill_value)
+        empty_layer = self._empty_grid(normalized_bounds, fill_value=fill_value)
+        self._tile_layers = {0: empty_layer}
 
-        if not preserve or not previous_data:
+        if not preserve or not previous_layers:
             return
 
         old_min, _ = previous_bounds
@@ -523,25 +589,45 @@ class TileMap2D(Node2D):
         old_width, old_height = self._grid_dimensions(previous_bounds)
         new_width, new_height = self._grid_dimensions(normalized_bounds)
 
-        for old_y in range(old_height):
-            for old_x in range(old_width):
-                new_x = old_x + old_min[0] - new_min[0]
-                new_y = old_y + old_min[1] - new_min[1]
-                if 0 <= new_x < new_width and 0 <= new_y < new_height:
-                    self._tile_data[new_y][new_x] = int(previous_data[old_y][old_x])
+        remapped_layers: dict[int, list[list[int]]] = {}
+        for layer_index, previous_data in previous_layers.items():
+            new_layer_data = self._empty_grid(normalized_bounds, fill_value=fill_value)
+            for old_y in range(old_height):
+                for old_x in range(old_width):
+                    new_x = old_x + old_min[0] - new_min[0]
+                    new_y = old_y + old_min[1] - new_min[1]
+                    if 0 <= new_x < new_width and 0 <= new_y < new_height:
+                        new_layer_data[new_y][new_x] = int(previous_data[old_y][old_x])
+            remapped_layers[int(layer_index)] = new_layer_data
 
-    def get_tile_id(self, tile_pos: tuple[int, int]) -> int:
+        if 0 not in remapped_layers:
+            remapped_layers[0] = self._empty_grid(normalized_bounds, fill_value=fill_value)
+        self._tile_layers = {layer: remapped_layers[layer] for layer in sorted(remapped_layers.keys())}
+
+    def ensure_layer(self, layer: int, fill_value: int = -1):
+        layer_index = self._normalize_layer_index(layer)
+        if layer_index not in self._tile_layers:
+            self._tile_layers[layer_index] = self._empty_grid(self._bounds, fill_value=fill_value)
+            self._tile_layers = {layer_id: self._tile_layers[layer_id] for layer_id in sorted(self._tile_layers.keys())}
+        return self._tile_layers[layer_index]
+
+    def get_tile_id(self, tile_pos: tuple[int, int], layer: int = 0) -> int:
         tile_x, tile_y = int(tile_pos[0]), int(tile_pos[1])
         (min_x, min_y), (max_x, max_y) = self._bounds
         if tile_x < min_x or tile_y < min_y or tile_x > max_x or tile_y > max_y:
             return -1
+        layer_index = self._normalize_layer_index(layer)
+        layer_data = self._tile_layers.get(layer_index)
+        if not isinstance(layer_data, list):
+            return -1
         row_index = tile_y - min_y
         column_index = tile_x - min_x
-        return int(self._tile_data[row_index][column_index])
+        return int(layer_data[row_index][column_index])
 
-    def set_tile_id(self, tile_pos: tuple[int, int], tile_id: int):
+    def set_tile_id(self, tile_pos: tuple[int, int], tile_id: int, layer: int = 0):
         tile_x, tile_y = int(tile_pos[0]), int(tile_pos[1])
         (min_x, min_y), (max_x, max_y) = self._bounds
+        layer_index = self._normalize_layer_index(layer)
 
         if tile_x < min_x or tile_y < min_y or tile_x > max_x or tile_y > max_y:
             expanded_bounds = self._normalize_bounds(
@@ -550,16 +636,23 @@ class TileMap2D(Node2D):
             self.set_bounds(expanded_bounds, preserve=True, fill_value=-1)
             (min_x, min_y), _ = self._bounds
 
+        layer_data = self.ensure_layer(layer_index, fill_value=-1)
         row_index = tile_y - min_y
         column_index = tile_x - min_x
-        self._tile_data[row_index][column_index] = int(tile_id)
-
+        layer_data[row_index][column_index] = int(tile_id)
+        self.shrink_to_fit(fill_value=-1)
         return True
+
+    def get_layer_indices(self) -> list[int]:
+        return sorted(int(layer) for layer in self._tile_layers.keys())
 
     def save_data(self) -> dict:
         data = super().save_data()
         data["bounds"] = [list(self._bounds[0]), list(self._bounds[1])]
-        data["tile_data"] = [list(row) for row in self._tile_data]
+        data["tile_layers"] = {
+            str(layer): [list(row) for row in layer_data]
+            for layer, layer_data in sorted(self._tile_layers.items(), key=lambda item: int(item[0]))
+        }
         if self._tileset_resource:
             data["tileset"] = self._tileset_resource
         return data
@@ -568,7 +661,7 @@ class TileMap2D(Node2D):
         base_data = {
             key: value
             for key, value in data.items()
-            if key not in {"tileset", "bounds", "tile_data", "_tile_data"}
+            if key not in {"tileset", "bounds", "tile_layers", "_tile_layers"}
         }
         super().load_data(base_data)
 
@@ -576,8 +669,10 @@ class TileMap2D(Node2D):
             self.tileset = data["tileset"]
 
         self._bounds = self._normalize_bounds(data.get("bounds", self._bounds))
-        source_tile_data = data.get("tile_data", data.get("_tile_data", self._tile_data))
-        self._tile_data = self._normalize_tile_data(source_tile_data, bounds=self._bounds)
+        source_tile_layers = data.get("tile_layers", data.get("_tile_layers", None))
+        if source_tile_layers is not None:
+            self._tile_layers = self._normalize_tile_layers(source_tile_layers, bounds=self._bounds)
+
 
     def tile_to_world(self, tile_pos: tuple[int, int]) -> tuple[int, int]:
         tw, th = self.tileset.tile_size if self.tileset and getattr(self.tileset, "tile_size", None) else (16, 16)

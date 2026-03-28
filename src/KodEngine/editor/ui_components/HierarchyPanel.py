@@ -20,48 +20,58 @@ class HierarchyPanel:
         pygui.add_separator()
         with pygui.table(header_row=False, resizable=False):
             pygui.add_table_column(init_width_or_weight=0.2)
+            pygui.add_table_column(init_width_or_weight=0.3)
             pygui.add_table_column(init_width_or_weight=0.2)
-            pygui.add_table_column(init_width_or_weight=0.6)
+            pygui.add_table_column(init_width_or_weight=0.3)
 
             with pygui.table_row():
                 #TODO: use textures instead of words
                 pygui.add_button(label="Add", tag="add_node_btn", width=-1, callback=self.ui.dialogs.show_add_node_window)
+                pygui.add_button(label="Link", tag="link_scene_btn", width=-1, callback=self.ui.dialogs.show_link_scene_window)
                 pygui.add_button(label="Del", tag="delete_node_btn", width=-1, callback=self.ui.dialogs.show_delete_node_window)
                 
         pygui.add_separator()
         with pygui.group(tag="hierarchy_tree"):
             self.draw_tree(self.ui.editor.get_scene_hierarchy())
 
-    def draw_tree(self, tree, _parent=None):
-        for node, _children in tree.items():
-            if _children:
-                with pygui.tree_node(label=node.name, default_open=True):
-                    self.add_node_selectable(node)
-                    self.draw_tree(_children, _parent=None)
-            else:
-                self.add_node_selectable(node, _parent=_parent)
+    def draw_tree(self, tree, depth=0):
+        items = list(tree.items())
 
-    def add_node_selectable(self, node, _parent=None):
+        for i, (node, children) in enumerate(items):
+            label = node.name
+
+            is_linked = getattr(node, "_is_linked_scene", False)
+            if is_linked:
+                label += " [Linked]"
+
+            with pygui.group(horizontal=True):
+                pygui.add_spacer(width=depth * 20)
+
+                self.add_node_selectable(node, label_override=label)
+
+            if children and not is_linked:
+                self.draw_tree(children, depth + 1)
+
+    def add_node_selectable(self, node, label_override=None, depth=0):
         tag = f"select_{id(node)}"
 
         self.ui.state.selectables[tag] = node
 
-        kwargs = {
-            "label": node.name,
-            "tag": tag,
-            "callback": self.on_node_selected,
-            "user_data": node,
-            "drag_callback": self._on_node_drag,
-            "drop_callback": self._on_node_drop,
-            "payload_type": "node_payload",
-            "user_data": node,
- 
-        }
-        if _parent is not None:
-            kwargs["parent"] = _parent
+        label = label_override if label_override else node.name
 
-        pygui.add_selectable(**kwargs)
-        
+        with pygui.group(horizontal=True):
+            pygui.add_spacer(width=depth * 20)
+            
+            pygui.add_selectable(
+                label=label,
+                tag=tag,
+                callback=self.on_node_selected,
+                user_data=node,
+                drag_callback=self._on_node_drag,
+                drop_callback=self._on_node_drop,
+                payload_type="node_payload",
+            )
+
         with pygui.drag_payload(parent=tag, drag_data=tag, payload_type="node_payload"):
             pygui.add_text(f"Drag {node.name}")
 

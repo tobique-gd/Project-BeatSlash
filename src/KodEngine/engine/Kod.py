@@ -1,4 +1,6 @@
 import pygame
+import math
+import platform
 from typing import Any
 
 
@@ -15,31 +17,17 @@ class Settings:
         self.project_settings = {
             "file_management" : {
                 "project_directory" : "/",
-                "file_extension_commands" : {
-                    ".kscn" : "--editor",
-                    ".py" : "--default",
-                    ".png" : "--default",
-                    ".jpg" : "--default",
-                    ".jpeg" : "--default",
-                    ".bmp" : "--default",
-                    ".tga" : "--default",
-                    ".gif" : "--default",
-                    ".wav" : "--default",
-                    ".ogg" : "--default",
-                    ".mp3" : "--default"
-
-                }
             },
 
             "window" : {
-                "viewport_resolution" : (640, 360),
-                "internal_viewport_resolution" : (640, 360)
+                "viewport_resolution" : (1920, 1080),
+                "internal_viewport_resolution" : (480, 270)
             },
             "physics" : {
                 "physics_substeps" : 4
             },
             "runtime" : {
-                "main_scene_path" : "src/BeatSlash/scenes/world.kscn",
+                "main_scene_path" : "src/BeatSlash/scenes/BeatSlashWorld.kscn",
                 "FPS" : 60
             }
 
@@ -53,13 +41,17 @@ class App:
 
         self.configuration = _configuration
         self.internal_resolution = self.configuration.project_settings["window"]["internal_viewport_resolution"]
+        self.base_internal_resolution = (
+            int(self.internal_resolution[0]),
+            int(self.internal_resolution[1]),
+        )
         self.resolution = self.configuration.project_settings["window"]["viewport_resolution"]
         self.FPS = self.configuration.project_settings["runtime"]["FPS"]
 
         if editor_mode:
             self.screen = pygame.display.set_mode(self.internal_resolution, pygame.HIDDEN)
         else:
-            self.screen = pygame.display.set_mode(self.resolution, pygame.RESIZABLE, vsync=1)
+            self.screen = self._create_runtime_window(self.resolution)
         
 
         self.internal_surface = pygame.Surface(self.internal_resolution).convert_alpha()
@@ -85,9 +77,48 @@ class App:
 
     #handling resizing of window since pygame doesnt do it automatically
     def handle_resize(self, size):
-        self.resolution = size
-        self.screen = pygame.display.set_mode(self.resolution, pygame.RESIZABLE, vsync=1)
-        self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
+        width = max(1, int(size[0]))
+        height = max(1, int(size[1]))
+
+        self.resolution = (width, height)
+        self.configuration.project_settings["window"]["viewport_resolution"] = self.resolution
+
+        current_surface = pygame.display.get_surface()
+        if current_surface is not None:
+            self.screen = current_surface
+
+    def _create_runtime_window(self, resolution):
+        # pygame-ce can crash on macOS when vsync is requested during display mode changes.
+        if platform.system() == "Darwin":
+            try:
+                return pygame.display.set_mode(resolution, pygame.RESIZABLE, vsync=1)
+            except:
+                return pygame.display.set_mode(resolution, pygame.RESIZABLE)
+            
+        try:
+            return pygame.display.set_mode(resolution, pygame.RESIZABLE, vsync=1)
+        except TypeError:
+            return pygame.display.set_mode(resolution, pygame.RESIZABLE)
+
+    def _present_internal_surface(self):
+        internal_w, internal_h = self.base_internal_resolution
+        output_w, output_h = self.resolution
+
+        if internal_w <= 0 or internal_h <= 0 or output_w <= 0 or output_h <= 0:
+            return
+        
+        scale_x = output_w / float(internal_w)
+        scale_y = output_h / float(internal_h)
+        integer_scale = max(1, int(math.ceil(max(scale_x, scale_y))))
+
+        target_w = internal_w * integer_scale
+        target_h = internal_h * integer_scale
+
+        offset_x = (output_w - target_w) // 2
+        offset_y = (output_h - target_h) // 2
+
+        self.scaled_surface = pygame.transform.scale(self.internal_surface, (target_w, target_h))
+        self.screen.blit(self.scaled_surface, (offset_x, offset_y))
 
     def set_scene(self, scene):
         if self.current_scene and getattr(self.current_scene, "root", None):
@@ -184,9 +215,17 @@ class App:
             ErrorHandler.throw_error("No scene set. Stopping running.")
             return
         
+        self.internal_resolution = self.base_internal_resolution
+        self.configuration.project_settings["window"]["internal_viewport_resolution"] = self.internal_resolution
+        self.internal_surface = pygame.Surface(self.internal_resolution).convert_alpha()
+        self.renderer.screen = self.internal_surface
+        
+        
         self.current_scene._ready()
         self.running = True
         last_frame_time = pygame.time.get_ticks()
+        self.resolution = self.screen.get_size()
+        
 
         while self.running:
             delta = self.calculate_delta(last_frame_time)
@@ -201,8 +240,8 @@ class App:
             
             self.physics_solver.physics_process(self.node_buckets["physics"], delta)
             self.renderer.render_frame(self.current_scene, camera, self.node_buckets["rendering"])
-            self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
-            self.screen.blit(self.scaled_surface, (0, 0))
+            self._present_internal_surface()
+            pygame.display.flip()
 
             self.clock.tick(self.FPS)
     

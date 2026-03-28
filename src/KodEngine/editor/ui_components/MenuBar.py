@@ -6,6 +6,8 @@ class MenuBar:
         self.ui = ui
 
     def _get_scene_display_text(self):
+        if not self.ui.app.current_scene:
+            return "No Scene Loaded"
         scene_name = self.ui.app.current_scene.name or ""
         scene_path = getattr(self.ui.app.current_scene, 'path', "")
         

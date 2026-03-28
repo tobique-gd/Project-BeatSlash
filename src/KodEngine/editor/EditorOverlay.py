@@ -46,7 +46,22 @@ class EditorOverlayRenderer:
 
     def _draw_node_shape_gizmo(self, debug, node, *, camera_is_active=False, selected=False):
         if isinstance(node, Nodes.Camera2D):
-            viewport_w, viewport_h = self.editor.initial_res
+            runtime_window = getattr(self.editor, "runtime_window_settings", None)
+            if isinstance(runtime_window, dict):
+                viewport_w, viewport_h = runtime_window.get("internal_viewport_resolution", (320, 180))
+            else:
+                viewport_w, viewport_h = self.editor.settings.project_settings["window"]["internal_viewport_resolution"]
+            zoom = getattr(node, "zoom", 1.0)
+            if isinstance(zoom, (list, tuple)):
+                zoom = zoom[0] if len(zoom) > 0 else 1.0
+            try:
+                zoom = float(zoom)
+            except Exception:
+                zoom = 1.0
+            zoom = max(0.001, zoom)
+
+            viewport_w = float(viewport_w) / zoom
+            viewport_h = float(viewport_h) / zoom
             if selected:
                 color = self._editor_colors["default_gizmo_color"]
                 line_width = 2

@@ -4,6 +4,7 @@ import os
 import sys
 import platform
 import subprocess
+import copy
 from collections import deque
 
 import dearpygui.dearpygui as pygui
@@ -34,6 +35,22 @@ class EditorSettings:
                 "default_collision_color": (0, 162, 255),
                 "default_x_axis_color": (255, 0, 0),
                 "default_y_axis_color": (0, 255, 0),
+            },
+            "file_management" : {
+                "file_extension_commands" : {
+                    ".kscn" : "--editor",
+                    ".py" : "--default",
+                    ".png" : "--default",
+                    ".jpg" : "--default",
+                    ".jpeg" : "--default",
+                    ".bmp" : "--default",
+                    ".tga" : "--default",
+                    ".gif" : "--default",
+                    ".wav" : "--default",
+                    ".ogg" : "--default",
+                    ".mp3" : "--default"
+
+                }
             }
         }
 
@@ -44,6 +61,11 @@ class KodEditor:
     def __init__(self):
         ErrorHandler.set_editor_mode(True)
         self.settings = Kod.Settings()
+        runtime_window_settings = self.settings.project_settings.get("window", {})
+        self.runtime_window_settings = {
+            "viewport_resolution": tuple(runtime_window_settings.get("viewport_resolution", (640, 360))),
+            "internal_viewport_resolution": tuple(runtime_window_settings.get("internal_viewport_resolution", (640, 360))),
+        }
         self.editor_settings = EditorSettings()
         self.initial_res = (640, 360)
         self.settings.project_settings["window"]["internal_viewport_resolution"] = self.initial_res
@@ -64,7 +86,7 @@ class KodEditor:
         self.mode = EditorMode.EDIT
         self.commands = deque()
 
-        scene_path = os.path.join(project_dir, "scenes", "world.kscn")
+        scene_path = os.path.join(project_dir, "scenes", "BeatSlashWorld.kscn")
         loaded_scene = ResourceServer.SceneLoader.load(scene_path)
 
         self.camera = Nodes.Camera2D()
@@ -137,6 +159,10 @@ class KodEditor:
             ErrorHandler.throw_error("No screen supplied. Stopping rendering")
             return None
 
+        selection_settings = self.app.configuration.editor_settings.setdefault("selection", {})
+        selected_node = getattr(self.ui.state, "selected_node", None)
+        selection_settings["selected_node_id"] = id(selected_node) if selected_node is not None else None
+
         self.overlay.queue_debug_overlays(self.overlay_gizmo_nodes)
 
         node_buckets = self.app.distribute_node_buckets() or {}
@@ -184,11 +210,28 @@ class KodEditor:
         )
 
     def _pick_bounds_camera(self, node):
+        runtime_window = getattr(self, "runtime_window_settings", None)
+        if isinstance(runtime_window, dict):
+            viewport_w, viewport_h = runtime_window.get("internal_viewport_resolution", (320, 180))
+        else:
+            viewport_w, viewport_h = self.settings.project_settings["window"]["internal_viewport_resolution"]
+        zoom = getattr(node, "zoom", 1.0)
+        if isinstance(zoom, (list, tuple)):
+            zoom = zoom[0] if len(zoom) > 0 else 1.0
+        try:
+            zoom = float(zoom)
+        except Exception:
+            zoom = 1.0
+        zoom = max(0.001, zoom)
+
+        world_w = float(viewport_w) / zoom
+        world_h = float(viewport_h) / zoom
+
         return (
-            node.global_position[0] - node.offset[0] - self.initial_res[0] / 2.0,
-            node.global_position[1] - node.offset[1] - self.initial_res[1] / 2.0,
-            float(self.initial_res[0]),
-            float(self.initial_res[1]),
+            node.global_position[0] - node.offset[0] - world_w / 2.0,
+            node.global_position[1] - node.offset[1] - world_h / 2.0,
+            world_w,
+            world_h,
         )
 
     def _pick_bounds_default(self, node):
@@ -280,6 +323,21 @@ class KodEditor:
     def set_selected_paint_tile_id(self, node, tile_id: int):
         self.ui.state.selected_paint_tile_ids[id(node)] = int(tile_id)
 
+    def get_selected_paint_tile_layer(self, node):
+        selected_layer = self.ui.state.selected_paint_tile_layers.get(id(node), 0)
+        if isinstance(node, Nodes.TileMap2D):
+            try:
+                setattr(node, "_editor_active_paint_layer", int(selected_layer))
+            except Exception:
+                setattr(node, "_editor_active_paint_layer", 0)
+        return selected_layer
+
+    def set_selected_paint_tile_layer(self, node, layer_index: int):
+        normalized_layer = int(layer_index)
+        self.ui.state.selected_paint_tile_layers[id(node)] = normalized_layer
+        if isinstance(node, Nodes.TileMap2D):
+            setattr(node, "_editor_active_paint_layer", normalized_layer)
+
     def get_scene_hierarchy(self):
         root = getattr(self.app.current_scene, "root", None)
         if root is None:
@@ -337,6 +395,7 @@ class KodEditor:
             self.app.set_scene(new_scene)
             self.ui.state.selected_node = None
             self.ui.state.selected_paint_tile_ids.clear()
+            self.ui.state.selected_paint_tile_layers.clear()
             self.ui.inspector.clear()
             self.ui._update_hierarchy()
             self.ui.menubar.update()
@@ -372,7 +431,7 @@ class KodEditor:
                     "--scene",
                     scene_path,
                     "--project-settings-json",
-                    json.dumps(self.settings.project_settings),
+                    json.dumps(self._runtime_project_settings()),
                     "--editor-settings-json",
                     json.dumps(self.editor_settings.editor_settings),
                 ],
@@ -386,11 +445,18 @@ class KodEditor:
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to run scene: {e}")
 
+    def _runtime_project_settings(self):
+        runtime_settings = copy.deepcopy(self.settings.project_settings)
+        runtime_window = runtime_settings.setdefault("window", {})
+        runtime_window["viewport_resolution"] = tuple(self.runtime_window_settings["viewport_resolution"])
+        runtime_window["internal_viewport_resolution"] = tuple(self.runtime_window_settings["internal_viewport_resolution"])
+        return runtime_settings
+
     def drag_file(self):
         pass
 
     def open_file(self, file_path):
-        extension_command_list = self.settings.project_settings["file_management"]["file_extension_commands"]
+        extension_command_list = self.settings.editor_settings["file_management"]["file_extension_commands"]
 
         _, extension = os.path.splitext(file_path)
         command = extension_command_list.get(extension, "--default")

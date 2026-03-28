@@ -16,7 +16,14 @@ class FileSystem:
         self._double_click_threshold = 0.5
         self._context_menu_path = None
         self._selected_directory = None
+        self._selected_file = None
         self._open_directories = set()
+    
+    def set_selected_file(self, path):
+        self._selected_file = path
+
+    def get_selected_file(self):
+        return self._selected_file
     
     def build(self, path=None):
         if path is None:
