@@ -15,11 +15,7 @@ authors = [
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
-dependencies = [
-    "dearpygui",
-    "pygame",
-    "numpy",
-]
+dynamic = ["dependencies"]
 
 [project.urls]
 Homepage = "https://github.com/tobique-gd/Project-BeatSlash"
@@ -31,6 +27,9 @@ kod-editor = "KodEngine.editor.Editor:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.package-data]
 "*" = ["*.kscn", "*.png", "*.jpg", "*.jpeg", "*.mp3", "*.wav", "*.ogg", "*.json"]

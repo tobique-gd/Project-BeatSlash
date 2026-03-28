@@ -19,6 +19,10 @@ class EditorUI:
         self.file_system = UIComp.FileSystem(self)
 
         pygui.create_context()
+        with pygui.font_registry():
+            default_font = pygui.add_font("src/KodEngine/editor/assets/fonts/kod_default_font.otf", 16)
+            pygui.bind_font(default_font)
+
         self.viewport.create_texture()
         self._create_layout()
         self._setup_dpg()

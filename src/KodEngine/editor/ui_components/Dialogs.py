@@ -1,7 +1,9 @@
 import dearpygui.dearpygui as pygui
 from ...engine import Nodes
 from ...engine.ErrorHandler import ErrorHandler
-
+from ...engine import ResourceServer
+from .. import ResourceEditors
+import os
 
 class BaseDialog:
     def __init__(self, ui):
@@ -79,6 +81,119 @@ class NodeDialogs(BaseDialog):
         
         if pygui.does_item_exist("delete_node_window"):
             pygui.delete_item("delete_node_window")
+
+
+
+    def _draw_scene_file_browser(self):
+        root = self.ui.editor.settings.project_settings["file_management"]["project_directory"]
+
+        def draw_dir(path):
+            try:
+                entries = sorted(os.listdir(path))
+            except Exception:
+                ErrorHandler.throw_error(f"Error accessing directory: {path}")
+                return
+
+            for entry in entries:
+                full_path = os.path.join(path, entry)
+
+                if os.path.isdir(full_path):
+                    with pygui.tree_node(label=entry, default_open=False):
+                        draw_dir(full_path)
+                else:
+                    if not entry.endswith(".kscn"):
+                        continue
+
+                    pygui.add_selectable(
+                        label=entry,
+                        user_data=full_path,
+                        callback=self._on_scene_file_selected,
+                        default_value=(
+                            self.ui.file_system.get_selected_file() == full_path
+                        )
+                    )
+
+        draw_dir(root)
+
+    def show_link_scene_window(self, sender, app_data):
+        if not self.ui.state.selected_node:
+            return
+
+        self._show_centered_modal(
+            label="Link Scene",
+            tag="link_scene_window",
+            width=640,
+            height=400,
+            no_resize=True,
+        )
+
+        with pygui.group(parent="link_scene_window"):
+            pygui.add_text("Select a scene to link (.kscn):")
+            pygui.add_separator()
+
+            with pygui.child_window(
+                tag="link_scene_file_browser",
+                border=True,
+                height=-60
+            ):
+                self._draw_scene_file_browser()
+
+            pygui.add_separator()
+
+            with pygui.group(horizontal=True):
+                pygui.add_button(
+                    label="Link",
+                    width=300,
+                    callback=self._on_scene_file_link_requested
+                )
+                pygui.add_button(
+                    label="Cancel",
+                    width=300,
+                    callback=lambda: pygui.delete_item("link_scene_window")
+                )
+    def _on_scene_file_link_requested(self, sender, app_data, user_data):
+        if not self.ui.state.selected_node:
+            ErrorHandler.throw_warning("No node selected to link scene to")
+            return
+        
+        selected_file = self.ui.file_system.get_selected_file()
+        if not selected_file:
+            ErrorHandler.throw_warning("No scene file selected")
+            return
+        
+        try:
+            pygui.delete_item("link_scene_window")
+            linked_scene = ResourceServer.SceneLoader.load(selected_file)
+            if not linked_scene:
+                ErrorHandler.throw_error("Failed to load scene")
+                return
+            
+
+            root = linked_scene.root
+            if not root:
+                ErrorHandler.throw_error("Linked scene has no root node")
+                return
+            root._is_linked_scene = True
+            #TODO replace with proper relative path
+            root._linked_scene_path = selected_file
+            self.ui.state.selected_node.add_child(root)
+
+            self.ui.hierarchy.update_hierarchy()
+        except Exception as e:
+            ErrorHandler.throw_error(f"Error linking scene: {e}")
+   
+    def _on_scene_file_selected(self, sender, app_data, user_data):
+        self.ui.file_system.set_selected_file(user_data)
+
+        parent = pygui.get_item_parent(sender)
+        if not parent:
+            return
+
+        children = pygui.get_item_children(parent, 1) or []
+
+        for child in children:
+            if pygui.get_item_type(child) == "mvAppItemType::mvSelectable":
+                pygui.set_value(child, child == sender)
 
     def show_add_node_window(self, sender, app_data):
         if not self.ui.state.selected_node:
@@ -172,28 +287,43 @@ class NodeDialogs(BaseDialog):
         
         try:
             new_node = NewNodeClass()
+            
+            
             for attr, value in vars(old_node).items():
+               
                 if attr.startswith("_") or attr in ("runtime_script",):
                     continue
                 try:
                     setattr(new_node, attr, value)
                 except Exception:
                     pass
+
+          
             if old_node._parent:
                 parent = old_node._parent
-                parent._children.remove(old_node)
-                parent._children.append(new_node)
+               
+                idx = parent._children.index(old_node)
+                parent._children[idx] = new_node
                 new_node._parent = parent
-            
-            for child in old_node._children:
-                child._parent = new_node
+            else:
+               
+                if self.ui.app.current_scene:
+                    self.ui.app.current_scene.root = new_node
+                    new_node._parent = None
+                    
+                    new_node.name = old_node.name 
+
+           
             new_node._children = old_node._children
+            for child in new_node._children:
+                child._parent = new_node
+            
+           
             old_node._children = []
-            
+            old_node._parent = None
+
             self.ui.state.selected_node = new_node
-            
             self.ui._update_hierarchy()
-            
             self.ui.inspector.update(new_node)
             
             ErrorHandler.throw_success(f"Changed node type from {current_type_name} to {new_type_name}")
@@ -429,6 +559,7 @@ class DialogManager:
             "editor_settings_window",
             "new_script_window",
             "new_scene_window",
+            "link_scene_window",
         )
 
     def is_any_dialog_open(self):
@@ -439,6 +570,10 @@ class DialogManager:
 
     def show_add_node_window(self, sender, app_data):
         self.node.show_add_node_window(sender, app_data)
+    
+    def show_link_scene_window(self, sender, app_data):
+        self.ui.file_system.set_selected_file(None)
+        self.node.show_link_scene_window(sender, app_data)
 
     def show_delete_node_window(self, sender, app_data):
         self.node.show_delete_node_window(sender, app_data)
@@ -449,8 +584,3 @@ class DialogManager:
     def show_editor_settings_window(self, sender=None, app_data=None):
         self.settings_dialog.show_editor_settings_window(sender, app_data)
 
-
-# Backward compatibility while migrating call sites to DialogManager.
-class Dialogs(DialogManager):
-    pass
-    

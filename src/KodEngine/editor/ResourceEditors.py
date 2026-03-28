@@ -317,8 +317,7 @@ class SpriteAnimationEditor(BaseResourceEditor):
                     label=f"##sprite_anim_name_{id(anim)}",
                     default_value=str(anim.name),
                     width=-1,
-                    on_enter=True,
-                    callback=lambda s, v: self._set_value(anim, "name", str(v), on_changed),
+                    callback=lambda s, v: setattr(anim, "name", str(v)),
                 )
 
             with pygui.table_row():

@@ -29,3 +29,4 @@ class EditorSessionState:
     selected_node: object | None = None
     selectables: dict[str, object] = field(default_factory=dict)
     selected_paint_tile_ids: dict[int, int] = field(default_factory=dict)
+    selected_paint_tile_layers: dict[int, int] = field(default_factory=dict)

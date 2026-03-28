@@ -97,6 +97,18 @@ class InspectorPanel:
     def update(self, node):
         pygui.delete_item("inspector_panel", children_only=True)
 
+        if node is None:
+            pygui.add_text("Inspector", parent="inspector_panel", color=(150, 150, 150))
+            pygui.add_separator(parent="inspector_panel")
+            return
+
+        if not hasattr(node, "__dict__"):
+            pygui.add_text("Inspector", parent="inspector_panel", color=(150, 150, 150))
+            pygui.add_separator(parent="inspector_panel")
+            node_type = type(node).__name__
+            pygui.add_text(f"Unsupported selection type: {node_type}", parent="inspector_panel", color=(180, 120, 120))
+            return
+
 
         pygui.add_text("Inspector", parent="inspector_panel", color=(150, 150, 150))
         pygui.add_separator(parent="inspector_panel")
@@ -368,7 +380,20 @@ class InspectorPanel:
 
         tileset.ensure_default_tile()
         selected_tile_id = self._get_selected_tilemap_tile_id(node, tileset)
+        selected_layer_index = self._get_selected_tilemap_layer_index(node)
         pygui.add_text(f"Selected Tile ID: {selected_tile_id}", parent="inspector_panel", color=(150, 150, 150))
+
+        with pygui.group(parent="inspector_panel", horizontal=True):
+            pygui.add_text("Paint Layer")
+            pygui.add_input_int(
+                label=f"##tilemap_layer_input_{id(node)}",
+                default_value=int(selected_layer_index),
+                step=1,
+                step_fast=5,
+                width=120,
+                user_data=node,
+                callback=self._on_tilemap_layer_input_changed,
+            )
 
         list_tag = f"tilemap_palette_list_{id(node)}"
         with pygui.child_window(parent="inspector_panel", tag=list_tag, border=True, height=240):
@@ -409,6 +434,29 @@ class InspectorPanel:
     def _select_tilemap_palette_tile(self, node: Nodes.TileMap2D, tile_id: int):
         self.ui.editor.set_selected_paint_tile_id(node, int(tile_id))
         self.update(node)
+
+    def _get_selected_tilemap_layer_index(self, node: Nodes.TileMap2D) -> int:
+        selected_layer = self.ui.editor.get_selected_paint_tile_layer(node)
+        try:
+            return int(selected_layer)
+        except Exception:
+            self.ui.editor.set_selected_paint_tile_layer(node, 0)
+            return 0
+
+    def _set_tilemap_layer_index(self, node: Nodes.TileMap2D, layer_index):
+        if node is None:
+            return
+
+        try:
+            normalized_layer = int(layer_index)
+        except Exception:
+            normalized_layer = 0
+
+        self.ui.editor.set_selected_paint_tile_layer(node, normalized_layer)
+        self.update(node)
+
+    def _on_tilemap_layer_input_changed(self, sender, app_data, user_data):
+        self._set_tilemap_layer_index(user_data, app_data)
 
     def _ensure_texture_registry(self):
         if not pygui.does_item_exist(self._texture_registry_tag):
@@ -753,6 +801,11 @@ class InspectorPanel:
     def _on_resource_changed(self, node, attr, parent_tag):
         self.update(node)
         self._render_resource_editor_content(node, attr, parent_tag)
+
+        # Refresh animation management window if open
+        animations_content_tag = f"animations_editor_content_{id(node)}"
+        if pygui.does_item_exist(animations_content_tag):
+            self._render_animations_content(node, animations_content_tag)
 
     def _show_project_file_picker(self, title, on_selected, extensions=None, initial_path=None):
         if not callable(on_selected):

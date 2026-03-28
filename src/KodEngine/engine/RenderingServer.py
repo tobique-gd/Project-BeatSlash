@@ -1,5 +1,6 @@
 from . import Nodes
 from . import Resources
+from .ErrorHandler import ErrorHandler
 
 #rendering works by sorting nodes by z-index and rendering them 
 class Renderer2D:
@@ -82,8 +83,6 @@ class Renderer2D:
 
         if self.debug_renderer is not None:
             self.debug_renderer.render(self.screen, self.pygame, self.camera, draw_pass="after_scene")
-        
-        self.pygame.display.flip()
 
     #rendering accounts for camera transformation and offset
     def _get_camera_zoom(self):
@@ -106,6 +105,17 @@ class Renderer2D:
 
             self._collect_ysort_renderables(child, out)
 
+    def _viewport_size(self):
+        try:
+            size = self.screen.get_size()
+            if isinstance(size, (list, tuple)) and len(size) >= 2:
+                return (int(size[0]), int(size[1]))
+        except Exception:
+            pass
+
+        fallback = self.configuration.project_settings["window"].get("internal_viewport_resolution", (640, 360))
+        return (int(fallback[0]), int(fallback[1]))
+
     def render_node(self, node):
         if isinstance(node, Nodes.TileMap2D):
             self.render_tilemap(node)
@@ -125,8 +135,10 @@ class Renderer2D:
             if tex is None:
                 return
 
-            # this performs frustum culling to improve performace but im not sure if its actually faster
-            if not self.is_inside_viewport(node, self.camera, self.configuration.project_settings["window"]["internal_viewport_resolution"]):
+            viewport_size = self._viewport_size()
+
+            # this performs frustum culling to improve performance but im not sure if its actually faster since i dont exactly know how sdl works and if the frustum check is more expensive than just rendering the texture
+            if not self.is_inside_viewport(node, self.camera, viewport_size):
                 return
             
         
@@ -139,8 +151,8 @@ class Renderer2D:
 
        
             camera_offset_centered = (
-                camera_offset_node_position[0] + self.configuration.project_settings["window"]["internal_viewport_resolution"][0] / 2.0,
-                camera_offset_node_position[1] + self.configuration.project_settings["window"]["internal_viewport_resolution"][1] / 2.0
+                camera_offset_node_position[0] + viewport_size[0] / 2.0,
+                camera_offset_node_position[1] + viewport_size[1] / 2.0
             )
 
             camera_space_translation = (
@@ -158,67 +170,111 @@ class Renderer2D:
     def render_tilemap(self, node):
         tileset = getattr(node, "tileset", None)
         tile_data = getattr(node, "tile_data", getattr(node, "_tile_data", None))
+        tile_layers = getattr(node, "tile_layers", getattr(node, "_tile_layers", None))
         bounds = getattr(node, "bounds", getattr(node, "_bounds", ((0, 0), (-1, -1))))
 
-        if tileset is None or not isinstance(tile_data, list):
+        if tileset is None:
+            return
+
+        if isinstance(tile_layers, dict):
+            sorted_layers = []
+            for layer_key, layer_data in tile_layers.items():
+                if not isinstance(layer_data, list):
+                    continue
+                try:
+                    layer_index = int(layer_key)
+                except Exception:
+                    continue
+                sorted_layers.append((layer_index, layer_data))
+            sorted_layers.sort(key=lambda item: item[0])
+            layers_to_render = sorted_layers
+        elif isinstance(tile_data, list):
+            layers_to_render = [(0, tile_data)]
+        else:
             return
 
         zoom = self._get_camera_zoom()
+        viewport_size = self._viewport_size()
         (min_x, min_y), _ = bounds
+        active_layer = getattr(node, "_editor_active_paint_layer", None)
+        active_layer_index = int(active_layer) if isinstance(active_layer, int) else None
+        selection_settings = self.configuration.editor_settings.get("selection", {})
+        selected_node_id = selection_settings.get("selected_node_id") if isinstance(selection_settings, dict) else None
+        is_selected_tilemap = isinstance(selected_node_id, int) and int(selected_node_id) == id(node)
+        dim_non_active_layers = ErrorHandler.is_editor_mode() and is_selected_tilemap and active_layer_index is not None
+        dim_factor = 0.45
 
-        for row_index, row in enumerate(tile_data):
-            if not isinstance(row, (list, tuple)):
-                continue
+        scaled_texture_cache = {}
+        dimmed_texture_cache = {}
 
-            for column_index, tile_id in enumerate(row):
-                try:
-                    tile_id = int(tile_id)
-                except Exception:
+        for layer_index, layer_data in layers_to_render:
+            is_dim_layer = bool(dim_non_active_layers and int(layer_index) != active_layer_index)
+            for row_index, row in enumerate(layer_data):
+                if not isinstance(row, (list, tuple)):
                     continue
 
-                if tile_id < 0:
-                    continue
+                for column_index, tile_id in enumerate(row):
+                    try:
+                        tile_id = int(tile_id)
+                    except Exception:
+                        continue
 
-                texture = tileset.get_tile_surface(tile_id)
-                if texture is None:
-                    continue
+                    if tile_id < 0:
+                        continue
 
-                tile_x = min_x + column_index
-                tile_y = min_y + row_index
-                world_x, world_y = node.tile_to_world((tile_x, tile_y))
+                    texture = tileset.get_tile_surface(tile_id)
+                    if texture is None:
+                        continue
 
-                tile_world_x = node.global_position[0] + world_x
-                tile_world_y = node.global_position[1] + world_y
+                    tile_x = min_x + column_index
+                    tile_y = min_y + row_index
+                    world_x, world_y = node.tile_to_world((tile_x, tile_y))
 
-                # tile doesnt have image so my normal frustum culling wont work so i have to do it manually here
-                if not self.is_tile_inside_viewport(
-                    tile_world_x,
-                    tile_world_y,
-                    texture.get_width(),
-                    texture.get_height(),
-                    self.camera,
-                    self.configuration.project_settings["window"]["internal_viewport_resolution"],
-                ):
-                    continue
+                    tile_world_x = node.global_position[0] + world_x
+                    tile_world_y = node.global_position[1] + world_y
 
-                camera_offset_node_position = (
-                    (tile_world_x - self.camera.global_position[0] + self.camera.offset[0]) * zoom,
-                    (tile_world_y - self.camera.global_position[1] + self.camera.offset[1]) * zoom,
-                )
+                    # tile doesnt have image so my normal frustum culling wont work so i have to do it manually here
+                    if not self.is_tile_inside_viewport(
+                        tile_world_x,
+                        tile_world_y,
+                        texture.get_width(),
+                        texture.get_height(),
+                        self.camera,
+                        viewport_size,
+                    ):
+                        continue
 
-                camera_offset_centered = (
-                    camera_offset_node_position[0] + self.configuration.project_settings["window"]["internal_viewport_resolution"][0] / 2.0,
-                    camera_offset_node_position[1] + self.configuration.project_settings["window"]["internal_viewport_resolution"][1] / 2.0,
-                )
+                    camera_offset_node_position = (
+                        (tile_world_x - self.camera.global_position[0] + self.camera.offset[0]) * zoom,
+                        (tile_world_y - self.camera.global_position[1] + self.camera.offset[1]) * zoom,
+                    )
 
-                
+                    camera_offset_centered = (
+                        camera_offset_node_position[0] + viewport_size[0] / 2.0,
+                        camera_offset_node_position[1] + viewport_size[1] / 2.0,
+                    )
 
-                if abs(zoom - 1.0) > 0.001:
-                    target_w = max(1, int(texture.get_width() * zoom))
-                    target_h = max(1, int(texture.get_height() * zoom))
-                    texture = self.pygame.transform.scale(texture, (target_w, target_h))
+                    render_texture = texture
+                    if abs(zoom - 1.0) > 0.001:
+                        target_w = max(1, int(texture.get_width() * zoom))
+                        target_h = max(1, int(texture.get_height() * zoom))
+                        scaled_key = (id(texture), target_w, target_h)
+                        render_texture = scaled_texture_cache.get(scaled_key)
+                        if render_texture is None:
+                            render_texture = self.pygame.transform.scale(texture, (target_w, target_h))
+                            scaled_texture_cache[scaled_key] = render_texture
 
-                self.screen.blit(texture, camera_offset_centered)
+                    if is_dim_layer:
+                        dim_key = (id(render_texture), int(dim_factor * 1000))
+                        dimmed_texture = dimmed_texture_cache.get(dim_key)
+                        if dimmed_texture is None:
+                            dimmed_texture = render_texture.copy()
+                            mul = max(0, min(255, int(255 * dim_factor)))
+                            dimmed_texture.fill((mul, mul, mul), special_flags=self.pygame.BLEND_RGB_MULT)
+                            dimmed_texture_cache[dim_key] = dimmed_texture
+                        render_texture = dimmed_texture
+
+                    self.screen.blit(render_texture, camera_offset_centered)
 
 
     def create_node_structure(self, node, nodes_array=None):
