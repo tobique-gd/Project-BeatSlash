@@ -49,8 +49,22 @@ class EditorUI:
                 pygui.add_table_column(init_width_or_weight=0.2)
 
                 with pygui.table_row():
-                    with pygui.child_window(border=True):
-                        self.hierarchy.build()
+                    with pygui.group():
+                        with pygui.child_window(border=True, height=-350):
+                            self.hierarchy.build()
+                    
+
+                        with pygui.child_window(label="File System", border=True):
+                            pygui.add_text("File System", color=(150, 150, 150))
+                            pygui.add_separator()
+                            with pygui.child_window(border=False, tag="file_system_tree"):
+                                self.file_system.build()
+
+                            with pygui.handler_registry():
+                                pygui.add_mouse_click_handler(
+                                    button=pygui.mvMouseButton_Right,
+                                    callback=self._file_system_right_click,
+                                )
 
                     with pygui.group():
                         with pygui.child_window(tag="viewport_container", border=True, height=-250, no_scrollbar=True):
@@ -58,22 +72,8 @@ class EditorUI:
                             pygui.add_image("engine_texture", tag="viewport_image")
 
                         with pygui.child_window(border=True, height=-1):
-                            with pygui.tab_bar(tag="bottom_dock_tabs"):
-                                with pygui.tab(label="Console"):
-                                    self.console.build()
-
-                                with pygui.tab(label="File System"):
-                                    pygui.add_text("File System", color=(150, 150, 150))
-                                    pygui.add_separator()
-                                    with pygui.child_window(border=False, tag="file_system_tree"):
-                                        self.file_system.build()
-
-                                    with pygui.handler_registry():
-                                        pygui.add_mouse_click_handler(
-                                            button=pygui.mvMouseButton_Right,
-                                            callback=self._file_system_right_click,
-                                        )
-
+                            self.console.build()
+                                
                     with pygui.child_window(border=True, tag="inspector_panel"):
                         self.inspector.build()
 

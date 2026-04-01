@@ -79,9 +79,13 @@ class NodeDialogs(BaseDialog):
         except Exception as e:
             ErrorHandler.throw_error(f"Error deleting node: {e}")
         
+        
         if pygui.does_item_exist("delete_node_window"):
             pygui.delete_item("delete_node_window")
 
+        self.ui.state.selected_node = None
+        self.ui._update_hierarchy()
+        self.ui.inspector.update(None)
 
 
     def _draw_scene_file_browser(self):

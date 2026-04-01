@@ -235,11 +235,7 @@ class SceneLoader:
         
     #deserialization of saved scene on disk
     @staticmethod
-    def deserialize_scene(scene):
-        if not isinstance(scene, dict) or "root" not in scene:
-            return None
-
-        def build_node(node_data):
+    def deserialize_node(node_data):
             props = node_data.get("properties", {})
             
 
@@ -249,12 +245,12 @@ class SceneLoader:
                 decoded_props = {}
                 SceneLoader._warn(f"Failed to decode properties for '{node_data.get('name', 'Unknown')}': {e}")
 
-            is_linked = isinstance(decoded_props, dict) and decoded_props.get("_is_linked_scene", False)
+            is_linked = isinstance(decoded_props, dict) and decoded_props.get("is_linked_scene", False)
 
             if is_linked:
-                linked_path = decoded_props.get("_linked_scene_path")
+                linked_path = decoded_props.get("linked_scene_path")
                 if not linked_path:
-                    raise RuntimeError(f"Linked scene '{node_data.get('name')}' is missing '_linked_scene_path'.")
+                    raise RuntimeError(f"Linked scene '{node_data.get('name')}' is missing 'linked_scene_path'.")
                 
                 resolved_path = ResourceLoader.resolve_path(linked_path)
                 linked_scene = SceneLoader.load(resolved_path)
@@ -264,33 +260,29 @@ class SceneLoader:
                 
                 node = linked_scene.root
                 
-                node._is_linked_scene = True
-                node._linked_scene_path = linked_path
+                node.is_linked_scene = True
+                node.linked_scene_path = linked_path
             else:
-                # --- Standard Node Logic ---
                 tname = node_data.get("type")
                 cls = getattr(Nodes, tname, getattr(Nodes, "Node", None))
                 if cls is None:
                     raise RuntimeError(f"Unknown node class: {tname}")
                 node = cls()
 
-            # Apply Name
             if "name" in node_data:
                 node.name = node_data["name"]
 
-            # Apply Properties (For linked scenes, these act as instance overrides)
+            
             if isinstance(decoded_props, dict):
                 try:
                     node.load_data(decoded_props)
                 except Exception as e:
                     SceneLoader._warn(f"Failed to load data for node '{node.name}': {e}")
-            
-            # Only process children from the JSON if this is NOT a linked scene.
-            # (Linked scenes already populated their children when SceneLoader.load was called above)
+
             if not is_linked:
                 for child_data in node_data.get("children", []):
                     try:
-                        child = build_node(child_data)
+                        child = SceneLoader.deserialize_node(child_data)
                         if child:
                             node.add_child(child)
                     except Exception as e:
@@ -298,8 +290,15 @@ class SceneLoader:
                         
             return node
 
+    @staticmethod
+    def deserialize_scene(scene):
+        if not isinstance(scene, dict) or "root" not in scene:
+            return None
+
+        
+
         try:
-            root_node = build_node(scene.get("root"))
+            root_node = SceneLoader.deserialize_node(scene.get("root"))
             if Scenes.Scene is not None:
                 return Scenes.Scene(scene.get("name"), root_node)
             return root_node
@@ -308,32 +307,35 @@ class SceneLoader:
             return None
 
     @staticmethod
-    def serialize_scene(scene):
-        def serialize_node(node):
-            node_dict = {
-                "type": type(node).__name__,
-                "name": node.name,
-                "properties": {},
-                "children": []
-            }
+    def serialize_node(node):
+        node_dict = {
+            "type": type(node).__name__,
+            "name": node.name,
+            "properties": {},
+            "children": []
+        }
 
-            try:
-                 raw_data = node.save_data()
-                 encoded_data = SceneLoader._encode_value(raw_data)
-                 if isinstance(encoded_data, dict):
-                     node_dict["properties"] = encoded_data
-            except Exception as e:
-                SceneLoader._warn(f"Failed to save data for node '{node.name}': {e}")
+        try:
+                raw_data = node.save_data()
+                encoded_data = SceneLoader._encode_value(raw_data)
+                if isinstance(encoded_data, dict):
+                    node_dict["properties"] = encoded_data
+        except Exception as e:
+            SceneLoader._warn(f"Failed to save data for node '{node.name}': {e}")
 
-            if getattr(node, "_is_linked_scene", False):
-                node_dict["properties"]["_is_linked_scene"] = True
-                node_dict["properties"]["_linked_scene_path"] = SceneLoader._to_project_relative(node._linked_scene_path)
-                return node_dict
-
-            for child in getattr(node, "_children", []):
-                node_dict["children"].append(serialize_node(child))
-
+        if getattr(node, "is_linked_scene", False):
+            node_dict["properties"]["is_linked_scene"] = True
+            node_dict["properties"]["linked_scene_path"] = SceneLoader._to_project_relative(node.linked_scene_path)
             return node_dict
 
-        scene_dict = {"name": getattr(scene, "name", None), "root": serialize_node(scene.root)}
+        for child in getattr(node, "_children", []):
+            node_dict["children"].append(SceneLoader.serialize_node(child))
+
+        return node_dict
+
+    @staticmethod
+    def serialize_scene(scene):
+        
+
+        scene_dict = {"name": getattr(scene, "name", None), "root": SceneLoader.serialize_node(scene.root)}
         return scene_dict

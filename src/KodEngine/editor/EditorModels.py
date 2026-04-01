@@ -16,6 +16,9 @@ class EditorCommandType(str, Enum):
     RUN_PROJECT = "run_project"
     OPEN_FILE = "open_file"
     OPEN_EDITOR_SETTINGS = "open_editor_settings"
+    COPY_NODE = "copy_node"
+    PASTE_NODE = "paste_node"
+    DUPLICATE_NODE = "duplicate_node"
 
 
 @dataclass
@@ -27,6 +30,7 @@ class EditorCommand:
 @dataclass
 class EditorSessionState:
     selected_node: object | None = None
+    copied_node_data : object | None = None
     selectables: dict[str, object] = field(default_factory=dict)
     selected_paint_tile_ids: dict[int, int] = field(default_factory=dict)
     selected_paint_tile_layers: dict[int, int] = field(default_factory=dict)

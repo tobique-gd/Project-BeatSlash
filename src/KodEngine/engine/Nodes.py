@@ -13,9 +13,8 @@ class Node:
         self.runtime_script: object | None = None
         self.script = None
         self._queued_for_deletion = False
-        self._is_linked_scene = False
-        self._linked_scene_path = None
-        
+        self.is_linked_scene = False
+        self.linked_scene_path = None
 
     def _on_enter(self):
         for child in getattr(self, "_children", []):
@@ -42,6 +41,12 @@ class Node:
     
     def queue_free(self):
         self._queued_for_deletion = True
+    
+    def clone(self):
+        data = ResourceServer.SceneLoader.serialize_node(self)
+        data_copy = data.copy()
+        des = ResourceServer.SceneLoader.deserialize_node(data_copy)
+        return des
 
     def get_node(self, _path_to_child: str):
         parts = _path_to_child.split("/")
@@ -438,6 +443,52 @@ class TileMap2D(Node2D):
         self._bounds: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (1, 1))
         self._tile_layers: dict[int, list[list[int]]] = {0: self._empty_grid(self._bounds, fill_value=-1)}
         self._tile_data: list[list[int]] = self._tile_layers[0]
+        self._chunked_tile_data: dict[int, dict[tuple[int, int], list[tuple[int, int, int]]]] = {}
+        self._chunk_size = 8
+    
+    def _on_enter(self):
+        self.preprocess_tile_data()
+
+    @property
+    def chunk_size(self):
+        return self._chunk_size
+    
+    @chunk_size.setter
+    def chunk_size(self, value):
+        try:
+            new_size = int(value)
+            if new_size > 0:
+                self._chunk_size = new_size
+                self.preprocess_tile_data()
+        except Exception:
+            pass
+
+    def preprocess_tile_data(self):
+        self._chunked_tile_data = {}
+        (min_x, min_y), _ = self._bounds
+        
+        chunk_area = self.chunk_size * self.chunk_size
+
+        for layer_index, layer_data in self._tile_layers.items():
+            chunked_layer = {}
+            for y, row in enumerate(layer_data):
+                for x, tile_id in enumerate(row):
+                    if tile_id == -1:
+                        continue
+                    
+                    abs_tx = x + min_x
+                    abs_ty = y + min_y
+                    
+                    cx, cy = abs_tx // self.chunk_size, abs_ty // self.chunk_size
+            
+                    rx, ry = abs_tx % self.chunk_size, abs_ty % self.chunk_size
+                    
+                    if (cx, cy) not in chunked_layer:
+                        chunked_layer[(cx, cy)] = [-1] * chunk_area
+                    
+                    chunked_layer[(cx, cy)][ry * self.chunk_size + rx] = tile_id
+            
+            self._chunked_tile_data[layer_index] = chunked_layer
 
     def shrink_to_fit(self, fill_value: int = -1):
         min_x, min_y = None, None
@@ -641,6 +692,7 @@ class TileMap2D(Node2D):
         column_index = tile_x - min_x
         layer_data[row_index][column_index] = int(tile_id)
         self.shrink_to_fit(fill_value=-1)
+        self.preprocess_tile_data()
         return True
 
     def get_layer_indices(self) -> list[int]:
