@@ -20,20 +20,21 @@ nav:
   - Nodes and Resources: EngineDataReference.md
   - Editor: EditorReference.md
   - Node Class Reference:
-      - Overview: NodesReference.md
-      - Node: nodes/Node.md
-      - Node2D: nodes/Node2D.md
-      - CollisionShape2D: nodes/CollisionShape2D.md
-      - RectangleCollisionShape2D: nodes/RectangleCollisionShape2D.md
-      - Sprite2D: nodes/Sprite2D.md
-      - AnimatedSprite2D: nodes/AnimatedSprite2D.md
-      - StaticBody2D: nodes/StaticBody2D.md
-      - DynamicBody2D: nodes/DynamicBody2D.md
-      - KinematicBody2D: nodes/KinematicBody2D.md
-      - Camera2D: nodes/Camera2D.md
-      - AudioPlayer: nodes/AudioPlayer.md
-      - TileMap2D: nodes/TileMap2D.md
-      - YSort2D: nodes/YSort2D.md
+      - Overview:
+          - Intro: NodesReference.md
+          - Node: nodes/Node.md
+          - Node2D: nodes/Node2D.md
+          - CollisionShape2D: nodes/CollisionShape2D.md
+          - RectangleCollisionShape2D: nodes/RectangleCollisionShape2D.md
+          - Sprite2D: nodes/Sprite2D.md
+          - AnimatedSprite2D: nodes/AnimatedSprite2D.md
+          - StaticBody2D: nodes/StaticBody2D.md
+          - DynamicBody2D: nodes/DynamicBody2D.md
+          - KinematicBody2D: nodes/KinematicBody2D.md
+          - Camera2D: nodes/Camera2D.md
+          - AudioPlayer: nodes/AudioPlayer.md
+          - TileMap2D: nodes/TileMap2D.md
+          - YSort2D: nodes/YSort2D.md
 
 markdown_extensions:
   - admonition
