@@ -138,6 +138,8 @@ class FileSystem:
     
     def _create_context_menu(self):
         with pygui.window(label="FileSystem Context Menu", tag="file_system_context_menu", show=False, no_title_bar=True, popup=True):
+            pygui.add_menu_item(label="New Folder", callback=self._create_new_folder)
+            pygui.add_separator()
             pygui.add_menu_item(label="New Script", callback=self._create_new_script)
             pygui.add_menu_item(label="New Scene", callback=self._create_new_scene)
             pygui.add_separator()
@@ -163,7 +165,6 @@ class FileSystem:
         ErrorHandler.throw_info("File tree refreshed")
 
     def _capture_open_directories(self):
-        """Capture current open/closed state of directory nodes before rebuild."""
         self._open_directories.clear()
         root_path = self.ui.app.configuration.project_settings["file_management"]["project_directory"]
 
@@ -178,6 +179,57 @@ class FileSystem:
                             self._open_directories.add(full_path)
                     except Exception:
                         continue
+    
+    def _create_new_folder(self):
+        pygui.configure_item("file_system_context_menu", show=False)
+        
+        if pygui.does_item_exist("new_folder_window"):
+            pygui.delete_item("new_folder_window")
+        
+        modal_width = 400
+        modal_height = 150
+        
+        with pygui.window(label="New folder", tag="new_folder_window", modal=False, show=True, width=modal_width, height=modal_height, no_collapse=True):
+            pygui.add_text("Enter folder name:")
+            pygui.add_input_text(tag="new_folder_name_input", default_value="New folder", width=-1)
+            pygui.add_separator()
+            with pygui.group(horizontal=True):
+                pygui.add_button(label="Create", width=190, callback=self._on_create_folder_confirm)
+                pygui.add_button(label="Cancel", width=190, callback=lambda: pygui.delete_item("new_folder_window"))
+        
+        main_width = pygui.get_item_width("Primary Window") or 1280
+        main_height = pygui.get_item_height("Primary Window") or 720
+        modal_x = int((main_width / 2 - modal_width / 2))
+        modal_y = int((main_height / 2 - modal_height / 2))
+        pygui.set_item_pos("new_folder_window", [modal_x, modal_y])
+
+    def _on_create_folder_confirm(self):
+        folder_name = pygui.get_value("new_folder_name_input")
+        
+        if not folder_name:
+            ErrorHandler.throw_error("folder name cannot be empty")
+            return
+        
+        target_dir = self._context_menu_path
+        if target_dir is None:
+            target_dir = self.ui.app.configuration.project_settings["file_management"]["project_directory"]
+        
+        if not os.path.isdir(target_dir):
+            target_dir = os.path.dirname(target_dir)
+        
+
+        folder_path = os.path.join(target_dir, folder_name)
+
+        try:
+            os.mkdir(folder_path)
+            ErrorHandler.throw_info(f"Created folder: {folder_name}")
+            self._refresh_file_tree()
+        except:
+            ErrorHandler.throw_error(f"Failed to create folder: {folder_name}")
+        
+        pygui.delete_item("new_folder_window")
+
+
     
     def _create_new_script(self):
         pygui.configure_item("file_system_context_menu", show=False)

@@ -438,8 +438,8 @@
                     ],
                     "current_animation":{
                         "name":"a_run_front",
-                        "current_frame":7,
-                        "time_accumulator":0.023000000000002588
+                        "current_frame":3,
+                        "time_accumulator":0.06933333333335373
                     }
                 },
                 "children":[]
@@ -453,7 +453,7 @@
                     "linked_scene_path":null,
                     "position":[
                         -7.5,
-                        -26.0
+                        -13.0
                     ],
                     "rotation":[
                         0,
@@ -462,7 +462,7 @@
                     "z_index":0,
                     "size":[
                         15.0,
-                        26.0
+                        13.0
                     ]
                 },
                 "children":[]
@@ -488,7 +488,15 @@
                         0
                     ],
                     "current":true,
-                    "zoom":1.0
+                    "zoom":1.0,
+                    "limit_min":[
+                        -208.0,
+                        -500.0
+                    ],
+                    "limit_max":[
+                        15.0,
+                        60.0
+                    ]
                 },
                 "children":[]
             }

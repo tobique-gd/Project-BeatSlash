@@ -346,9 +346,9 @@ class KinematicBody2D(Node2D):
         self.velocity = (0, 0)
 
     def move_and_slide(self):
-        self.position = (
-            self.position[0] + self.velocity[0],
-            self.position[1] + self.velocity[1]
+        self.global_position = (
+            self.global_position[0] + self.velocity[0],
+            self.global_position[1] + self.velocity[1]
         )
 
     
@@ -360,7 +360,55 @@ class Camera2D(Node2D):
         self.offset = (0, 0)
         self.current : bool = True
         self.zoom = 1.0
+        self.limit_min : tuple[float, float] = (float(-1), float(-1))
+        self.limit_max : tuple[float, float] = (float(-1), float(-1))
     
+    @property
+    def global_position(self):
+        if self._parent is None:
+            p = self.position
+        elif isinstance(self._parent, Node2D):
+            p_global = self._parent.global_position
+            p = (self.position[0] + p_global[0], self.position[1] + p_global[1])
+        else:
+            p = self.position
+
+        clamped_x, clamped_y = p
+        if self.limit_min != (float(-1), float(-1)):
+            clamped_x = max(clamped_x, self.limit_min[0])
+            clamped_y = max(clamped_y, self.limit_min[1])
+
+        if self.limit_max != (float(-1), float(-1)):
+            clamped_x = min(clamped_x, self.limit_max[0])
+            clamped_y = min(clamped_y, self.limit_max[1])
+
+        return (clamped_x, clamped_y)
+
+    # i need to limit cameras global position within the limits, but the limits are in global space, so i need to convert the desired global position to local space before setting it, and also consider the offset
+
+    @global_position.setter
+    def global_position(self, value: tuple[float, float]) -> None:
+        clamped_x, clamped_y = value
+
+        if self.limit_min != (float(-1), float(-1)):
+            clamped_x = max(clamped_x, self.limit_min[0])
+            clamped_y = max(clamped_y, self.limit_min[1])
+
+        if self.limit_max != (float(-1), float(-1)):
+            clamped_x = min(clamped_x, self.limit_max[0])
+            clamped_y = min(clamped_y, self.limit_max[1])
+
+        final_x = clamped_x - self.offset[0]
+        final_y = clamped_y - self.offset[1]
+
+        if self._parent is None:
+            self.position = (final_x, final_y)
+        elif isinstance(self._parent, Node2D):
+            parent_global = self._parent.global_position
+            self.position = (final_x - parent_global[0], final_y - parent_global[1])
+        else:
+            self.position = (final_x, final_y)
+
 class AudioPlayer(Node):
     def __init__(self) -> None:
         super().__init__()
