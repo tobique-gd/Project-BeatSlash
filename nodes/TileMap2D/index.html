@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://tobique-gd.github.io/Project-BeatSlash/nodes/TileMap2D/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>TileMap2D - KodEngine Docs</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../stylesheets/extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "TileMap2D";
+        var mkdocs_page_input_path = "nodes/TileMap2D.md";
+        var mkdocs_page_url = "/Project-BeatSlash/nodes/TileMap2D/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/yaml.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/rust.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> KodEngine Docs
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EngineRuntimeReference/">Engine Runtime</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EngineDataReference/">Nodes and Resources</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EditorReference/">Editor</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Node Class Reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Overview</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../NodesReference/">Intro</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Node/">Node</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Node2D/">Node2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../CollisionShape2D/">CollisionShape2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../RectangleCollisionShape2D/">RectangleCollisionShape2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Sprite2D/">Sprite2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../AnimatedSprite2D/">AnimatedSprite2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../StaticBody2D/">StaticBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../DynamicBody2D/">DynamicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../KinematicBody2D/">KinematicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Camera2D/">Camera2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../AudioPlayer/">AudioPlayer</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">TileMap2D</a>
+    <ul class="current">
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../YSort2D/">YSort2D</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">KodEngine Docs</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Node Class Reference</li>
+          <li class="breadcrumb-item">Overview</li>
+      <li class="breadcrumb-item active">TileMap2D</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/tobique-gd/Project-BeatSlash/edit/master/docs/nodes/TileMap2D.md">Edit on tobique-gd/Project-BeatSlash</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="tilemap2d">TileMap2D<a class="headerlink" href="#tilemap2d" title="Permanent link">&para;</a></h1>
+<p>TileMap2D stores layered tile grids and chunked render data.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>init</strong>()</td>
+<td>Initializes tileset slot, bounds, layers, and chunk cache.</td>
+</tr>
+<tr>
+<td>_on_enter()</td>
+<td>Rebuilds chunked tile data when entering scene tree.</td>
+</tr>
+<tr>
+<td>chunk_size (property getter)</td>
+<td>Returns chunk dimension in tiles.</td>
+</tr>
+<tr>
+<td>chunk_size (property setter)</td>
+<td>Sets chunk dimension and rebuilds chunk cache.</td>
+</tr>
+<tr>
+<td>preprocess_tile_data()</td>
+<td>Converts tile layers into chunked runtime data.</td>
+</tr>
+<tr>
+<td>shrink_to_fit(fill_value=-1)</td>
+<td>Reduces bounds to non-empty tile extents.</td>
+</tr>
+<tr>
+<td>_normalize_bounds(bounds)</td>
+<td>Normalizes min and max tile bounds ordering.</td>
+</tr>
+<tr>
+<td>_grid_dimensions(bounds)</td>
+<td>Computes grid width and height from bounds.</td>
+</tr>
+<tr>
+<td>_empty_grid(bounds=None, fill_value=-1)</td>
+<td>Creates an empty tile grid for bounds.</td>
+</tr>
+<tr>
+<td>_normalize_tile_data(value, bounds=None, fill_value=-1)</td>
+<td>Normalizes raw tile array into bounded int grid.</td>
+</tr>
+<tr>
+<td>_normalize_layer_index(layer)</td>
+<td>Coerces layer id to int.</td>
+</tr>
+<tr>
+<td>_normalize_tile_layers(value, bounds=None, fill_value=-1)</td>
+<td>Normalizes tile layer dictionary input.</td>
+</tr>
+<tr>
+<td>tileset (property getter)</td>
+<td>Returns tileset resource.</td>
+</tr>
+<tr>
+<td>bounds (property getter)</td>
+<td>Returns tile bounds.</td>
+</tr>
+<tr>
+<td>bounds (property setter)</td>
+<td>Updates bounds while preserving existing data.</td>
+</tr>
+<tr>
+<td>tile_layers (property getter)</td>
+<td>Returns tile layer map.</td>
+</tr>
+<tr>
+<td>tile_layers (property setter)</td>
+<td>Assigns normalized tile layers and shrinks bounds.</td>
+</tr>
+<tr>
+<td>tileset (property setter)</td>
+<td>Assigns tileset resource from object or path.</td>
+</tr>
+<tr>
+<td>set_bounds(bounds, preserve=True, fill_value=-1)</td>
+<td>Resizes map bounds and remaps layer content.</td>
+</tr>
+<tr>
+<td>ensure_layer(layer, fill_value=-1)</td>
+<td>Ensures a target layer exists and returns it.</td>
+</tr>
+<tr>
+<td>get_tile_id(tile_pos, layer=0)</td>
+<td>Reads tile id at tile coordinates and layer.</td>
+</tr>
+<tr>
+<td>set_tile_id(tile_pos, tile_id, layer=0)</td>
+<td>Writes tile id, expands bounds when needed, and rebuilds cache.</td>
+</tr>
+<tr>
+<td>get_layer_indices()</td>
+<td>Returns sorted layer indices.</td>
+</tr>
+<tr>
+<td>save_data()</td>
+<td>Serializes bounds, layers, and tileset reference.</td>
+</tr>
+<tr>
+<td>load_data(data)</td>
+<td>Deserializes bounds, layers, and tileset reference.</td>
+</tr>
+<tr>
+<td>tile_to_world(tile_pos)</td>
+<td>Converts tile coordinates to local world coordinates.</td>
+</tr>
+<tr>
+<td>world_to_tile(world_pos)</td>
+<td>Converts local world coordinates to tile coordinates.</td>
+</tr>
+<tr>
+<td>world_bounds (property getter)</td>
+<td>Returns world-space bounds for current tile bounds.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>position</td>
+<td>Local tilemap position inherited from Node2D.</td>
+</tr>
+<tr>
+<td>rotation</td>
+<td>Local rotation inherited from Node2D.</td>
+</tr>
+<tr>
+<td>z_index</td>
+<td>Render ordering inherited from Node2D.</td>
+</tr>
+<tr>
+<td>chunk_size</td>
+<td>Tile chunk size used when building cached render data.</td>
+</tr>
+<tr>
+<td>tileset</td>
+<td>Bound tileset resource or resource path.</td>
+</tr>
+<tr>
+<td>bounds</td>
+<td>Inclusive tile coordinate bounds for the map.</td>
+</tr>
+<tr>
+<td>tile_layers</td>
+<td>Layered tile grid data keyed by layer index.</td>
+</tr>
+<tr>
+<td>world_bounds</td>
+<td>World-space bounds derived from the current tile bounds.</td>
+</tr>
+</tbody>
+</table>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../AudioPlayer/" class="btn btn-neutral float-left" title="AudioPlayer"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../YSort2D/" class="btn btn-neutral float-right" title="YSort2D">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/tobique-gd/Project-BeatSlash" class="fa fa-code-fork" style="color: #fcfcfc"> tobique-gd/Project-BeatSlash</a>
+        </span>
+    
+    
+      <span><a href="../AudioPlayer/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../YSort2D/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

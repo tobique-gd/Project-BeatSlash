@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://tobique-gd.github.io/Project-BeatSlash/EngineDataReference/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Nodes and Resources - KodEngine Docs</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../stylesheets/extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Nodes and Resources";
+        var mkdocs_page_input_path = "EngineDataReference.md";
+        var mkdocs_page_url = "/Project-BeatSlash/EngineDataReference/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/yaml.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/rust.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> KodEngine Docs
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../EngineRuntimeReference/">Engine Runtime</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Nodes and Resources</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#node-model">Node Model</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#scene-serialization">Scene Serialization</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#resource-loading">Resource Loading</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#built-in-resources">Built-In Resources</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#scripting-model">Scripting Model</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../EditorReference/">Editor</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Node Class Reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Overview</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../NodesReference/">Intro</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/Node/">Node</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/Node2D/">Node2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/CollisionShape2D/">CollisionShape2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/RectangleCollisionShape2D/">RectangleCollisionShape2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/Sprite2D/">Sprite2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/AnimatedSprite2D/">AnimatedSprite2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/StaticBody2D/">StaticBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/DynamicBody2D/">DynamicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/KinematicBody2D/">KinematicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/Camera2D/">Camera2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/AudioPlayer/">AudioPlayer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/TileMap2D/">TileMap2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../nodes/YSort2D/">YSort2D</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">KodEngine Docs</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Nodes and Resources</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/tobique-gd/Project-BeatSlash/edit/master/docs/EngineDataReference.md">Edit on tobique-gd/Project-BeatSlash</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="engine-nodes-and-resources-reference">Engine Nodes and Resources Reference<a class="headerlink" href="#engine-nodes-and-resources-reference" title="Permanent link">&para;</a></h1>
+<h2 id="node-model">Node Model<a class="headerlink" href="#node-model" title="Permanent link">&para;</a></h2>
+<p>All scene objects derive from Node in src/KodEngine/engine/Nodes.py. Node manages parent and child links, lookup by path, recursive type queries, script binding, and serialization hooks. Node2D adds transform fields and world position propagation.</p>
+<h2 id="scene-serialization">Scene Serialization<a class="headerlink" href="#scene-serialization" title="Permanent link">&para;</a></h2>
+<p>SceneLoader in src/KodEngine/engine/ResourceServer.py reads and writes .kscn files as JSON payloads. Node type names are stored as class names. Node fields are serialized through save_data and restored through load_data. Resource instances are encoded with marker payloads. Linked scenes are restored through is_linked_scene and linked_scene_path.</p>
+<h2 id="resource-loading">Resource Loading<a class="headerlink" href="#resource-loading" title="Permanent link">&para;</a></h2>
+<p>ResourceLoader resolves project-relative paths against the configured project root. It caches loaded resources by absolute path and instantiates resource classes through extension lookup. The type and extension registries are defined by Resource subclasses in src/KodEngine/engine/Resources.py.</p>
+<h2 id="built-in-resources">Built-In Resources<a class="headerlink" href="#built-in-resources" title="Permanent link">&para;</a></h2>
+<p>Built-in resource classes include Texture2D, AudioStream, Script, SpriteAnimation, Tileset2D, Tile2D, CollisionShape, and CollisionRectangleShape. Resource objects support path-based loading, dictionary serialization, and nested resource encoding.</p>
+<h2 id="scripting-model">Scripting Model<a class="headerlink" href="#scripting-model" title="Permanent link">&para;</a></h2>
+<p>Node script slots are stored as Script resources and resolved at runtime through load_script. Runtime calls _ready, _process(delta), and _input(event) when handlers are present. If a module defines SCRIPT_CLASS or <strong>script_class</strong>, runtime instantiates that class with the node binding. Otherwise runtime uses ScriptProxy with module-level handlers.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../EngineRuntimeReference/" class="btn btn-neutral float-left" title="Engine Runtime"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../EditorReference/" class="btn btn-neutral float-right" title="Editor">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/tobique-gd/Project-BeatSlash" class="fa fa-code-fork" style="color: #fcfcfc"> tobique-gd/Project-BeatSlash</a>
+        </span>
+    
+    
+      <span><a href="../EngineRuntimeReference/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../EditorReference/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

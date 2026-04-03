@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://tobique-gd.github.io/Project-BeatSlash/nodes/Sprite2D/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Sprite2D - KodEngine Docs</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../stylesheets/extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Sprite2D";
+        var mkdocs_page_input_path = "nodes/Sprite2D.md";
+        var mkdocs_page_url = "/Project-BeatSlash/nodes/Sprite2D/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/yaml.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/rust.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> KodEngine Docs
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EngineRuntimeReference/">Engine Runtime</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EngineDataReference/">Nodes and Resources</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EditorReference/">Editor</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Node Class Reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Overview</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../NodesReference/">Intro</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Node/">Node</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Node2D/">Node2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../CollisionShape2D/">CollisionShape2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../RectangleCollisionShape2D/">RectangleCollisionShape2D</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Sprite2D</a>
+    <ul class="current">
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../AnimatedSprite2D/">AnimatedSprite2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../StaticBody2D/">StaticBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../DynamicBody2D/">DynamicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../KinematicBody2D/">KinematicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Camera2D/">Camera2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../AudioPlayer/">AudioPlayer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../TileMap2D/">TileMap2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../YSort2D/">YSort2D</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">KodEngine Docs</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Node Class Reference</li>
+          <li class="breadcrumb-item">Overview</li>
+      <li class="breadcrumb-item active">Sprite2D</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/tobique-gd/Project-BeatSlash/edit/master/docs/nodes/Sprite2D.md">Edit on tobique-gd/Project-BeatSlash</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="sprite2d">Sprite2D<a class="headerlink" href="#sprite2d" title="Permanent link">&para;</a></h1>
+<p>Sprite2D renders a texture resource in world space.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>init</strong>()</td>
+<td>Initializes sprite transform offsets and texture slot.</td>
+</tr>
+<tr>
+<td>save_data()</td>
+<td>Saves sprite fields and texture resource reference.</td>
+</tr>
+<tr>
+<td>load_data(data)</td>
+<td>Loads sprite fields and texture resource reference.</td>
+</tr>
+<tr>
+<td>texture (property getter)</td>
+<td>Returns current texture resource.</td>
+</tr>
+<tr>
+<td>texture (property setter)</td>
+<td>Accepts texture resource or path and resolves resource binding.</td>
+</tr>
+<tr>
+<td>image (property getter)</td>
+<td>Returns renderable surface with horizontal and vertical flip applied.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>position</td>
+<td>Local sprite position relative to the parent node.</td>
+</tr>
+<tr>
+<td>rotation</td>
+<td>Local rotation value inherited from Node2D.</td>
+</tr>
+<tr>
+<td>z_index</td>
+<td>Sprite render ordering inherited from Node2D.</td>
+</tr>
+<tr>
+<td>flip_h</td>
+<td>Flips the sprite horizontally when rendering.</td>
+</tr>
+<tr>
+<td>flip_v</td>
+<td>Flips the sprite vertically when rendering.</td>
+</tr>
+<tr>
+<td>offset</td>
+<td>Pixel offset applied during rendering.</td>
+</tr>
+<tr>
+<td>texture</td>
+<td>Bound texture resource or resource path.</td>
+</tr>
+<tr>
+<td>image</td>
+<td>Render-ready surface after texture lookup and flipping.</td>
+</tr>
+</tbody>
+</table>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../RectangleCollisionShape2D/" class="btn btn-neutral float-left" title="RectangleCollisionShape2D"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../AnimatedSprite2D/" class="btn btn-neutral float-right" title="AnimatedSprite2D">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/tobique-gd/Project-BeatSlash" class="fa fa-code-fork" style="color: #fcfcfc"> tobique-gd/Project-BeatSlash</a>
+        </span>
+    
+    
+      <span><a href="../RectangleCollisionShape2D/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../AnimatedSprite2D/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

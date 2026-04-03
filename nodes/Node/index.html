@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://tobique-gd.github.io/Project-BeatSlash/nodes/Node/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Node - KodEngine Docs</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../stylesheets/extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Node";
+        var mkdocs_page_input_path = "nodes/Node.md";
+        var mkdocs_page_url = "/Project-BeatSlash/nodes/Node/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/yaml.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/rust.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> KodEngine Docs
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EngineRuntimeReference/">Engine Runtime</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EngineDataReference/">Nodes and Resources</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../EditorReference/">Editor</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Node Class Reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Overview</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../NodesReference/">Intro</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Node</a>
+    <ul class="current">
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Node2D/">Node2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../CollisionShape2D/">CollisionShape2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../RectangleCollisionShape2D/">RectangleCollisionShape2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Sprite2D/">Sprite2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../AnimatedSprite2D/">AnimatedSprite2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../StaticBody2D/">StaticBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../DynamicBody2D/">DynamicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../KinematicBody2D/">KinematicBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Camera2D/">Camera2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../AudioPlayer/">AudioPlayer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../TileMap2D/">TileMap2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../YSort2D/">YSort2D</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">KodEngine Docs</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Node Class Reference</li>
+          <li class="breadcrumb-item">Overview</li>
+      <li class="breadcrumb-item active">Node</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/tobique-gd/Project-BeatSlash/edit/master/docs/nodes/Node.md">Edit on tobique-gd/Project-BeatSlash</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="node">Node<a class="headerlink" href="#node" title="Permanent link">&para;</a></h1>
+<p>Node is the base class for all scene graph objects.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>init</strong>()</td>
+<td>Initializes core fields, parent links, script state, and linked scene flags.</td>
+</tr>
+<tr>
+<td>_on_enter()</td>
+<td>Recursively calls child enter handlers.</td>
+</tr>
+<tr>
+<td>on_exit()</td>
+<td>Recursively calls child exit handlers.</td>
+</tr>
+<tr>
+<td>add_child(_node)</td>
+<td>Appends a child and sets parent reference.</td>
+</tr>
+<tr>
+<td>remove_child(_node)</td>
+<td>Removes a child and clears parent reference.</td>
+</tr>
+<tr>
+<td>queue_free()</td>
+<td>Marks the node for deferred deletion.</td>
+</tr>
+<tr>
+<td>clone()</td>
+<td>Serializes and deserializes the node to create a copy.</td>
+</tr>
+<tr>
+<td>get_node(_path_to_child)</td>
+<td>Resolves a child node by slash path.</td>
+</tr>
+<tr>
+<td>get_child(index)</td>
+<td>Returns child at index or None.</td>
+</tr>
+<tr>
+<td>get_nodes_by_type(node_type)</td>
+<td>Recursively collects children by type.</td>
+</tr>
+<tr>
+<td>set_script(module_name)</td>
+<td>Assigns a script resource path.</td>
+</tr>
+<tr>
+<td>reparent_to(new_parent)</td>
+<td>Moves the node to a new parent.</td>
+</tr>
+<tr>
+<td>script (property getter)</td>
+<td>Returns current script resource.</td>
+</tr>
+<tr>
+<td>script (property setter)</td>
+<td>Accepts resource, path, or None and binds runtime script.</td>
+</tr>
+<tr>
+<td>_update(_delta)</td>
+<td>Per-frame runtime hook for subclasses.</td>
+</tr>
+<tr>
+<td>editor_update(delta)</td>
+<td>Per-frame editor hook for subclasses.</td>
+</tr>
+<tr>
+<td>save_data()</td>
+<td>Serializes public non-callable fields.</td>
+</tr>
+<tr>
+<td>load_data(data)</td>
+<td>Loads serialized fields into node properties.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>Node name, defaults to the class name.</td>
+</tr>
+<tr>
+<td>script</td>
+<td>Bound script resource or resource path.</td>
+</tr>
+<tr>
+<td>runtime_script</td>
+<td>Loaded runtime script instance, if a script is assigned.</td>
+</tr>
+<tr>
+<td>is_linked_scene</td>
+<td>Marks the node as originating from a linked scene.</td>
+</tr>
+<tr>
+<td>linked_scene_path</td>
+<td>Path to the linked scene resource.</td>
+</tr>
+</tbody>
+</table>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../../NodesReference/" class="btn btn-neutral float-left" title="Intro"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../Node2D/" class="btn btn-neutral float-right" title="Node2D">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/tobique-gd/Project-BeatSlash" class="fa fa-code-fork" style="color: #fcfcfc"> tobique-gd/Project-BeatSlash</a>
+        </span>
+    
+    
+      <span><a href="../../NodesReference/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../Node2D/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
