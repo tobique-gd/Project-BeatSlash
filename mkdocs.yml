@@ -1,0 +1,49 @@
+site_name: KodEngine Docs
+site_description: Runtime and editor documentation for Project BeatSlash and KodEngine.
+site_url: https://tobique-gd.github.io/Project-BeatSlash/
+repo_url: https://github.com/tobique-gd/Project-BeatSlash
+repo_name: tobique-gd/Project-BeatSlash
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  hljs_languages:
+    - yaml
+    - rust
+
+nav:
+  - Home: index.md
+  - Engine Runtime: EngineRuntimeReference.md
+  - Nodes and Resources: EngineDataReference.md
+  - Editor: EditorReference.md
+  - Node Class Reference:
+      - Overview: NodesReference.md
+      - Node: nodes/Node.md
+      - Node2D: nodes/Node2D.md
+      - CollisionShape2D: nodes/CollisionShape2D.md
+      - RectangleCollisionShape2D: nodes/RectangleCollisionShape2D.md
+      - Sprite2D: nodes/Sprite2D.md
+      - AnimatedSprite2D: nodes/AnimatedSprite2D.md
+      - StaticBody2D: nodes/StaticBody2D.md
+      - DynamicBody2D: nodes/DynamicBody2D.md
+      - KinematicBody2D: nodes/KinematicBody2D.md
+      - Camera2D: nodes/Camera2D.md
+      - AudioPlayer: nodes/AudioPlayer.md
+      - TileMap2D: nodes/TileMap2D.md
+      - YSort2D: nodes/YSort2D.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
+
+plugins:
+  - search
+
+extra_css:
+  - stylesheets/extra.css
