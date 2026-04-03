@@ -119,6 +119,7 @@ class App:
 
         self.scaled_surface = pygame.transform.scale(self.internal_surface, (target_w, target_h))
         self.screen.blit(self.scaled_surface, (offset_x, offset_y))
+        
 
     def set_scene(self, scene):
         if self.current_scene and getattr(self.current_scene, "root", None):

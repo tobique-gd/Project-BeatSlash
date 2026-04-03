@@ -40,7 +40,7 @@ class HierarchyPanel:
         for i, (node, children) in enumerate(items):
             label = node.name
 
-            is_linked = getattr(node, "_is_linked_scene", False)
+            is_linked = getattr(node, "is_linked_scene", False)
             if is_linked:
                 label += " [Linked]"
 

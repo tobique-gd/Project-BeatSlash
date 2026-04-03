@@ -127,7 +127,7 @@ class InspectorPanel:
 
             self.draw_property(node, "name", getattr(node, "name", ""))
 
-        excluded = {"_children", "_parent", "runtime_script", "name", "global_position"}
+        excluded = {"_children", "_parent", "runtime_script", "name", "global_position", "is_linked_scene", "linked_scene_path"}
         node_cls = type(node)
         mro = [cls for cls in node_cls.mro() if cls is not object]
         base_to_derived = list(reversed(mro))

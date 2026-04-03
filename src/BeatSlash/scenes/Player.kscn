@@ -5,6 +5,8 @@
         "name":"Player",
         "properties":{
             "name":"Player",
+            "is_linked_scene":false,
+            "linked_scene_path":null,
             "position":[
                 0,
                 0
@@ -25,9 +27,11 @@
                 "name":"AnimatedSprite2D",
                 "properties":{
                     "name":"AnimatedSprite2D",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
                     "position":[
-                        -8.5,
-                        -26.0
+                        0.0,
+                        0.0
                     ],
                     "rotation":[
                         0,
@@ -37,8 +41,8 @@
                     "flip_h":false,
                     "flip_v":false,
                     "offset":[
-                        0,
-                        0
+                        -8.5,
+                        -26.0
                     ],
                     "animations":[
                         {
@@ -433,9 +437,9 @@
                         }
                     ],
                     "current_animation":{
-                        "name":"a_idle_front",
-                        "current_frame":1,
-                        "time_accumulator":0.06899999999999776
+                        "name":"a_run_front",
+                        "current_frame":3,
+                        "time_accumulator":0.06933333333335373
                     }
                 },
                 "children":[]
@@ -445,9 +449,11 @@
                 "name":"RectangleCollisionShape2D",
                 "properties":{
                     "name":"RectangleCollisionShape2D",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
                     "position":[
                         -7.5,
-                        -26.0
+                        -13.0
                     ],
                     "rotation":[
                         0,
@@ -456,7 +462,7 @@
                     "z_index":0,
                     "size":[
                         15.0,
-                        26.0
+                        13.0
                     ]
                 },
                 "children":[]
@@ -466,9 +472,11 @@
                 "name":"Camera2D",
                 "properties":{
                     "name":"Camera2D",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
                     "position":[
-                        0,
-                        0
+                        0.0,
+                        0.0
                     ],
                     "rotation":[
                         0,
@@ -480,7 +488,15 @@
                         0
                     ],
                     "current":true,
-                    "zoom":1.0
+                    "zoom":1.0,
+                    "limit_min":[
+                        -208.0,
+                        -500.0
+                    ],
+                    "limit_max":[
+                        15.0,
+                        60.0
+                    ]
                 },
                 "children":[]
             }

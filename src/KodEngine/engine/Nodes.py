@@ -13,9 +13,8 @@ class Node:
         self.runtime_script: object | None = None
         self.script = None
         self._queued_for_deletion = False
-        self._is_linked_scene = False
-        self._linked_scene_path = None
-        
+        self.is_linked_scene = False
+        self.linked_scene_path = None
 
     def _on_enter(self):
         for child in getattr(self, "_children", []):
@@ -42,6 +41,12 @@ class Node:
     
     def queue_free(self):
         self._queued_for_deletion = True
+    
+    def clone(self):
+        data = ResourceServer.SceneLoader.serialize_node(self)
+        data_copy = data.copy()
+        des = ResourceServer.SceneLoader.deserialize_node(data_copy)
+        return des
 
     def get_node(self, _path_to_child: str):
         parts = _path_to_child.split("/")
@@ -341,9 +346,9 @@ class KinematicBody2D(Node2D):
         self.velocity = (0, 0)
 
     def move_and_slide(self):
-        self.position = (
-            self.position[0] + self.velocity[0],
-            self.position[1] + self.velocity[1]
+        self.global_position = (
+            self.global_position[0] + self.velocity[0],
+            self.global_position[1] + self.velocity[1]
         )
 
     
@@ -355,7 +360,55 @@ class Camera2D(Node2D):
         self.offset = (0, 0)
         self.current : bool = True
         self.zoom = 1.0
+        self.limit_min : tuple[float, float] = (float(-1), float(-1))
+        self.limit_max : tuple[float, float] = (float(-1), float(-1))
     
+    @property
+    def global_position(self):
+        if self._parent is None:
+            p = self.position
+        elif isinstance(self._parent, Node2D):
+            p_global = self._parent.global_position
+            p = (self.position[0] + p_global[0], self.position[1] + p_global[1])
+        else:
+            p = self.position
+
+        clamped_x, clamped_y = p
+        if self.limit_min != (float(-1), float(-1)):
+            clamped_x = max(clamped_x, self.limit_min[0])
+            clamped_y = max(clamped_y, self.limit_min[1])
+
+        if self.limit_max != (float(-1), float(-1)):
+            clamped_x = min(clamped_x, self.limit_max[0])
+            clamped_y = min(clamped_y, self.limit_max[1])
+
+        return (clamped_x, clamped_y)
+
+    # i need to limit cameras global position within the limits, but the limits are in global space, so i need to convert the desired global position to local space before setting it, and also consider the offset
+
+    @global_position.setter
+    def global_position(self, value: tuple[float, float]) -> None:
+        clamped_x, clamped_y = value
+
+        if self.limit_min != (float(-1), float(-1)):
+            clamped_x = max(clamped_x, self.limit_min[0])
+            clamped_y = max(clamped_y, self.limit_min[1])
+
+        if self.limit_max != (float(-1), float(-1)):
+            clamped_x = min(clamped_x, self.limit_max[0])
+            clamped_y = min(clamped_y, self.limit_max[1])
+
+        final_x = clamped_x - self.offset[0]
+        final_y = clamped_y - self.offset[1]
+
+        if self._parent is None:
+            self.position = (final_x, final_y)
+        elif isinstance(self._parent, Node2D):
+            parent_global = self._parent.global_position
+            self.position = (final_x - parent_global[0], final_y - parent_global[1])
+        else:
+            self.position = (final_x, final_y)
+
 class AudioPlayer(Node):
     def __init__(self) -> None:
         super().__init__()
@@ -438,6 +491,52 @@ class TileMap2D(Node2D):
         self._bounds: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (1, 1))
         self._tile_layers: dict[int, list[list[int]]] = {0: self._empty_grid(self._bounds, fill_value=-1)}
         self._tile_data: list[list[int]] = self._tile_layers[0]
+        self._chunked_tile_data: dict[int, dict[tuple[int, int], list[tuple[int, int, int]]]] = {}
+        self._chunk_size = 8
+    
+    def _on_enter(self):
+        self.preprocess_tile_data()
+
+    @property
+    def chunk_size(self):
+        return self._chunk_size
+    
+    @chunk_size.setter
+    def chunk_size(self, value):
+        try:
+            new_size = int(value)
+            if new_size > 0:
+                self._chunk_size = new_size
+                self.preprocess_tile_data()
+        except Exception:
+            pass
+
+    def preprocess_tile_data(self):
+        self._chunked_tile_data = {}
+        (min_x, min_y), _ = self._bounds
+        
+        chunk_area = self.chunk_size * self.chunk_size
+
+        for layer_index, layer_data in self._tile_layers.items():
+            chunked_layer = {}
+            for y, row in enumerate(layer_data):
+                for x, tile_id in enumerate(row):
+                    if tile_id == -1:
+                        continue
+                    
+                    abs_tx = x + min_x
+                    abs_ty = y + min_y
+                    
+                    cx, cy = abs_tx // self.chunk_size, abs_ty // self.chunk_size
+            
+                    rx, ry = abs_tx % self.chunk_size, abs_ty % self.chunk_size
+                    
+                    if (cx, cy) not in chunked_layer:
+                        chunked_layer[(cx, cy)] = [-1] * chunk_area
+                    
+                    chunked_layer[(cx, cy)][ry * self.chunk_size + rx] = tile_id
+            
+            self._chunked_tile_data[layer_index] = chunked_layer
 
     def shrink_to_fit(self, fill_value: int = -1):
         min_x, min_y = None, None
@@ -641,6 +740,7 @@ class TileMap2D(Node2D):
         column_index = tile_x - min_x
         layer_data[row_index][column_index] = int(tile_id)
         self.shrink_to_fit(fill_value=-1)
+        self.preprocess_tile_data()
         return True
 
     def get_layer_indices(self) -> list[int]:

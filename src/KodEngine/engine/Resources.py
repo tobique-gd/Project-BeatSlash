@@ -162,7 +162,9 @@ class AudioStream(Resource):
         self.file_path = path
         self.resource_path = path
         try:
-            self._sound = pygame.mixer.Sound(path)
+            from .ResourceServer import ResourceLoader
+            resolved_path = ResourceLoader.resolve_path(path)
+            self._sound = pygame.mixer.Sound(resolved_path)
         except Exception as e:
             print(f"Failed to load audio from {path}: {e}")
             self._sound = None
@@ -242,10 +244,13 @@ class Texture2D(Resource):
         return 0
 
     def load_texture(self, path: str):
+        #loading from project directory relative path
         self.texture_path = path
         self.resource_path = path
         try:
-            self._surface = pygame.image.load(path).convert_alpha()
+            from .ResourceServer import ResourceLoader
+            resolved_path = ResourceLoader.resolve_path(path)
+            self._surface = pygame.image.load(resolved_path).convert_alpha()
         except Exception as e:
             print(f"Failed to load texture from {path}: {e}")
             self._surface = None

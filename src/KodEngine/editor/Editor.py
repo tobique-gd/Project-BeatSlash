@@ -51,6 +51,16 @@ class EditorSettings:
                     ".mp3" : "--default"
 
                 }
+            },
+            "keyboard_shortcuts" : {
+                "save_scene": {"modifiers": ["ctrl"], "key": "s"},
+                "load_scene": {"modifiers": ["ctrl"], "key": "o"},
+                "run_scene": {"modifiers": ["ctrl"], "key": "r"},
+                "run_project": {"modifiers": ["ctrl", "shift"], "key": "r"},
+                "open_editor_settings": {"modifiers": ["ctrl"], "key": ","},
+                "duplicate_node": {"modifiers": ["ctrl"], "key": "d"},
+                "copy_node": {"modifiers": ["ctrl"], "key": "c"},
+                "paste_node": {"modifiers": ["ctrl"], "key": "v"}
             }
         }
 
@@ -382,7 +392,8 @@ class KodEditor:
             scene_path = getattr(scene, "path", None) if scene else None
 
         try:
-            ResourceServer.SceneLoader.save(scene, scene_path)
+            if ResourceServer.SceneLoader.save(scene, scene_path):
+                ErrorHandler.throw_info(f"Scene saved successfully: {scene_path}")
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to save scene to {scene_path}, {e}")
 
@@ -500,10 +511,85 @@ class KodEditor:
             case EditorCommandType.OPEN_EDITOR_SETTINGS:
                 self.ui.dialogs.show_editor_settings_window()
 
+            case EditorCommandType.COPY_NODE:
+                self.ui.state.copied_node_data = None
+                selected_node = getattr(self.ui.state, "selected_node", None)
+                if selected_node is not None:
+                    try:
+                        self.ui.state.copied_node_data = selected_node.clone()
+                    except Exception as e:
+                        ErrorHandler.throw_error(f"Failed to copy node: {e}")
+            
+            case EditorCommandType.PASTE_NODE:
+                if self.ui.state.copied_node_data is not None:
+                    try:
+                        new_node = self.ui.state.copied_node_data
+                        parent_node = getattr(self.ui.state.selected_node, "_parent", None)
+                        if parent_node is not None:
+                            parent_node.add_child(new_node)
+                            self._set_selected_node(new_node)
+                            self.ui._update_hierarchy()
+                        else:
+                            ErrorHandler.throw_error("Cannot paste node: No parent found for the new node.")
+                    except Exception as e:
+                        ErrorHandler.throw_error(f"Failed to paste node: {e}")
+            
+            case EditorCommandType.DUPLICATE_NODE:
+                selected_node = getattr(self.ui.state, "selected_node", None)
+                if selected_node is not None:
+                    try:
+                        new_node = selected_node.clone()
+                        parent_node = getattr(selected_node, "_parent", None)
+                        if parent_node is not None:
+                            parent_node.add_child(new_node)
+                            self._set_selected_node(new_node)
+                            self.ui._update_hierarchy()
+                        else:
+                            ErrorHandler.throw_error("Cannot duplicate node: No parent found for the new node.")
+                    except Exception as e:
+                        ErrorHandler.throw_error(f"Failed to duplicate node: {e}")
+
     def _drain_commands(self):
         while self.commands:
             cmd = self.commands.popleft()
             self._dispatch_command(cmd)
+
+    def _handle_keyboard_shortcuts(self):
+        if self.ui.dialogs.is_any_dialog_open():
+            return
+
+        for action, shortcut in self.editor_settings.editor_settings["keyboard_shortcuts"].items():
+            modifiers = shortcut.get("modifiers", [])
+            key = shortcut.get("key")
+
+            ctrl_pressed = pygui.is_key_down(pygui.mvKey_ModCtrl)
+            shift_pressed = pygui.is_key_down(pygui.mvKey_ModShift)
+            alt_pressed = pygui.is_key_down(pygui.mvKey_ModAlt)
+
+            key_code = getattr(pygui, f"mvKey_{key.upper()}", None)
+            if (
+                (("ctrl" in modifiers) == ctrl_pressed) and
+                (("shift" in modifiers) == shift_pressed) and
+                (("alt" in modifiers) == alt_pressed) and
+                key_code is not None and pygui.is_key_pressed(key_code)
+            ):
+                match action:
+                    case "save_scene":
+                        self.queue_command(EditorCommandType.SAVE_SCENE)
+                    case "load_scene":
+                        self.queue_command(EditorCommandType.LOAD_SCENE)
+                    case "run_scene":
+                        self.queue_command(EditorCommandType.RUN_SCENE, scene_path=getattr(self.app.current_scene, "path", None))
+                    case "run_project":
+                        self.queue_command(EditorCommandType.RUN_PROJECT)
+                    case "open_editor_settings":
+                        self.queue_command(EditorCommandType.OPEN_EDITOR_SETTINGS)
+                    case "duplicate_node":
+                        self.queue_command(EditorCommandType.DUPLICATE_NODE)
+                    case "copy_node":
+                        self.queue_command(EditorCommandType.COPY_NODE)
+                    case "paste_node":
+                        self.queue_command(EditorCommandType.PASTE_NODE)
 
     def update_events(self):
         self._drain_commands()
@@ -515,6 +601,8 @@ class KodEditor:
 
         self.gizmo.update_interaction()
         self.tools.update()
+
+        self._handle_keyboard_shortcuts()
 
         if pygui.is_mouse_button_clicked(pygui.mvMouseButton_Left):
             if not self.gizmo._is_mouse_over_viewport():
@@ -584,3 +672,6 @@ class KodEditor:
 def main():
     editor = KodEditor()
     editor.run()
+
+if __name__ == "__main__":
+    main()
