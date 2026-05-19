@@ -1,5 +1,6 @@
 import json
 import os
+from enum import Enum
 from . import (Nodes, Scenes, Resources)
 from .ErrorHandler import ErrorHandler
 
@@ -106,6 +107,9 @@ class SceneLoader:
 
     @staticmethod
     def _encode_value(value):
+        if isinstance(value, Enum):
+            return value.value
+
         if isinstance(value, Resources.Resource):
             encoded_resource = SceneLoader._encode_value(value.to_dict())
             return {SceneLoader.RESOURCE_KEY: encoded_resource}

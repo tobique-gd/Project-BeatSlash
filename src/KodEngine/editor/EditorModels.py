@@ -16,9 +16,11 @@ class EditorCommandType(str, Enum):
     RUN_PROJECT = "run_project"
     OPEN_FILE = "open_file"
     OPEN_EDITOR_SETTINGS = "open_editor_settings"
+    OPEN_PROJECT_SETTINGS = "open_project_settings"
     COPY_NODE = "copy_node"
     PASTE_NODE = "paste_node"
     DUPLICATE_NODE = "duplicate_node"
+
 
 
 @dataclass

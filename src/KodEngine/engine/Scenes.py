@@ -1,4 +1,5 @@
 from . import ErrorHandler
+from . import Nodes
 
 #scenes store a collection of nodes
 class Scene:
@@ -21,6 +22,22 @@ class Scene:
     def _process(self, delta):
         self._process_node(self.root, delta)
         self._process_deletion_queue()
+
+    def _process_ui(self, viewport_size):
+        if self.root is None or viewport_size is None:
+            return
+
+        def traverse(node):
+            if isinstance(node, Nodes.Control):
+                parent = getattr(node, "_parent", None)
+                if not isinstance(parent, Nodes.Control):
+                    node.process_ui(viewport_size)
+                return
+
+            for child in getattr(node, "_children", []):
+                traverse(child)
+
+        traverse(self.root)
 
     def _process_node(self, node, delta):
 
@@ -62,6 +79,9 @@ class Scene:
     def _input_node(self, node, _event):
         if node.runtime_script:
             node.runtime_script._input(_event)
+
+        if hasattr(node, "_input"):
+            node._input(_event)
         
         for child in node._children:
             self._input_node(child, _event)

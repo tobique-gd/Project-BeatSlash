@@ -336,7 +336,13 @@ class ScriptProxy:
     def __getattr__(self, name):
         module = object.__getattribute__(self, "_module")
         if hasattr(module, name):
-            return getattr(module, name)
+            attr = getattr(module, name)
+            if callable(attr):
+                def bound(*args, **kwargs):
+                    return attr(self, *args, **kwargs)
+
+                return bound
+            return attr
         raise AttributeError(name)
 
 #helper functions for file management
@@ -843,3 +849,53 @@ class Tile2D(Resource):
         )
         obj.load_data(data)
         return obj
+
+
+class Font(Resource):
+    type_id = "Font"
+    extensions = (".font", ".json")
+
+    def __init__(self, name="Font", size: int = 14, resource_path: str | None = None):
+        super().__init__(name=name, resource_path=resource_path)
+        self.size: int = size
+        self.color: tuple[int, int, int, int] = (255, 255, 255, 255)
+
+    def save_data(self) -> dict:
+        data = super().save_data()
+        data["size"] = self.size
+        data["color"] = list(self.color)
+        return data
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        self.size = int(data.get("size", 14))
+        color_data = data.get("color", [255, 255, 255, 255])
+        if isinstance(color_data, (list, tuple)):
+            self.color = self.color
+        else:
+            self.color = (255, 255, 255, 255)
+
+    @classmethod
+    def from_path(cls, path: str):
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                obj = cls.from_dict(data)
+                if obj is not None:
+                    obj.resource_path = path
+                    return obj
+            except Exception as e:
+                print(f"Failed to load font from {path}: {e}")
+        return cls(resource_path=path)
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        obj = cls(
+            name=data.get("name", "Font"),
+            size=int(data.get("size", 14)),
+            resource_path=data.get("resource_path")
+        )
+        obj.load_data(data)
+        return obj
+

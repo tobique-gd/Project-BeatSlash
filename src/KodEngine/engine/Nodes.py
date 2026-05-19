@@ -2,7 +2,9 @@ from . import Resources
 import pygame
 import os
 from . import ResourceServer
-
+from .ErrorHandler import ErrorHandler
+from enum import Enum
+from . import Globals
 
 class Node:
     def __init__(self) -> None:
@@ -15,6 +17,221 @@ class Node:
         self._queued_for_deletion = False
         self.is_linked_scene = False
         self.linked_scene_path = None
+        self._signal_connections: dict[str, list[dict]] = {}
+        self._next_signal_connection_id = 1
+
+    def connect(self, signal, callback=None, target=None, method=None, oneshot=False, allow_duplicate=False):
+        callback_fn = None
+        method_name = None
+
+        if isinstance(callback, str):
+            method_name = callback
+        elif callable(callback):
+            callback_fn = callback
+        elif callback is not None:
+            ErrorHandler.throw_warning(
+                f"Invalid callback for signal '{signal}' on node '{self.name}': expected callable or method name"
+            )
+            return None
+
+        if method is not None:
+            if isinstance(method, str):
+                method_name = method
+            else:
+                ErrorHandler.throw_warning(
+                    f"Invalid method for signal '{signal}' on node '{self.name}': expected string"
+                )
+                return None
+
+        if callback_fn is None and method_name is None:
+            ErrorHandler.throw_warning(
+                f"connect() called without callable or method for signal '{signal}' on node '{self.name}'"
+            )
+            return None
+
+        if signal not in self._signal_connections:
+            self._signal_connections[signal] = []
+
+        if not allow_duplicate:
+            for connection in self._signal_connections[signal]:
+                if (
+                    connection.get("callback") is callback_fn
+                    and connection.get("method") == method_name
+                    and connection.get("target") is target
+                ):
+                    return connection.get("id")
+
+        connection_id = self._next_signal_connection_id
+        self._next_signal_connection_id += 1
+
+        self._signal_connections[signal].append(
+            {
+                "id": connection_id,
+                "callback": callback_fn,
+                "method": method_name,
+                "target": target,
+                "oneshot": bool(oneshot),
+            }
+        )
+        return connection_id
+
+    def disconnect(self, connection_id: int):
+        for signal_name, connections in list(self._signal_connections.items()):
+            for idx, connection in enumerate(connections):
+                if connection.get("id") == connection_id:
+                    del connections[idx]
+                    if not connections:
+                        self._signal_connections.pop(signal_name, None)
+                    return True
+        return False
+
+    def disconnect_signal(self, signal, callback=None, target=None, method=None):
+        if signal not in self._signal_connections:
+            return 0
+
+        removed = 0
+        remaining = []
+        for connection in self._signal_connections[signal]:
+            if self._signal_connection_matches(connection, callback=callback, target=target, method=method):
+                removed += 1
+            else:
+                remaining.append(connection)
+
+        if remaining:
+            self._signal_connections[signal] = remaining
+        else:
+            self._signal_connections.pop(signal, None)
+        return removed
+
+    def get_signal_connections(self, signal=None):
+        if signal is not None:
+            return list(self._signal_connections.get(signal, []))
+        return {name: list(connections) for name, connections in self._signal_connections.items()}
+
+    def _signal_connection_matches(self, connection, callback=None, target=None, method=None):
+        expected_method = method
+        expected_callback = callback
+
+        if isinstance(callback, str):
+            expected_method = callback
+            expected_callback = None
+
+        callback_matches = expected_callback is None or connection.get("callback") is expected_callback
+        method_matches = expected_method is None or connection.get("method") == expected_method
+        target_matches = target is None or connection.get("target") is target
+        return callback_matches and method_matches and target_matches
+
+    def _invoke_signal_target_method(self, target, method_name: str, *args, **kwargs):
+        script_proxy_call = getattr(target, "_call", None)
+        script_proxy_module = getattr(target, "_module", None)
+        if callable(script_proxy_call) and script_proxy_module is not None and hasattr(script_proxy_module, method_name):
+            if kwargs:
+                ErrorHandler.throw_warning(
+                    f"Signal method '{method_name}' on script proxy ignores keyword arguments"
+                )
+            script_proxy_call(method_name, *args)
+            return True
+
+        bound_method = getattr(target, method_name, None)
+        if callable(bound_method):
+            bound_method(*args, **kwargs)
+            return True
+
+        return False
+
+    def change_scene_to(self, scene_path):
+        if not scene_path:
+            ErrorHandler.throw_warning(f"change_scene_to() called on node '{self.name}' without a scene path")
+            return False
+
+        app = getattr(Globals, "APP", None)
+        if app is None:
+            ErrorHandler.throw_warning(f"change_scene_to() called on node '{self.name}' but no active app is available")
+            return False
+
+        resolved_scene_path = ResourceServer.ResourceLoader.resolve_path(scene_path)
+        scene = ResourceServer.SceneLoader.load(resolved_scene_path)
+        if scene is None:
+            ErrorHandler.throw_warning(f"Failed to change scene on node '{self.name}': could not load '{scene_path}'")
+            return False
+
+        app.set_scene(scene)
+        return True
+
+    def quit(self):
+        app = getattr(Globals, "APP", None)
+        if app is None:
+            ErrorHandler.throw_warning(f"quit() called on node '{self.name}' but no active app is available")
+            return False
+
+        app.kill()
+        return True
+
+    def _invoke_signal_connection(self, connection, *args, **kwargs):
+        callback = connection.get("callback")
+        if callable(callback):
+            callback(*args, **kwargs)
+            return True
+
+        method_name = connection.get("method")
+        if not method_name:
+            return False
+
+        explicit_target = connection.get("target")
+        if explicit_target is not None:
+            return self._invoke_signal_target_method(explicit_target, method_name, *args, **kwargs)
+
+        current_node = self
+        while current_node is not None:
+            runtime_script = getattr(current_node, "runtime_script", None)
+            if runtime_script is not None and self._invoke_signal_target_method(runtime_script, method_name, *args, **kwargs):
+                return True
+
+            if self._invoke_signal_target_method(current_node, method_name, *args, **kwargs):
+                return True
+
+            parent = getattr(current_node, "_parent", None)
+            current_node = parent if isinstance(parent, Node) else None
+
+        return False
+    
+    def preload(self, scene_path: str):
+        resolved_scene_path = ResourceServer.ResourceLoader.resolve_path(scene_path)
+        scene = ResourceServer.SceneLoader.load(resolved_scene_path)
+        if scene is None:
+            ErrorHandler.throw_warning(f"Failed to preload scene on node '{self.name}': could not load '{scene_path}'")
+            return None
+        return scene
+    
+    def instantiate(self, scene):
+        return scene.root if scene else None
+        
+
+    def emit_signal(self, signal, *args, **kwargs):
+        callbacks = list(self._signal_connections.get(signal, []))
+        oneshot_to_remove = []
+        called_count = 0
+
+        for callback in callbacks:
+            try:
+                called = self._invoke_signal_connection(callback, *args, **kwargs)
+                if called:
+                    called_count += 1
+                else:
+                    ErrorHandler.throw_warning(
+                        f"No valid callback target while emitting signal '{signal}' on node '{self.name}'"
+                    )
+
+                if callback.get("oneshot"):
+                    oneshot_to_remove.append(callback.get("id"))
+            except Exception as e:
+                ErrorHandler.throw_error(f"Error in signal callback for signal '{signal}' on node '{self.name}': {e}")
+
+        for connection_id in oneshot_to_remove:
+            if connection_id is not None:
+                self.disconnect(connection_id)
+
+        return called_count
 
     def _on_enter(self):
         for child in getattr(self, "_children", []):
@@ -73,10 +290,6 @@ class Node:
             if isinstance(child, node_type):
                 found_nodes.append(child)
 
-            found = child.get_nodes_by_type(node_type)
-            if found is not None:
-                found_nodes.extend(found)
-
         return found_nodes
 
     def set_script(self, module_name: str):
@@ -121,6 +334,9 @@ class Node:
     def editor_update(self, delta):
         pass
 
+    def _input(self, _event):
+        pass
+
     def save_data(self) -> dict:
         data = {}
 
@@ -154,13 +370,13 @@ class Node:
                 child.load_data(child_data)
 
 
-
 class Node2D(Node):
     def __init__(self) -> None:
         super().__init__()
         self.position: tuple[float, float] = (0, 0)
         self.rotation: tuple[float, float] = (0, 0)
         self.z_index = 0
+        self.visible = True
 
     @property
     def global_position(self):
@@ -181,7 +397,22 @@ class Node2D(Node):
             self.position = (value[0] - parent_global[0], value[1] - parent_global[1])
         else:
             self.position = value
+
+    @property
+    def global_visible(self) -> bool:
+        if not self.visible:
+            return False
+        if isinstance(self._parent, Node2D):
+            return self._parent.global_visible
+        return True
     
+class CollisionObject2D(Node2D):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.collision_layer = 0
+        self.collision_mask = 0
+
 class CollisionShape2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
@@ -331,16 +562,16 @@ class AnimatedSprite2D(Sprite2D):
             return pygame.transform.flip(frames[frame_index], self.flip_h, self.flip_v)
         return None
 
-class StaticBody2D(Node2D):
+class StaticBody2D(CollisionObject2D):
     def __init__(self) -> None:
         super().__init__()
 
-class DynamicBody2D(Node2D):
+class DynamicBody2D(CollisionObject2D):
     def __init__(self) -> None:
         super().__init__()
         self.velocity = (0, 0)
 
-class KinematicBody2D(Node2D):
+class KinematicBody2D(CollisionObject2D):
     def __init__(self) -> None:
         super().__init__()
         self.velocity = (0, 0)
@@ -362,52 +593,6 @@ class Camera2D(Node2D):
         self.zoom = 1.0
         self.limit_min : tuple[float, float] = (float(-1), float(-1))
         self.limit_max : tuple[float, float] = (float(-1), float(-1))
-    
-    @property
-    def global_position(self):
-        if self._parent is None:
-            p = self.position
-        elif isinstance(self._parent, Node2D):
-            p_global = self._parent.global_position
-            p = (self.position[0] + p_global[0], self.position[1] + p_global[1])
-        else:
-            p = self.position
-
-        clamped_x, clamped_y = p
-        if self.limit_min != (float(-1), float(-1)):
-            clamped_x = max(clamped_x, self.limit_min[0])
-            clamped_y = max(clamped_y, self.limit_min[1])
-
-        if self.limit_max != (float(-1), float(-1)):
-            clamped_x = min(clamped_x, self.limit_max[0])
-            clamped_y = min(clamped_y, self.limit_max[1])
-
-        return (clamped_x, clamped_y)
-
-    # i need to limit cameras global position within the limits, but the limits are in global space, so i need to convert the desired global position to local space before setting it, and also consider the offset
-
-    @global_position.setter
-    def global_position(self, value: tuple[float, float]) -> None:
-        clamped_x, clamped_y = value
-
-        if self.limit_min != (float(-1), float(-1)):
-            clamped_x = max(clamped_x, self.limit_min[0])
-            clamped_y = max(clamped_y, self.limit_min[1])
-
-        if self.limit_max != (float(-1), float(-1)):
-            clamped_x = min(clamped_x, self.limit_max[0])
-            clamped_y = min(clamped_y, self.limit_max[1])
-
-        final_x = clamped_x - self.offset[0]
-        final_y = clamped_y - self.offset[1]
-
-        if self._parent is None:
-            self.position = (final_x, final_y)
-        elif isinstance(self._parent, Node2D):
-            parent_global = self._parent.global_position
-            self.position = (final_x - parent_global[0], final_y - parent_global[1])
-        else:
-            self.position = (final_x, final_y)
 
 class AudioPlayer(Node):
     def __init__(self) -> None:
@@ -794,3 +979,292 @@ class TileMap2D(Node2D):
 class YSort2D(Node2D):
     def __init__(self) -> None:
         super().__init__()
+
+class Area2D(CollisionObject2D):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.collide_with_areas = True
+        self.collide_with_bodies = True
+        self._overlapping_areas = []
+        self._overlapping_bodies = []
+
+    def get_overlapping_bodies(self) -> list[CollisionObject2D]:
+        return self._overlapping_bodies
+
+    def get_overlapping_areas(self) -> list['Area2D']:
+        return self._overlapping_areas
+    
+
+
+
+
+class Control(Node):
+    DEFAULT_FONT_SIZE = 14
+    DEFAULT_FONT_COLOR = (245, 245, 245, 255)
+    DEFAULT_PADDING = (4, 4, 4, 4)
+    DEFAULT_GAP = 4
+    DEFAULT_BG_COLOR = (58, 62, 72, 255)
+
+    class AnchorType(Enum):
+        TOP_LEFT = "TOP_LEFT"
+        TOP_CENTER = "TOP_CENTER"
+        TOP_RIGHT = "TOP_RIGHT"
+        CENTER_LEFT = "CENTER_LEFT"
+        CENTER = "CENTER"
+        CENTER_RIGHT = "CENTER_RIGHT"
+        BOTTOM_LEFT = "BOTTOM_LEFT"
+        BOTTOM_CENTER = "BOTTOM_CENTER"
+        BOTTOM_RIGHT = "BOTTOM_RIGHT"
+        NONE = "NONE"
+        FULL_RECT = "FULL_RECT"
+
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.anchor = self.AnchorType.NONE
+        self.position: tuple[float, float] = (0, 0)
+        self._anchor_offset: tuple[float, float] = (0, 0)
+        self.size: tuple[float, float] = (0, 0)
+        self.z_index = 0
+        
+        self.font : Resources.Font = Resources.Font()
+        self.font_size: int = self.DEFAULT_FONT_SIZE
+        self.font_color: tuple[int, int, int, int] = self.DEFAULT_FONT_COLOR
+        self.padding: tuple[int, int, int, int] = self.DEFAULT_PADDING
+        self.bg_color: tuple[int, int, int, int] = self.DEFAULT_BG_COLOR
+        
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        if "anchor" in data and isinstance(data["anchor"], str):
+            try:
+                self.anchor = self.AnchorType[data["anchor"]]
+            except (KeyError, ValueError):
+                self.anchor = self.AnchorType.NONE
+
+    def _layout_parent_rect(self, viewport_size=None, parent_rect=None):
+        if parent_rect is not None:
+            return parent_rect
+
+        if isinstance(self._parent, Control):
+            return (
+                float(self._parent.global_position[0]),
+                float(self._parent.global_position[1]),
+                float(self._parent.size[0]),
+                float(self._parent.size[1]),
+            )
+
+        if viewport_size is not None:
+            return (0.0, 0.0, float(viewport_size[0]), float(viewport_size[1]))
+
+        return (float(self.global_position[0]), float(self.global_position[1]), float(self.size[0]), float(self.size[1]))
+
+    def _resolve_anchor(self, parent_rect):
+        _, _, parent_w, parent_h = parent_rect
+        width = float(self.size[0])
+        height = float(self.size[1])
+
+        if self.anchor == self.AnchorType.NONE:
+            self._anchor_offset = (0.0, 0.0)
+            return
+
+        if self.anchor == self.AnchorType.FULL_RECT:
+            self._anchor_offset = (0.0, 0.0)
+            self.size = (max(0.0, parent_w), max(0.0, parent_h))
+            return
+
+        anchor_positions = {
+            self.AnchorType.TOP_LEFT: (0.0, 0.0),
+            self.AnchorType.TOP_CENTER: ((parent_w - width) / 2.0, 0.0),
+            self.AnchorType.TOP_RIGHT: (parent_w - width, 0.0),
+            self.AnchorType.CENTER_LEFT: (0.0, (parent_h - height) / 2.0),
+            self.AnchorType.CENTER: ((parent_w - width) / 2.0, (parent_h - height) / 2.0),
+            self.AnchorType.CENTER_RIGHT: (parent_w - width, (parent_h - height) / 2.0),
+            self.AnchorType.BOTTOM_LEFT: (0.0, parent_h - height),
+            self.AnchorType.BOTTOM_CENTER: ((parent_w - width) / 2.0, parent_h - height),
+            self.AnchorType.BOTTOM_RIGHT: (parent_w - width, parent_h - height),
+        }
+
+        local_position = anchor_positions.get(self.anchor)
+        if local_position is not None:
+            self._anchor_offset = local_position
+
+    def _content_rect(self):
+        return (
+            float(self.global_position[0]),
+            float(self.global_position[1]),
+            float(self.size[0]),
+            float(self.size[1]),
+        )
+
+    def _layout_children(self, viewport_size=None):
+        for child in self._children:
+            if isinstance(child, Control):
+                child.process_ui(viewport_size, parent_rect=self._content_rect(), apply_anchor=True)
+
+    def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        if apply_anchor:
+            self._resolve_anchor(self._layout_parent_rect(viewport_size, parent_rect))
+
+        self._layout_children(viewport_size)
+
+    @property
+    def global_position(self):
+        if self._parent is None:
+            return (self.position[0] + self._anchor_offset[0], self.position[1] + self._anchor_offset[1])
+        if isinstance(self._parent, Control):
+            p = self._parent.global_position
+            return (
+                self.position[0] + self._anchor_offset[0] + p[0],
+                self.position[1] + self._anchor_offset[1] + p[1],
+            )
+        return (self.position[0] + self._anchor_offset[0], self.position[1] + self._anchor_offset[1])
+
+    @global_position.setter
+    def global_position(self, value: tuple[float, float]) -> None:
+        if self._parent is None:
+            self.position = (
+                value[0] - self._anchor_offset[0],
+                value[1] - self._anchor_offset[1],
+            )
+        elif isinstance(self._parent, Control):
+            parent_global = self._parent.global_position
+            self.position = (
+                value[0] - parent_global[0] - self._anchor_offset[0],
+                value[1] - parent_global[1] - self._anchor_offset[1],
+            )
+        else:
+            self.position = (
+                value[0] - self._anchor_offset[0],
+                value[1] - self._anchor_offset[1],
+            )
+    
+
+class Label(Control):
+    def __init__(self) -> None:
+        super().__init__()
+        self.text = ""
+    
+
+class Button(Control):
+    def __init__(self) -> None:
+        super().__init__()
+        self.text = ""
+        self.flat = False
+        self.pressed = False
+        self._text_size_cache: tuple[int, int] | None = None
+
+    def _contains_point(self, point: tuple[float, float]) -> bool:
+        x, y = float(self.global_position[0]), float(self.global_position[1])
+        w, h = float(self.size[0]), float(self.size[1])
+        if w <= 0 or h <= 0:
+            return False
+        px, py = float(point[0]), float(point[1])
+        return x <= px <= (x + w) and y <= py <= (y + h)
+
+    def _input(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._contains_point(event.pos):
+                self.pressed = True
+                self.emit_signal("on_pressed")
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.pressed = False
+
+    
+    def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        size_w, size_h = float(self.size[0]), float(self.size[1])
+        if (size_w < 1 or size_h < 1) and self.text:
+            text_w, text_h = self._text_size_cache if self._text_size_cache else (0, 0)
+            padding = getattr(self, "padding", self.DEFAULT_PADDING)
+            button_w = text_w + int(padding[1]) + int(padding[3])
+            button_h = text_h + int(padding[0]) + int(padding[2])
+            self.size = (float(max(button_w, 40)), float(max(button_h, 24)))
+        
+        super().process_ui(viewport_size, parent_rect, apply_anchor)
+    
+
+class TextureRect2D(Control):
+    def __init__(self) -> None:
+        super().__init__()
+        self._texture_resource = None
+
+    def save_data(self) -> dict:
+        data = super().save_data()
+        if self._texture_resource:
+            data["texture"] = self._texture_resource
+        return data
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        if "texture" in data:
+            self.texture = data["texture"]
+
+    @property
+    def image(self):
+        if self._texture_resource:
+            return self._texture_resource.get_texture()
+        return None
+
+    @property
+    def texture(self):
+        return self._texture_resource
+
+    @texture.setter
+    def texture(self, value):
+        if isinstance(value, Resources.Texture2D):
+            self._texture_resource = value
+        elif isinstance(value, str):
+            try:
+                res = ResourceServer.ResourceLoader.load(value)
+                if isinstance(res, Resources.Texture2D):
+                    self._texture_resource = res
+                else:
+                    self._texture_resource = Resources.Texture2D(resource_path=value)
+            except Exception:
+                self._texture_resource = None
+        else:
+            self._texture_resource = None
+
+class VBoxContainer(Control):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.gap = self.DEFAULT_GAP
+
+    def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        if apply_anchor:
+            self._resolve_anchor(self._layout_parent_rect(viewport_size, parent_rect))
+
+        current_y = 0
+        gap = max(0, int(self.gap))
+        for idx, child in enumerate(self._children):
+            if isinstance(child, Control):
+                if idx > 0:
+                    current_y += gap
+                child.position = (0.0, float(current_y))
+                child.process_ui(viewport_size, parent_rect=self._content_rect(), apply_anchor=True)
+                current_y += float(getattr(child, "size", (0, 0))[1]) if hasattr(child, "size") else 0.0
+
+class HBoxContainer(Control):
+    def __init__(self) -> None:
+        super().__init__()
+        self.gap = self.DEFAULT_GAP
+    def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        if apply_anchor:
+            self._resolve_anchor(self._layout_parent_rect(viewport_size, parent_rect))
+
+        current_x = 0
+        gap = max(0, int(self.gap))
+        for idx, child in enumerate(self._children):
+            if isinstance(child, Control):
+                if idx > 0:
+                    current_x += gap
+                child.position = (float(current_x), 0.0)
+                child.process_ui(viewport_size, parent_rect=self._content_rect(), apply_anchor=True)
+                current_x += float(getattr(child, "size", (0, 0))[0]) if hasattr(child, "size") else 0.0    
+
+class ColorRect2D(Control):
+    def __init__(self) -> None:
+        super().__init__()
+        self.color : tuple[int, int, int, int] = (255, 255, 255, 255)

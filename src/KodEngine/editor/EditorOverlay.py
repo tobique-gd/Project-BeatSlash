@@ -46,11 +46,7 @@ class EditorOverlayRenderer:
 
     def _draw_node_shape_gizmo(self, debug, node, *, camera_is_active=False, selected=False):
         if isinstance(node, Nodes.Camera2D):
-            runtime_window = getattr(self.editor, "runtime_window_settings", None)
-            if isinstance(runtime_window, dict):
-                viewport_w, viewport_h = runtime_window.get("internal_viewport_resolution", (320, 180))
-            else:
-                viewport_w, viewport_h = self.editor.settings.project_settings["window"]["internal_viewport_resolution"]
+            viewport_w, viewport_h = self.editor.base_internal_width, self.editor.base_internal_height
             zoom = getattr(node, "zoom", 1.0)
             if isinstance(zoom, (list, tuple)):
                 zoom = zoom[0] if len(zoom) > 0 else 1.0
@@ -129,6 +125,22 @@ class EditorOverlayRenderer:
                 draw_pass="after_scene",
                 z_index=20,
             )
+            return
+
+        if isinstance(node, Nodes.Control) and hasattr(node, "size"):
+            debug.draw_rect(
+                (
+                    node.global_position[0],
+                    node.global_position[1],
+                    node.size[0],
+                    node.size[1],
+                ),
+                color=self._editor_colors["default_gizmo_color"],
+                space="world",
+                draw_pass="after_scene",
+                z_index=20,
+            )
+            return
 
     def queue_debug_overlays(self, always_visible_nodes=None):
         if not hasattr(self.editor.app, "debug_renderer"):

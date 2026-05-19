@@ -8,6 +8,7 @@ class DebugRenderingServer:
         self.configuration = configuration
         self._command_list = []
         self._command_sequence = 0
+        self._viewport_size = None
 
     def _queue_command(self, command_type, draw_pass="after_scene", z_index=0, **payload):
         self._command_list.append(
@@ -150,16 +151,22 @@ class DebugRenderingServer:
         zoom = getattr(camera, "zoom", 1.0)
         zoom = max(0.001, zoom)
 
+        if isinstance(self._viewport_size, (list, tuple)) and len(self._viewport_size) >= 2:
+            viewport_w = max(1, int(self._viewport_size[0]))
+            viewport_h = max(1, int(self._viewport_size[1]))
+        else:
+            fallback = self.configuration.project_settings["window"].get("internal_viewport_resolution", (640, 360))
+            viewport_w = max(1, int(fallback[0]))
+            viewport_h = max(1, int(fallback[1]))
+
         camera_offset_node_position = (
             (world_pos[0] - camera.global_position[0] + camera.offset[0]) * zoom,
             (world_pos[1] - camera.global_position[1] + camera.offset[1]) * zoom,
         )
 
         return (
-            camera_offset_node_position[0]
-            + self.configuration.project_settings["window"]["internal_viewport_resolution"][0] / 2.0,
-            camera_offset_node_position[1]
-            + self.configuration.project_settings["window"]["internal_viewport_resolution"][1] / 2.0,
+            camera_offset_node_position[0] + viewport_w / 2.0,
+            camera_offset_node_position[1] + viewport_h / 2.0,
         )
 
     def _extract_rgba(self, color, alpha):
@@ -177,6 +184,11 @@ class DebugRenderingServer:
         return rgb, final_alpha
 
     def render(self, screen, pygame_module, camera, draw_pass="after_scene"):
+        try:
+            self._viewport_size = screen.get_size()
+        except Exception:
+            self._viewport_size = None
+
         commands = [cmd for cmd in self._command_list if cmd.get("draw_pass", "after_scene") == draw_pass]
         commands.sort(key=lambda cmd: (int(cmd.get("z_index", 0)), int(cmd.get("_seq", 0))))
 

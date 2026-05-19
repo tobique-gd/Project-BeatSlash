@@ -1,8 +1,9 @@
 import dearpygui.dearpygui as pygui
-
+from ..engine import ResourceServer
 from . import ui_components as UIComp
 from .EditorModels import EditorSessionState
 from ..engine.ErrorHandler import ErrorHandler
+from ..engine.Globals import THEME_DEFAULTS
 
 
 class EditorUI:
@@ -17,11 +18,12 @@ class EditorUI:
         self.dialogs = UIComp.Dialogs.DialogManager(self, self.editor.editor_settings)
         self.menubar = UIComp.MenuBar(self)
         self.file_system = UIComp.FileSystem(self)
+    
 
         pygui.create_context()
         with pygui.font_registry():
-            default_font = pygui.add_font("src/KodEngine/editor/assets/fonts/kod_default_font.otf", 16)
-            pygui.bind_font(default_font)
+            self.default_font = pygui.add_font("src/KodEngine/editor/assets/fonts/kod_default_font.otf", THEME_DEFAULTS["font_size"])
+            pygui.bind_font(self.default_font)
 
         self.viewport.create_texture()
         self._create_layout()

@@ -6,6 +6,7 @@ import platform
 import subprocess
 import copy
 from collections import deque
+import traceback
 
 import dearpygui.dearpygui as pygui
 import numpy as np
@@ -23,6 +24,10 @@ from .EditorUI import EditorUI
 from ..engine import Kod, Nodes, ResourceServer
 from ..engine.ErrorHandler import ErrorHandler
 
+
+def debug(msg):
+    print(f"[KodEditor] {msg}")
+    sys.stdout.flush()
 
 class EditorSettings:
     def __init__(self):
@@ -71,14 +76,13 @@ class KodEditor:
     def __init__(self):
         ErrorHandler.set_editor_mode(True)
         self.settings = Kod.Settings()
+
         runtime_window_settings = self.settings.project_settings.get("window", {})
         self.runtime_window_settings = {
             "viewport_resolution": tuple(runtime_window_settings.get("viewport_resolution", (640, 360))),
             "internal_viewport_resolution": tuple(runtime_window_settings.get("internal_viewport_resolution", (640, 360))),
         }
         self.editor_settings = EditorSettings()
-        self.initial_res = (640, 360)
-        self.settings.project_settings["window"]["internal_viewport_resolution"] = self.initial_res
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
         potential_path = os.path.abspath(os.path.join(current_dir, "..", "..", "BeatSlash"))
@@ -103,7 +107,9 @@ class KodEditor:
         self.app.set_camera(self.camera)
         self.app.set_scene(loaded_scene)
 
-        self.width, self.height = self.initial_res
+        self.base_internal_width, self.base_internal_height = self.runtime_window_settings["internal_viewport_resolution"]
+        self.width, self.height = self.base_internal_width, self.base_internal_height
+        self.display_width, self.display_height = self.runtime_window_settings["viewport_resolution"]
         self.zoom_step = 1.1
         self.min_zoom = 0.1
         self.max_zoom = 12.0
@@ -118,6 +124,12 @@ class KodEditor:
             Nodes.RectangleCollisionShape2D: self._pick_bounds_rectangle_collision,
             Nodes.Camera2D: self._pick_bounds_camera,
         }
+
+        # Load editor state (last opened scene and zoom) after UI exists
+        try:
+            self._load_editor_state()
+        except Exception:
+            pass
 
     def _screen_to_world(self, screen_x, screen_y):
         zoom = self._get_camera_zoom()
@@ -149,6 +161,10 @@ class KodEditor:
         except Exception:
             return
         self.camera.zoom = max(self.min_zoom, min(self.max_zoom, value))
+        try:
+            self._save_editor_state()
+        except Exception:
+            pass
 
     def to_relative_path(self, path_str):
         if not isinstance(path_str, str):
@@ -177,15 +193,35 @@ class KodEditor:
 
         node_buckets = self.app.distribute_node_buckets() or {}
         renderable_nodes = node_buckets.get("rendering", [])
+        ui_nodes = node_buckets.get("ui", [])
+
         self.app.renderer.render_frame(self.app.current_scene, self.camera, renderable_nodes)
-        self.app.scaled_surface = pygame.transform.scale(self.app.internal_surface, self.app.resolution)
-        self.app.screen.blit(self.app.scaled_surface, (0, 0))
+
+        viewport_size = (int(self.display_width), int(self.display_height))
+        composite_surface = pygame.Surface(viewport_size, pygame.SRCALPHA).convert_alpha()
+        if self.app.internal_surface.get_size() != viewport_size:
+            self.app.scaled_surface = pygame.transform.scale(self.app.internal_surface, viewport_size)
+        else:
+            self.app.scaled_surface = self.app.internal_surface.copy()
+
+        composite_surface.blit(self.app.scaled_surface, (0, 0))
+
+        self.app.renderer.render_ui_frame(
+            ui_nodes,
+            viewport_size=viewport_size,
+            target_surface=composite_surface,
+            source_size=self.app.internal_resolution
+        )
+
+        if self.app.screen:
+            self.app.screen.blit(composite_surface, (0, 0))
 
         self.app.clock.tick(self.app.FPS)
 
-        data = pygame.surfarray.array3d(self.app.internal_surface)
+        data = pygame.surfarray.array3d(composite_surface)
         data = data.transpose([1, 0, 2])
-        alpha = np.full((self.height, self.width, 1), 255, dtype=np.uint8)
+        frame_height, frame_width = data.shape[:2]
+        alpha = np.full((frame_height, frame_width, 1), 255, dtype=np.uint8)
         rgba = np.concatenate((data, alpha), axis=2)
         return rgba.astype(np.float32) / 255.0
 
@@ -220,11 +256,7 @@ class KodEditor:
         )
 
     def _pick_bounds_camera(self, node):
-        runtime_window = getattr(self, "runtime_window_settings", None)
-        if isinstance(runtime_window, dict):
-            viewport_w, viewport_h = runtime_window.get("internal_viewport_resolution", (320, 180))
-        else:
-            viewport_w, viewport_h = self.settings.project_settings["window"]["internal_viewport_resolution"]
+        viewport_w, viewport_h = self.base_internal_width, self.base_internal_height
         zoom = getattr(node, "zoom", 1.0)
         if isinstance(zoom, (list, tuple)):
             zoom = zoom[0] if len(zoom) > 0 else 1.0
@@ -358,22 +390,50 @@ class KodEditor:
 
         return {root: build(root)}
 
+    def _compute_editor_internal_resolution(self, display_width, display_height):
+        display_width = max(1, int(display_width))
+        display_height = max(1, int(display_height))
+
+        base_w = max(1, int(self.base_internal_width))
+        base_h = max(1, int(self.base_internal_height))
+
+        display_aspect = display_width / float(display_height)
+        base_aspect = base_w / float(base_h)
+
+        if display_aspect < base_aspect:
+            # Narrow viewport: keep horizontal extent and expand vertical extent.
+            target_w = base_w
+            target_h = max(1, int(round(base_w / display_aspect)))
+        else:
+            # Wide viewport: keep vertical extent and expand horizontal extent.
+            target_h = base_h
+            target_w = max(1, int(round(base_h * display_aspect)))
+
+        return target_w, target_h
+
     def update_viewport_size(self, new_width, new_height):
         new_width, new_height = int(new_width), int(new_height)
-        if new_width == self.width and new_height == self.height:
-            return False
         if new_width <= 0 or new_height <= 0:
-            return False
+            return False, False
 
-        self.width, self.height = new_width, new_height
+        display_changed = not (new_width == self.display_width and new_height == self.display_height)
+        target_internal_width, target_internal_height = self._compute_editor_internal_resolution(new_width, new_height)
+        internal_changed = not (target_internal_width == self.width and target_internal_height == self.height)
 
-        self.app.internal_resolution = (self.width, self.height)
-        self.settings.project_settings["window"]["internal_viewport_resolution"] = (self.width, self.height)
+        if not display_changed and not internal_changed:
+            return False, False
 
-        new_surface = pygame.Surface((self.width, self.height)).convert_alpha()
-        self.app.internal_surface = new_surface
-        self.app.renderer.screen = new_surface
-        return True
+        self.display_width, self.display_height = new_width, new_height
+        self.app.resolution = (self.display_width, self.display_height)
+
+        if internal_changed:
+            self.width, self.height = target_internal_width, target_internal_height
+            self.app.internal_resolution = (self.width, self.height)
+            new_surface = pygame.Surface((self.width, self.height)).convert_alpha()
+            self.app.internal_surface = new_surface
+            self.app.renderer.screen = new_surface
+
+        return True, internal_changed
 
     def queue_command(self, command_type, **payload):
         if isinstance(command_type, str):
@@ -411,8 +471,76 @@ class KodEditor:
             self.ui._update_hierarchy()
             self.ui.menubar.update()
 
+            try:
+                self._save_editor_state()
+            except Exception:
+                pass
+
         except Exception as e:
             ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
+
+    def _state_file_path(self):
+        try:
+            project_directory = self.settings.project_settings["file_management"].get("project_directory")
+            if not project_directory:
+                return os.path.abspath(".kod_editor_state.json")
+            return os.path.join(os.path.abspath(project_directory), ".kod_editor_state.json")
+        except Exception:
+            return os.path.abspath(".kod_editor_state.json")
+
+    def _load_editor_state(self):
+        path = self._state_file_path()
+        if not os.path.exists(path):
+            return False
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            last_zoom = data.get("last_zoom")
+            last_scene = data.get("last_opened_scene")
+
+            if last_zoom is not None:
+                try:
+                    self._set_camera_zoom(float(last_zoom))
+                except Exception:
+                    pass
+
+            if last_scene:
+                try:
+                    resolved = ResourceServer.ResourceLoader.resolve_path(last_scene)
+                    if os.path.exists(resolved):
+                        self.load_scene(resolved)
+                except Exception:
+                    pass
+
+            return True
+        except Exception:
+            return False
+
+    def _save_editor_state(self):
+        path = self._state_file_path()
+        data = {}
+        try:
+            data["last_zoom"] = self._get_camera_zoom()
+        except Exception:
+            data["last_zoom"] = None
+
+        try:
+            scene_path = getattr(self.app.current_scene, "path", None)
+            if scene_path:
+                # store relative when possible
+                data["last_opened_scene"] = self.to_relative_path(scene_path)
+            else:
+                data["last_opened_scene"] = None
+        except Exception:
+            data["last_opened_scene"] = None
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception:
+            return False
 
     def run_scene(self, scene_path=None):
         # This needs to run in a subprocess to avoid freezing the editor.
@@ -434,7 +562,7 @@ class KodEditor:
             if "SDL_VIDEODRIVER" in env:
                 del env["SDL_VIDEODRIVER"]
 
-            result = subprocess.run(
+            process = subprocess.Popen(
                 [
                     sys.executable,
                     "-m",
@@ -448,19 +576,46 @@ class KodEditor:
                 ],
                 cwd=src_root,
                 env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
             )
 
-            if result.returncode != 0:
-                ErrorHandler.throw_error(f"Scene process exited with code {result.returncode}")
+            debug(f"Runtime started PID: {process.pid}")
+
+            def read_output(proc):
+                try:
+                    for line in proc.stdout:
+                        if line:
+                            print(f"[RUNTIME] {line.strip()}")
+                            traceback.print_exc()
+                            sys.stdout.flush()
+
+                    for line in proc.stderr:
+                        if line:
+                            print(f"[RUNTIME ERROR] {line.strip()}")
+                            traceback.print_exc()
+                            sys.stdout.flush()
+
+                except Exception as e:
+                    print("[KodEditor ERROR]")
+                    traceback.print_exc()
+
+            import threading
+            threading.Thread(target=read_output, args=(process,), daemon=True).start()
+
+            ErrorHandler.throw_success(f"Scene started (PID: {process.pid})")
 
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to run scene: {e}")
 
     def _runtime_project_settings(self):
+        
         runtime_settings = copy.deepcopy(self.settings.project_settings)
         runtime_window = runtime_settings.setdefault("window", {})
         runtime_window["viewport_resolution"] = tuple(self.runtime_window_settings["viewport_resolution"])
-        runtime_window["internal_viewport_resolution"] = tuple(self.runtime_window_settings["internal_viewport_resolution"])
+        
+        
         return runtime_settings
 
     def drag_file(self):
@@ -509,7 +664,9 @@ class KodEditor:
                 if file_path:
                     self.open_file(file_path)
             case EditorCommandType.OPEN_EDITOR_SETTINGS:
-                self.ui.dialogs.show_editor_settings_window()
+                self.ui.dialogs.show_settings_window(self.editor_settings.editor_settings, "Editor Settings")
+            case EditorCommandType.OPEN_PROJECT_SETTINGS:
+                self.ui.dialogs.show_settings_window(self.app.configuration.project_settings, "Project Settings")
 
             case EditorCommandType.COPY_NODE:
                 self.ui.state.copied_node_data = None
@@ -653,8 +810,13 @@ class KodEditor:
 
     def _run_editor_frame(self, delta):
         self.update_events()
+        
         self._prepare_editor_frame()
         self._update_editor_scene_state(delta)
+
+        if self.app.current_scene:
+            self.app.current_scene._process_ui(self.app.internal_resolution)
+        
         self._sync_editor_scene_deletions()
         self._render_editor_viewport_frame()
         

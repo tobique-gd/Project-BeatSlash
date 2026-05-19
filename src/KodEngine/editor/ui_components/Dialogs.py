@@ -177,9 +177,9 @@ class NodeDialogs(BaseDialog):
             if not root:
                 ErrorHandler.throw_error("Linked scene has no root node")
                 return
-            root._is_linked_scene = True
+            root.is_linked_scene = True
             #TODO replace with proper relative path
-            root._linked_scene_path = selected_file
+            root.linked_scene_path = selected_file
             self.ui.state.selected_node.add_child(root)
 
             self.ui.hierarchy.update_hierarchy()
@@ -338,18 +338,19 @@ class NodeDialogs(BaseDialog):
         if pygui.does_item_exist("change_type_window"):
             pygui.delete_item("change_type_window")
 
-class EditorSettingsDialog(BaseDialog):
+class SettingsDialog(BaseDialog):
     def __init__(self, ui, settings):
         super().__init__(ui)
         self.settings = settings
         self._selected_section = None
+        self._active_settings = self.settings.editor_settings
 
     def _format_setting_label(self, setting_key):
         return str(setting_key).replace("_", " ").title()
 
     def _set_setting_value(self, section_key, setting_key, value):
         try:
-            section = self.settings.editor_settings.get(section_key, {})
+            section = self._active_settings.get(section_key, {})
             if not isinstance(section, dict):
                 return
 
@@ -450,7 +451,7 @@ class EditorSettingsDialog(BaseDialog):
             )
 
     def _draw_section_content(self, section_key):
-        section_data = self.settings.editor_settings.get(section_key)
+        section_data = self._active_settings.get(section_key)
         if not isinstance(section_data, dict):
             pygui.add_text("Section data is invalid.", parent="editor_settings_content", color=(220, 100, 100))
             return
@@ -508,7 +509,7 @@ class EditorSettingsDialog(BaseDialog):
             pygui.add_text("Sections", color=(170, 170, 170))
             pygui.add_separator()
 
-            section_keys = list(self.settings.editor_settings.keys())
+            section_keys = list(self._active_settings.keys())
             for section_key in section_keys:
                 pygui.add_selectable(
                     label=self._format_setting_label(section_key),
@@ -521,23 +522,28 @@ class EditorSettingsDialog(BaseDialog):
         with pygui.child_window(tag="editor_settings_content", width=-1, border=True):
             pass
 
-    def show_editor_settings_window(self, sender=None, app_data=None):
+    def show_settings_window(self, settings, window_label):
         modal_width = 800
         modal_height = 580
 
+        if isinstance(settings, dict):
+            self._active_settings = settings
+        else:
+            self._active_settings = self.settings.editor_settings
+
         self._show_centered_modal(
-            label="Editor Settings",
-            tag="editor_settings_window",
+            label=window_label,
+            tag="settings_window",
             width=modal_width,
             height=modal_height,
         )
 
-        pygui.add_separator(parent="editor_settings_window")
+        pygui.add_separator(parent="settings_window")
 
-        section_keys = list(self.settings.editor_settings.keys())
+        section_keys = list(settings.keys())
         self._selected_section = section_keys[0] if section_keys else None
 
-        with pygui.table(parent="editor_settings_window", header_row=False, resizable=True, borders_innerV=True):
+        with pygui.table(parent="settings_window", header_row=False, resizable=True, borders_innerV=True):
             pygui.add_table_column(init_width_or_weight=170)
             pygui.add_table_column(init_width_or_weight=530)
 
@@ -555,12 +561,12 @@ class DialogManager:
         self.ui = ui
         self.settings = settings
         self.node = NodeDialogs(ui)
-        self.settings_dialog = EditorSettingsDialog(ui, settings)
+        self.settings_dialog = SettingsDialog(ui, settings)
         self._dialog_tags = (
             "add_node_window",
             "delete_node_window",
             "change_type_window",
-            "editor_settings_window",
+            "settings_window",
             "new_script_window",
             "new_scene_window",
             "link_scene_window",
@@ -585,6 +591,6 @@ class DialogManager:
     def show_change_type_window(self, sender, app_data):
         self.node.show_change_type_window(sender, app_data)
 
-    def show_editor_settings_window(self, sender=None, app_data=None):
-        self.settings_dialog.show_editor_settings_window(sender, app_data)
+    def show_settings_window(self, sender=None, app_data=None):
+        self.settings_dialog.show_settings_window(sender, app_data)
 

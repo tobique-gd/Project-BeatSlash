@@ -9,7 +9,7 @@ from typing import Optional
 # ======================
 BASE_SPEED = 125
 DASH_SPEED = 200
-DASH_DURATION = 0.6
+DASH_DURATION = 0.5
 
 
 # ======================

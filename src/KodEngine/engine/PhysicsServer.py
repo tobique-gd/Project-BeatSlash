@@ -23,8 +23,13 @@ class PhysicsSolver2D:
             for body in self.physics_bodies:
                 self.resolve_physics_step_y(body)
 
+        self.resolve_area_overlaps()
+
     def _is_moving_body(self, body):
         return isinstance(body, (Nodes.DynamicBody2D, Nodes.KinematicBody2D))
+
+    def _is_solid_body(self, body):
+        return isinstance(body, (Nodes.StaticBody2D, Nodes.DynamicBody2D, Nodes.KinematicBody2D))
 
     def _get_rect_shapes(self, body):
         if body is None:
@@ -85,6 +90,8 @@ class PhysicsSolver2D:
         for other in self.physics_bodies:
             if other is body:
                 continue
+            if not self._is_solid_body(other):
+                continue
 
             other_shapes = self._get_rect_shapes(other)
             if not other_shapes:
@@ -113,6 +120,8 @@ class PhysicsSolver2D:
         for other in self.physics_bodies:
             if other is body:
                 continue
+            if not self._is_solid_body(other):
+                continue
 
             other_shapes = self._get_rect_shapes(other)
             if not other_shapes:
@@ -127,3 +136,86 @@ class PhysicsSolver2D:
                             body.position = (body.position[0], body.position[1] + overlap_y)
                             if hasattr(body, 'velocity'):
                                 body.velocity = (body.velocity[0], 0)
+
+    def _has_any_shape_overlap(self, body, other):
+        body_shapes = self._get_rect_shapes(body)
+        if not body_shapes:
+            return False
+
+        other_shapes = self._get_rect_shapes(other)
+        if not other_shapes:
+            return False
+
+        for body_shape in body_shapes:
+            for other_shape in other_shapes:
+                if self.check_collision_pair(body, body_shape, other, other_shape):
+                    return True
+
+        return False
+
+    def _emit_overlap_transition_signals(self, area, previous_nodes, current_nodes, entered_signal, exited_signal):
+        previous_set = set(previous_nodes)
+        current_set = set(current_nodes)
+
+        for node in current_set - previous_set:
+            area.emit_signal(entered_signal, node)
+
+        for node in previous_set - current_set:
+            area.emit_signal(exited_signal, node)
+
+    def resolve_area_overlaps(self):
+        area_nodes = [
+            node for node in self.physics_bodies
+            if isinstance(node, Nodes.Area2D)
+        ]
+
+        previous_overlaps = {
+            area: {
+                "areas": list(getattr(area, "_overlapping_areas", [])),
+                "bodies": list(getattr(area, "_overlapping_bodies", [])),
+            }
+            for area in area_nodes
+        }
+
+        for area in area_nodes:
+            area._overlapping_areas = []
+            area._overlapping_bodies = []
+
+        for area in area_nodes:
+            for other in self.physics_bodies:
+                if other is area:
+                    continue
+
+                if isinstance(other, Nodes.Area2D):
+                    if not area.collide_with_areas:
+                        continue
+                else:
+                    if not area.collide_with_bodies:
+                        continue
+
+                if not self._has_any_shape_overlap(area, other):
+                    continue
+
+                if isinstance(other, Nodes.Area2D):
+                    if other not in area._overlapping_areas:
+                        area._overlapping_areas.append(other)
+                else:
+                    if other not in area._overlapping_bodies:
+                        area._overlapping_bodies.append(other)
+
+        for area in area_nodes:
+            previous = previous_overlaps.get(area, {"areas": [], "bodies": []})
+            self._emit_overlap_transition_signals(
+                area,
+                previous["bodies"],
+                area._overlapping_bodies,
+                "body_entered",
+                "body_exited",
+            )
+            self._emit_overlap_transition_signals(
+                area,
+                previous["areas"],
+                area._overlapping_areas,
+                "area_entered",
+                "area_exited",
+            )
