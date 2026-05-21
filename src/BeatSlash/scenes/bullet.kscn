@@ -1,22 +1,41 @@
 {
-    "name":"Pillar.kscn",
+    "name":"bullet.kscn",
     "root":{
-        "type":"Node2D",
-        "name":"PillarOvergrown",
+        "type":"KinematicBody2D",
+        "name":"Bullet",
         "properties":{
-            "name":"PillarOvergrown",
+            "name":"Bullet",
             "is_linked_scene":false,
             "linked_scene_path":null,
             "position":[
-                0,
-                0
+                0.0,
+                0.0
             ],
             "rotation":[
                 0,
                 0
             ],
             "z_index":0,
-            "visible":true
+            "visible":true,
+            "collision_layers":[
+                5
+            ],
+            "collision_masks":[
+                2
+            ],
+            "velocity":[
+                0.0,
+                0.0
+            ],
+            "script":{
+                "__resource__":{
+                    "name":"Script",
+                    "resource_path":"scripts/entities/bullet.py",
+                    "script_path":"scripts/entities/bullet.py",
+                    "type":"Script",
+                    "resource_type":"Script"
+                }
+            }
         },
         "children":[
             {
@@ -27,26 +46,26 @@
                     "is_linked_scene":false,
                     "linked_scene_path":null,
                     "position":[
-                        0,
-                        0
+                        0.0,
+                        0.0
                     ],
                     "rotation":[
                         0,
                         0
                     ],
-                    "z_index":0,
+                    "z_index":2,
                     "visible":true,
                     "flip_h":false,
                     "flip_v":false,
                     "offset":[
-                        0.0,
-                        -42.0
+                        -8.0,
+                        -8.0
                     ],
                     "texture":{
                         "__resource__":{
                             "name":"Texture",
-                            "resource_path":"assets/textures/spritesheets/map_details/pillar0.png",
-                            "texture_path":"assets/textures/spritesheets/map_details/pillar0.png",
+                            "resource_path":"assets/textures/spritesheets/entities/bullets/red_bullet.png",
+                            "texture_path":"assets/textures/spritesheets/entities/bullets/red_bullet.png",
                             "type":"Texture2D",
                             "resource_type":"Texture2D"
                         }
@@ -55,10 +74,10 @@
                 "children":[]
             },
             {
-                "type":"StaticBody2D",
-                "name":"StaticBody2D",
+                "type":"Area2D",
+                "name":"Area2D",
                 "properties":{
-                    "name":"StaticBody2D",
+                    "name":"Area2D",
                     "is_linked_scene":false,
                     "linked_scene_path":null,
                     "position":[
@@ -72,12 +91,13 @@
                     "z_index":0,
                     "visible":true,
                     "collision_layers":[
-                        1
+                        5
                     ],
                     "collision_masks":[
-                        2,
-                        5
-                    ]
+                        2
+                    ],
+                    "collide_with_areas":true,
+                    "collide_with_bodies":true
                 },
                 "children":[
                     {
@@ -88,8 +108,8 @@
                             "is_linked_scene":false,
                             "linked_scene_path":null,
                             "position":[
-                                0.0,
-                                -16.0
+                                -4.0,
+                                -4.0
                             ],
                             "rotation":[
                                 0,
@@ -98,8 +118,8 @@
                             "z_index":0,
                             "visible":true,
                             "size":[
-                                16.0,
-                                9.0
+                                8.0,
+                                8.0
                             ]
                         },
                         "children":[]

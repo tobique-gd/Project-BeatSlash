@@ -100,12 +100,12 @@ class KodEditor:
         self.mode = EditorMode.EDIT
         self.commands = deque()
 
-        scene_path = os.path.join(project_dir, "scenes", "BeatSlashWorld.kscn")
-        loaded_scene = ResourceServer.SceneLoader.load(scene_path)
+        loaded_scene = None
 
         self.camera = Nodes.Camera2D()
         self.app.set_camera(self.camera)
-        self.app.set_scene(loaded_scene)
+        if loaded_scene is not None:
+            self.app.set_scene(loaded_scene)
 
         self.base_internal_width, self.base_internal_height = self.runtime_window_settings["internal_viewport_resolution"]
         self.width, self.height = self.base_internal_width, self.base_internal_height
@@ -161,6 +161,8 @@ class KodEditor:
         except Exception:
             return
         self.camera.zoom = max(self.min_zoom, min(self.max_zoom, value))
+        if getattr(self, "_restoring_state", False):
+            return
         try:
             self._save_editor_state()
         except Exception:
@@ -457,7 +459,7 @@ class KodEditor:
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to save scene to {scene_path}, {e}")
 
-    def load_scene(self, scene_path):
+    def load_scene(self, scene_path, save_state=True):
         if scene_path is None:
             ErrorHandler.throw_error("Failed to load scene from None")
 
@@ -470,11 +472,17 @@ class KodEditor:
             self.ui.inspector.clear()
             self.ui._update_hierarchy()
             self.ui.menubar.update()
-
             try:
-                self._save_editor_state()
+                loaded_path = getattr(new_scene, "path", None) or scene_path
+                self.ui.viewport.register_scene(loaded_path, make_active=True)
             except Exception:
                 pass
+
+            if save_state and not getattr(self, "_restoring_state", False):
+                try:
+                    self._save_editor_state()
+                except Exception:
+                    pass
 
         except Exception as e:
             ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
@@ -493,11 +501,14 @@ class KodEditor:
         if not os.path.exists(path):
             return False
         try:
+            self._restoring_state = True
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             last_zoom = data.get("last_zoom")
             last_scene = data.get("last_opened_scene")
+            saved_tabs = data.get("open_scene_tabs") or []
+            saved_active = data.get("active_scene_path")
 
             if last_zoom is not None:
                 try:
@@ -509,13 +520,36 @@ class KodEditor:
                 try:
                     resolved = ResourceServer.ResourceLoader.resolve_path(last_scene)
                     if os.path.exists(resolved):
-                        self.load_scene(resolved)
+                        self.load_scene(resolved, save_state=False)
                 except Exception:
                     pass
+
+            if hasattr(self, "ui") and hasattr(self.ui, "viewport"):
+                try:
+                    resolved_tabs = []
+                    for tab_path in saved_tabs:
+                        if not tab_path:
+                            continue
+                        resolved = ResourceServer.ResourceLoader.resolve_path(tab_path)
+                        if os.path.exists(resolved):
+                            resolved_tabs.append(resolved)
+                            self.ui.viewport.register_scene(resolved, make_active=False, refresh_ui=False)
+
+                    if saved_active:
+                        resolved_active = ResourceServer.ResourceLoader.resolve_path(saved_active)
+                        if os.path.exists(resolved_active):
+                            self.ui.viewport.set_active_scene(resolved_active)
+                    
+                    self.ui.viewport.build_tabs()
+                except Exception:
+                    pass
+
 
             return True
         except Exception:
             return False
+        finally:
+            self._restoring_state = False
 
     def _save_editor_state(self):
         path = self._state_file_path()
@@ -534,6 +568,15 @@ class KodEditor:
                 data["last_opened_scene"] = None
         except Exception:
             data["last_opened_scene"] = None
+
+        try:
+            tabs = getattr(self.ui.state, "open_scene_tabs", []) if hasattr(self, "ui") else []
+            active_tab = getattr(self.ui.state, "active_scene_path", None) if hasattr(self, "ui") else None
+            data["open_scene_tabs"] = [self.to_relative_path(p) for p in tabs if p]
+            data["active_scene_path"] = self.to_relative_path(active_tab) if active_tab else None
+        except Exception:
+            data["open_scene_tabs"] = []
+            data["active_scene_path"] = None
 
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -609,6 +652,18 @@ class KodEditor:
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to run scene: {e}")
 
+    def run_project(self):
+        try:
+            current_scene = getattr(self.app, "current_scene", None)
+            current_path = getattr(current_scene, "path", None) if current_scene else None
+            if current_scene and current_path:
+                self.save_scene(scene=current_scene, scene_path=current_path)
+
+            main_scene_file_path = self.app.configuration.project_settings["runtime"]["main_scene_path"]
+            self.run_scene(main_scene_file_path)
+        except Exception as e:
+            ErrorHandler.throw_error(f"Failed to run project: {e}")
+
     def _runtime_project_settings(self):
         
         runtime_settings = copy.deepcopy(self.settings.project_settings)
@@ -657,8 +712,7 @@ class KodEditor:
             case EditorCommandType.RUN_SCENE:
                 self.run_scene(cmd.payload.get("scene_path"))
             case EditorCommandType.RUN_PROJECT:
-                main_scene_file_path = self.app.configuration.project_settings["runtime"]["main_scene_path"]
-                self.run_scene(main_scene_file_path)
+                self.run_project()
             case EditorCommandType.OPEN_FILE:
                 file_path = cmd.payload.get("file_path")
                 if file_path:

@@ -1,3 +1,5 @@
+import inspect
+
 import dearpygui.dearpygui as pygui
 from ...engine import Nodes
 from ...engine.ErrorHandler import ErrorHandler
@@ -41,7 +43,7 @@ class NodeDialogs(BaseDialog):
         node_classes = []
         for attr_name in dir(Nodes):
             attr = getattr(Nodes, attr_name)
-            if isinstance(attr, type) and issubclass(attr, Nodes.Node) and attr is not Nodes.Node:
+            if isinstance(attr, type) and issubclass(attr, Nodes.Node) and not inspect.isabstract(attr):
                 node_classes.append((attr_name, attr))
         return sorted(node_classes, key=lambda x: x[0])
 
@@ -220,6 +222,7 @@ class NodeDialogs(BaseDialog):
             node_classes = self.get_node_classes()
 
             for node_name, node_class in node_classes:
+                
                 pygui.add_button(
                     label=node_name,
                     width=-1,

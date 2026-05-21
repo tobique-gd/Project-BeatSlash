@@ -337,7 +337,87 @@ class Renderer2D:
             )
 
             return
+        if isinstance(node, Nodes.TextureProgress):
+            rect_x, rect_y, rect_w, rect_h = self._scale_ui_rect(
+                node,
+                scale_x,
+                scale_y
+            )
 
+            if rect_w <= 0 or rect_h <= 0:
+                return
+
+            under_res = getattr(node, "_under_texture_resource", None) or getattr(node, "under_texture", None)
+            fill_res = getattr(node, "_fill_texture_resource", None) or getattr(node, "fill_texture", None)
+
+            under_surf = None
+            fill_surf = None
+            try:
+                if under_res is not None:
+                    under_surf = under_res.get_texture() if hasattr(under_res, "get_texture") else under_res
+            except Exception:
+                under_surf = None
+
+            try:
+                if fill_res is not None:
+                    fill_surf = fill_res.get_texture() if hasattr(fill_res, "get_texture") else fill_res
+            except Exception:
+                fill_surf = None
+
+            if under_surf is not None:
+                try:
+                    if under_surf.get_width() != rect_w or under_surf.get_height() != rect_h:
+                        under_tex = self.pygame.transform.scale(under_surf, (rect_w, rect_h))
+                    else:
+                        under_tex = under_surf
+                    surface.blit(under_tex, (rect_x, rect_y))
+                except Exception:
+                    s = self.pygame.Surface((rect_w, rect_h), self.pygame.SRCALPHA)
+                    s.fill((60, 60, 60, 255))
+                    surface.blit(s, (rect_x, rect_y))
+            else:
+                s = self.pygame.Surface((rect_w, rect_h), self.pygame.SRCALPHA)
+                s.fill((60, 60, 60, 255))
+                surface.blit(s, (rect_x, rect_y))
+
+            try:
+                v = float(getattr(node, "value", 0.0))
+                minv = float(getattr(node, "min_value", 0.0))
+                maxv = float(getattr(node, "max_value", 100.0))
+            except Exception:
+                v, minv, maxv = 0.0, 0.0, 100.0
+
+            denom = maxv - minv if (maxv - minv) != 0 else 1.0
+            ratio = max(0.0, min(1.0, (v - minv) / denom))
+            fill_w = int(rect_w * ratio)
+
+            if fill_w <= 0:
+                return
+
+            if fill_surf is not None:
+                try:
+                    if fill_surf.get_width() != rect_w or fill_surf.get_height() != rect_h:
+                        scaled = self.pygame.transform.scale(fill_surf, (rect_w, rect_h))
+                    else:
+                        scaled = fill_surf
+
+                    try:
+                        fill_part = scaled.subsurface((0, 0, fill_w, rect_h)).copy()
+                    except Exception:
+                        fill_part = self.pygame.Surface((fill_w, rect_h), self.pygame.SRCALPHA)
+                        fill_part.blit(scaled, (0, 0), (0, 0, fill_w, rect_h))
+
+                    surface.blit(fill_part, (rect_x, rect_y))
+                except Exception:
+                    s2 = self.pygame.Surface((fill_w, rect_h), self.pygame.SRCALPHA)
+                    s2.fill((0, 200, 0, 255))
+                    surface.blit(s2, (rect_x, rect_y))
+            else:
+                s2 = self.pygame.Surface((fill_w, rect_h), self.pygame.SRCALPHA)
+                s2.fill((0, 200, 0, 255))
+                surface.blit(s2, (rect_x, rect_y))
+
+            return
 
         if isinstance(node, Nodes.TextureRect2D):
             tex = node.image

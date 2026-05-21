@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from . import Resources
 import pygame
 import os
@@ -250,7 +252,14 @@ class Node:
     def add_child(self, _node):
         self._children.append(_node)
         _node._parent = self
-    
+
+        runtime_script = getattr(_node, "runtime_script", None)
+        if runtime_script is not None and hasattr(runtime_script, "_ready"):
+            try:
+                runtime_script._ready()
+            except Exception:
+                pass
+
     def remove_child(self, _node):
         if _node in self._children:
             _node._parent = None
@@ -405,22 +414,35 @@ class Node2D(Node):
         if isinstance(self._parent, Node2D):
             return self._parent.global_visible
         return True
-    
-class CollisionObject2D(Node2D):
+
+
+class CollisionObject2D(Node2D, ABC):
+    def __init__(self) -> None:
+        super().__init__()
+        
+        self.collision_layers = []
+        self.collision_masks = []
+        
+
+    @abstractmethod
+    def _abstract_collision_object(self) -> None:
+        pass
+
+class CollisionShape2D(Node2D, ABC):
     def __init__(self) -> None:
         super().__init__()
 
-        self.collision_layer = 0
-        self.collision_mask = 0
-
-class CollisionShape2D(Node2D):
-    def __init__(self) -> None:
-        super().__init__()
+    @abstractmethod
+    def _abstract_collision_shape(self) -> None:
+        pass
 
 class RectangleCollisionShape2D(CollisionShape2D):
     def __init__(self) -> None:
         super().__init__()
         self.size = (32, 32)
+
+    def _abstract_collision_shape(self) -> None:
+        pass
 
 class Sprite2D(Node2D):
     def __init__(self) -> None:
@@ -532,7 +554,7 @@ class AnimatedSprite2D(Sprite2D):
         self.animations.append(animation)
 
     def play(self, name: str):
-        if self._current_animation and name == self._current_animation.name:
+        if self._current_animation and name == self._current_animation.name and not self._current_animation.finished:
             return
 
         for anim in self.animations:
@@ -540,15 +562,22 @@ class AnimatedSprite2D(Sprite2D):
                 self._current_animation = anim
                 anim.current_frame = 0
                 anim.time_accumulator = 0
+                anim.finished = False
                 break
 
     def _update(self, delta: float):
         if self.current_animation:
+            was_finished = self.current_animation.finished
             self.current_animation.update(delta)
+            if not was_finished and self.current_animation.finished:
+                self.emit_signal("animation_finished", self.current_animation.name)
     
     def editor_update(self, delta):
         if self.current_animation:
+            was_finished = self.current_animation.finished
             self.current_animation.update(delta)
+            if not was_finished and self.current_animation.finished:
+                self.emit_signal("animation_finished", self.current_animation.name)
 
     @property
     def image(self):
@@ -566,15 +595,24 @@ class StaticBody2D(CollisionObject2D):
     def __init__(self) -> None:
         super().__init__()
 
+    def _abstract_collision_object(self) -> None:
+        pass
+
 class DynamicBody2D(CollisionObject2D):
     def __init__(self) -> None:
         super().__init__()
         self.velocity = (0, 0)
 
+    def _abstract_collision_object(self) -> None:
+        pass
+
 class KinematicBody2D(CollisionObject2D):
     def __init__(self) -> None:
         super().__init__()
         self.velocity = (0, 0)
+
+    def _abstract_collision_object(self) -> None:
+        pass
 
     def move_and_slide(self):
         self.global_position = (
@@ -989,6 +1027,9 @@ class Area2D(CollisionObject2D):
         self._overlapping_areas = []
         self._overlapping_bodies = []
 
+    def _abstract_collision_object(self) -> None:
+        pass
+
     def get_overlapping_bodies(self) -> list[CollisionObject2D]:
         return self._overlapping_bodies
 
@@ -1268,3 +1309,66 @@ class ColorRect2D(Control):
     def __init__(self) -> None:
         super().__init__()
         self.color : tuple[int, int, int, int] = (255, 255, 255, 255)
+
+class TextureProgress(Control):
+    def __init__(self) -> None:
+        super().__init__()
+        self.value = 0.0
+        self.min_value = 0.0
+        self.max_value = 100.0
+        self._under_texture_resource = None
+        self._fill_texture_resource = None
+
+    @property
+    def under_texture(self):
+        return self._under_texture_resource
+    
+    @under_texture.setter
+    def under_texture(self, value):
+        if isinstance(value, Resources.Texture2D):
+            self._under_texture_resource = value
+        elif isinstance(value, str):
+            try:
+                res = ResourceServer.ResourceLoader.load(value)
+                if isinstance(res, Resources.Texture2D):
+                    self._under_texture_resource = res
+                else:
+                    self._under_texture_resource = Resources.Texture2D(resource_path=value)
+            except Exception:
+                self._under_texture_resource = None
+        else:
+            self._under_texture_resource = None
+    
+    @property
+    def fill_texture(self):
+        return self._fill_texture_resource
+    
+    @fill_texture.setter
+    def fill_texture(self, value):
+        if isinstance(value, Resources.Texture2D):
+            self._fill_texture_resource = value
+        elif isinstance(value, str):
+            try:
+                res = ResourceServer.ResourceLoader.load(value)
+                if isinstance(res, Resources.Texture2D):
+                    self._fill_texture_resource = res
+                else:
+                    self._fill_texture_resource = Resources.Texture2D(resource_path=value)
+            except Exception:
+                self._fill_texture_resource = None
+        else:
+            self._fill_texture_resource = None
+
+    def save_data(self) -> dict:
+        data = super().save_data()
+        data["under_texture"] = self._under_texture_resource
+        data["fill_texture"] = self._fill_texture_resource
+        return data
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        if "under_texture" in data:
+            self.under_texture = data["under_texture"]
+        if "fill_texture" in data:
+            self.fill_texture = data["fill_texture"]
+    

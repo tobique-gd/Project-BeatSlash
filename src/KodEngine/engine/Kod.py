@@ -234,7 +234,7 @@ class App:
 
         rendering_types = (Nodes.Sprite2D, Nodes.AnimatedSprite2D, Nodes.TileMap2D)
         physics_types = (Nodes.CollisionObject2D)
-        ui_types = (Nodes.Label, Nodes.Button, Nodes.ColorRect2D, Nodes.TextureRect2D)
+        ui_types = (Nodes.Label, Nodes.Button, Nodes.ColorRect2D, Nodes.TextureRect2D, Nodes.TextureProgress)
 
         def traverse(node, inside_ysort=False):
             is_ysort = isinstance(node, Nodes.YSort2D)

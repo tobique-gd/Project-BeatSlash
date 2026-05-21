@@ -17,8 +17,12 @@
             ],
             "z_index":0,
             "visible":true,
-            "collision_layer":3,
-            "collision_mask":1,
+            "collision_layers":[
+                3
+            ],
+            "collision_masks":[
+                1
+            ],
             "velocity":[
                 0,
                 0
@@ -43,7 +47,7 @@
                     "linked_scene_path":null,
                     "position":[
                         -5.5,
-                        -12.822619047619048
+                        -2.834023008228229
                     ],
                     "rotation":[
                         0,
@@ -79,7 +83,7 @@
                     "flip_v":false,
                     "offset":[
                         -7.5,
-                        -27.0
+                        -17.0
                     ],
                     "animations":[
                         {
@@ -283,8 +287,8 @@
                     ],
                     "current_animation":{
                         "name":"a_idle",
-                        "current_frame":3,
-                        "time_accumulator":0.13700000000001838
+                        "current_frame":1,
+                        "time_accumulator":0.13000000000003215
                     }
                 },
                 "children":[]
@@ -306,8 +310,12 @@
                     ],
                     "z_index":0,
                     "visible":true,
-                    "collision_layer":3,
-                    "collision_mask":2,
+                    "collision_layers":[
+                        3
+                    ],
+                    "collision_masks":[
+                        2
+                    ],
                     "collide_with_areas":true,
                     "collide_with_bodies":true
                 },
@@ -321,7 +329,7 @@
                             "linked_scene_path":null,
                             "position":[
                                 -9.813482590769969,
-                                -27.154364650649637
+                                -17.16576861125883
                             ],
                             "rotation":[
                                 0,
@@ -355,8 +363,12 @@
                     ],
                     "z_index":0,
                     "visible":true,
-                    "collision_layer":3,
-                    "collision_mask":2,
+                    "collision_layers":[
+                        3
+                    ],
+                    "collision_masks":[
+                        2
+                    ],
                     "collide_with_areas":true,
                     "collide_with_bodies":true
                 },
@@ -370,7 +382,7 @@
                             "linked_scene_path":null,
                             "position":[
                                 -105.91635624581338,
-                                -105.73141456243181
+                                -95.04442822596802
                             ],
                             "rotation":[
                                 0,

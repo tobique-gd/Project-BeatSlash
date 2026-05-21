@@ -10,14 +10,8 @@ class Scene:
         self.path = path
     
     def _ready(self):
-        self._ready_node(self.root)
-
-    def _ready_node(self, node):
-        if hasattr(node, "runtime_script") and node.runtime_script:
-            node.runtime_script._ready()
-
-        for child in getattr(node, "_children", []):
-            self._ready_node(child)
+        if self.root is not None and hasattr(self.root, "runtime_script") and self.root.runtime_script:
+            self.root.runtime_script._ready()
 
     def _process(self, delta):
         self._process_node(self.root, delta)

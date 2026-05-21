@@ -36,3 +36,5 @@ class EditorSessionState:
     selectables: dict[str, object] = field(default_factory=dict)
     selected_paint_tile_ids: dict[int, int] = field(default_factory=dict)
     selected_paint_tile_layers: dict[int, int] = field(default_factory=dict)
+    open_scene_tabs: list[str] = field(default_factory=list)
+    active_scene_path: str | None = None

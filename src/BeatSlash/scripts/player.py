@@ -4,17 +4,11 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 
-# ======================
-# CONSTANTS
-# ======================
 BASE_SPEED = 125
 DASH_SPEED = 200
 DASH_DURATION = 0.5
 
 
-# ======================
-# STATE BASE CLASS
-# ======================
 class PlayerState(ABC):
     def __init__(self, player):
         self.player = player
@@ -141,11 +135,10 @@ class DashState(PlayerState):
         pass
 
 
-# ======================
-# PLAYER METHODS
-# ======================
+
 def _ready(self):
     self.animated_sprite = self.node.get_node("AnimatedSprite2D")
+    self.health_bar = self.node.get_node("UI/HealthBar")
     self.current_animation_name = None
 
     self.last_direction = (0, 1)
@@ -153,6 +146,9 @@ def _ready(self):
 
     self.facing = "front"
     self.space_just_pressed = True
+
+    self.health = 10
+    self.health_bar.value = self.health
 
     self.current_state = IdleState(self)
     self.current_state.on_enter()
@@ -210,6 +206,7 @@ def _update_facing(self):
 
 
 def _process(self, delta):
+    self.health_bar.value = self.health
     movement_input = _get_movement_input(self)
     self.input_vector = movement_input
 
@@ -218,10 +215,14 @@ def _process(self, delta):
 
     _update_facing(self)
 
+    if self.health <= 0:
+        print("DEAD")
+        self.node.quit()
+        return
 
     new_state = self.current_state.update(delta, movement_input)
     if new_state:
         _switch_state(self, new_state)
 
-    # Move
+    
     self.node.move_and_slide()

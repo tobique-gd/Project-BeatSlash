@@ -1,4 +1,12 @@
 {
-  "last_zoom": 12.0,
-  "last_opened_scene": "scenes/main_menu/main_menu.kscn"
+  "last_zoom": 1.1075519781247773,
+  "last_opened_scene": "scenes/main_menu/main_menu.kscn",
+  "open_scene_tabs": [
+    "scenes/map_tiles/tile_left_right.kscn",
+    "scenes/main_menu/main_menu.kscn",
+    "scenes/Player.kscn",
+    "scenes/entities/robu_enemy.kscn",
+    "scenes/bullet.kscn"
+  ],
+  "active_scene_path": "scenes/main_menu/main_menu.kscn"
 }

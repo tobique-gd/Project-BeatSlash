@@ -45,6 +45,49 @@ class PhysicsSolver2D:
             body.global_position[1] + shape.position[1],
         )
 
+    def _layers_match(self, a, b):
+        try:
+            def to_masks(obj):
+                layer_vals = getattr(obj, "collision_layers", None)
+                mask_vals = getattr(obj, "collision_masks", None)
+
+                def norm_values(val):
+                    if val is None:
+                        return []
+                    if isinstance(val, (list, tuple)):
+                        return list(val)[:10]
+                    return [val]
+
+                def interpret_index(x):
+                    masks = set()
+                    try:
+                        xi = int(x)
+                        if 1 <= xi <= 32:
+                            masks.add(1 << (xi - 1))
+                    except Exception:
+                        pass
+                    return masks
+
+                layer_masks = set()
+                for v in norm_values(layer_vals):
+                    layer_masks.update(interpret_index(v))
+
+                mask_masks = set()
+                for v in norm_values(mask_vals):
+                    mask_masks.update(interpret_index(v))
+
+                return layer_masks, mask_masks
+
+            a_layer_masks, a_mask_masks = to_masks(a)
+            b_layer_masks, b_mask_masks = to_masks(b)
+
+            # A and B collide if any layer bit of A is in B's mask and vice versa
+            a_in_b = any((al & bm) != 0 for al in a_layer_masks for bm in b_mask_masks)
+            b_in_a = any((bl & am) != 0 for bl in b_layer_masks for am in a_mask_masks)
+            return a_in_b and b_in_a
+        except Exception:
+            return False
+
     def check_collision_pair(self, body1, shape1, body2, shape2):
         pos1 = self._get_shape_world_position(body1, shape1)
         pos2 = self._get_shape_world_position(body2, shape2)
@@ -93,6 +136,10 @@ class PhysicsSolver2D:
             if not self._is_solid_body(other):
                 continue
 
+            # respect collision layers/masks
+            if not self._layers_match(body, other):
+                continue
+
             other_shapes = self._get_rect_shapes(other)
             if not other_shapes:
                 continue
@@ -121,6 +168,10 @@ class PhysicsSolver2D:
             if other is body:
                 continue
             if not self._is_solid_body(other):
+                continue
+
+            # respect collision layers/masks
+            if not self._layers_match(body, other):
                 continue
 
             other_shapes = self._get_rect_shapes(other)
@@ -186,12 +237,17 @@ class PhysicsSolver2D:
                 if other is area:
                     continue
 
+                # respect area collision flags
                 if isinstance(other, Nodes.Area2D):
                     if not area.collide_with_areas:
                         continue
                 else:
                     if not area.collide_with_bodies:
                         continue
+
+                # respect collision layers/masks
+                if not self._layers_match(area, other):
+                    continue
 
                 if not self._has_any_shape_overlap(area, other):
                     continue

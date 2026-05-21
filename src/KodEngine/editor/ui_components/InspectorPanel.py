@@ -34,6 +34,11 @@ class InspectorPanel:
             (Nodes.AnimatedSprite2D, "animations"): self._draw_animations_property,
         }
 
+        self._custom_property_editors.update({
+            (Nodes.CollisionObject2D, "collision_layers"): self._draw_collision_layers_property,
+            (Nodes.CollisionObject2D, "collision_masks"): self._draw_collision_masks_property,
+        })
+
     def _resource_slot_info(self, node, attr, value):
         if isinstance(value, Resource):
             return True, value
@@ -242,6 +247,74 @@ class InspectorPanel:
 
         if isinstance(node, Nodes.TileMap2D):
             self._draw_tilemap_palette(node)
+
+    def _layers_from_node(self, node, which: str):
+        # which: "layers" or "masks"
+        attr_list = f"collision_{which}"
+        list_attr = f"collision_{which}s"
+
+        vals = []
+        if hasattr(node, list_attr):
+            v = getattr(node, list_attr)
+            if isinstance(v, (list, tuple)):
+                vals = [int(x) for x in v]
+        if not vals and hasattr(node, attr_list):
+            # support legacy single int (index or bitmask)
+            v = getattr(node, attr_list)
+            try:
+                iv = int(v)
+                # if it's a small number, interpret as 1-based index
+                if 1 <= iv <= 32:
+                    vals = [iv]
+                else:
+                    # treat as bitmask
+                    for i in range(32):
+                        if (iv >> i) & 1:
+                            vals.append(i + 1)
+            except Exception:
+                pass
+        return sorted(set(vals))
+
+    def _set_layers_on_node(self, node, which: str, selections):
+        list_attr = f"collision_{which}s"
+        try:
+            setattr(node, list_attr, sorted(int(x) for x in selections))
+            self.ui._update_hierarchy()
+        except Exception:
+            pass
+
+    def _draw_layer_grid(self, node, which: str, label_text: str):
+        # draws 32 toggles for layers 1..32
+        selections = set(self._layers_from_node(node, which))
+        with pygui.table_row():
+            pygui.add_text(label_text)
+            # layout grid in 4 rows of 8
+            with pygui.child_window(width=-1, height=80):
+                for row in range(4):
+                    with pygui.group(horizontal=True):
+                        for col in range(8):
+                            idx = row * 8 + col + 1
+                            tag = f"{which}_{id(node)}_{idx}"
+                            default = idx in selections
+                            pygui.add_checkbox(label=str(idx), tag=tag, default_value=default,
+                                               callback=lambda s, v, ud: self._on_layer_toggle(ud, v),
+                                               user_data=(node, which, idx))
+
+    def _on_layer_toggle(self, user_data, value):
+        node, which, idx = user_data
+        current = set(self._layers_from_node(node, which))
+        if value:
+            current.add(idx)
+        else:
+            current.discard(idx)
+        self._set_layers_on_node(node, which, sorted(current))
+
+    def _draw_collision_layers_property(self, node, attr, value, label_text):
+        self._draw_layer_grid(node, "layer", "Layers")
+
+    def _draw_collision_masks_property(self, node, attr, value, label_text):
+        self._draw_layer_grid(node, "mask", "Masks")
+        
 
 
     def draw_property(self, node, attr, value):
