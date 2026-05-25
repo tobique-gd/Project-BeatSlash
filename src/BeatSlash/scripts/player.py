@@ -1,13 +1,17 @@
 from .common import mathlib
 import pygame
+import json
+import os
 from abc import ABC, abstractmethod
 from typing import Optional
-
 
 BASE_SPEED = 125
 DASH_SPEED = 200
 DASH_DURATION = 0.5
-
+MAX_STAMINA = 100.0
+STAMINA_UPGRADE_MULTIPLIER = 1.1
+DASH_STAMINA_COST = 50.0
+STAMINA_REGEN_PER_SECOND = 8.0
 
 class PlayerState(ABC):
     def __init__(self, player):
@@ -35,9 +39,6 @@ class PlayerState(ABC):
         return f"a_{base}_{self.player.facing}"
 
 
-# ======================
-# IDLE STATE
-# ======================
 class IdleState(PlayerState):
     def on_enter(self):
         pass
@@ -60,9 +61,6 @@ class IdleState(PlayerState):
         pass
 
 
-# ======================
-# RUN STATE
-# ======================
 class RunState(PlayerState):
     def on_enter(self):
         pass
@@ -92,9 +90,6 @@ class RunState(PlayerState):
         pass
 
 
-# ======================
-# DASH STATE
-# ======================
 class DashState(PlayerState):
     def __init__(self, player):
         super().__init__(player)
@@ -103,6 +98,8 @@ class DashState(PlayerState):
 
     def on_enter(self):
         self.time_left = DASH_DURATION
+
+        self.player.stamina = max(0.0, self.player.stamina - DASH_STAMINA_COST)
 
         x, y = self.player.input_vector
         if x != 0 or y != 0:
@@ -135,11 +132,69 @@ class DashState(PlayerState):
         pass
 
 
+class DeathState(PlayerState):
+    def __init__(self, player):
+        super().__init__(player)
+        self.post_animation_time = 0.0
+        self.animation_finished = False
+
+    def on_enter(self):
+        self.player.node.velocity = (0, 0)
+        self.play_animation("a_death")
+
+    def handle_input(self, event):
+        return None
+
+    def update(self, delta, movement_input):
+        self.player.node.velocity = (0, 0)
+
+        if not self.animation_finished:
+            return None
+
+        self.post_animation_time += delta
+
+        if self.post_animation_time >= 1.0:
+            self.player.node.change_scene_to("scenes/main_menu/start_screen.kscn")
+
+        return None
+
+    def on_exit(self):
+        pass
+
+
+def _load_player_progress():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    save_path = os.path.join(current_dir, "..", "data", "save.json")
+
+    credits = 0
+    stamina_level = 1
+
+    try:
+        if os.path.exists(save_path):
+            with open(save_path, "r") as f:
+                save = json.load(f)
+            credits = int(save.get("player", {}).get("credits", 0))
+            stamina_level = int(save.get("upgrades", {}).get("stamina", 1))
+    except Exception:
+        pass
+
+    max_stamina = MAX_STAMINA * (STAMINA_UPGRADE_MULTIPLIER ** max(0, stamina_level - 1))
+    return credits, max_stamina
+
+
 
 def _ready(self):
     self.animated_sprite = self.node.get_node("AnimatedSprite2D")
     self.health_bar = self.node.get_node("UI/HealthBar")
+    self.stamina_bar = self.node.get_node("UI/StaminaBar")
     self.current_animation_name = None
+
+    _on_animation_finished._player = self
+    if self.animated_sprite is not None:
+        try:
+            self.animated_sprite.connect("animation_finished", _on_animation_finished)
+        except Exception:
+            pass
 
     self.last_direction = (0, 1)
     self.input_vector = (0, 0)
@@ -149,6 +204,11 @@ def _ready(self):
 
     self.health = 10
     self.health_bar.value = self.health
+    self.credits, self.max_stamina = _load_player_progress()
+    self.stamina = self.max_stamina
+    if self.stamina_bar is not None:
+        self.stamina_bar.max_value = self.max_stamina
+        self.stamina_bar.value = self.stamina
 
     self.current_state = IdleState(self)
     self.current_state.on_enter()
@@ -157,7 +217,8 @@ def _ready(self):
 def _input(self, event):
     if event.type == pygame.KEYDOWN:
         if event.key == pygame.K_SPACE and self.space_just_pressed:
-            _switch_state(self, DashState(self))
+            if self.stamina >= DASH_STAMINA_COST:
+                _switch_state(self, DashState(self))
             self.space_just_pressed = False
 
     if event.type == pygame.KEYUP:
@@ -207,6 +268,20 @@ def _update_facing(self):
 
 def _process(self, delta):
     self.health_bar.value = self.health
+    if isinstance(self.current_state, DeathState):
+        self.current_state.update(delta, (0, 0))
+        self.node.move_and_slide()
+        return
+
+    stamina_regen = STAMINA_REGEN_PER_SECOND * (self.max_stamina / MAX_STAMINA)
+    self.stamina = min(self.max_stamina, self.stamina + (stamina_regen * delta))
+    if self.stamina_bar is not None:
+        self.stamina_bar.max_value = self.max_stamina
+        self.stamina_bar.value = self.stamina
+
+    if not hasattr(self, "credits"):
+        self.credits, self.max_stamina = _load_player_progress()
+        self.stamina = self.max_stamina
     movement_input = _get_movement_input(self)
     self.input_vector = movement_input
 
@@ -216,8 +291,7 @@ def _process(self, delta):
     _update_facing(self)
 
     if self.health <= 0:
-        print("DEAD")
-        self.node.quit()
+        _switch_state(self, DeathState(self))
         return
 
     new_state = self.current_state.update(delta, movement_input)
@@ -226,3 +300,34 @@ def _process(self, delta):
 
     
     self.node.move_and_slide()
+
+    try:
+        if hasattr(self, "credits"):
+            if not hasattr(self, "_last_credits") or self._last_credits != self.credits:
+                credits_label = self.node.get_node("UI/CreditsLabel")
+                if credits_label is not None:
+                    try:
+                        credits_label.text = str(self.credits)
+                    except Exception:
+                        pass
+                self._last_credits = self.credits
+    except Exception:
+        pass
+
+
+def _on_animation_finished(animation_name=None):
+    if animation_name != "a_death":
+        return
+
+    player = getattr(_on_animation_finished, "_player", None)
+    if player is None:
+        return
+
+    if not isinstance(player.current_state, DeathState):
+        return
+
+    player.current_state.post_animation_time = 0.0
+    player.current_state.animation_finished = True
+
+
+_on_animation_finished._player = None

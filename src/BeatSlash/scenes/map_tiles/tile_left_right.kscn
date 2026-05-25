@@ -15,6 +15,10 @@
                 0,
                 0
             ],
+            "scale":[
+                1,
+                1
+            ],
             "z_index":0,
             "visible":true
         },
@@ -33,6 +37,10 @@
                     "rotation":[
                         0,
                         0
+                    ],
+                    "scale":[
+                        1,
+                        1
                     ],
                     "z_index":0,
                     "visible":true,
@@ -9942,8 +9950,8 @@
                     "audio":{
                         "__resource__":{
                             "name":"Audio",
-                            "resource_path":"assets/audio/Aftermath.mp3",
-                            "file_path":"assets/audio/Aftermath.mp3",
+                            "resource_path":"assets/audio/BossfightOST.mp3",
+                            "file_path":"assets/audio/BossfightOST.mp3",
                             "type":"AudioStream",
                             "resource_type":"AudioStream"
                         }
@@ -9965,6 +9973,10 @@
                     "rotation":[
                         0,
                         0
+                    ],
+                    "scale":[
+                        1,
+                        1
                     ],
                     "z_index":0,
                     "visible":true,
@@ -9992,6 +10004,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true,
                             "size":[
@@ -10015,6 +10031,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -10040,6 +10060,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true,
                             "size":[
@@ -10064,6 +10088,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true,
                             "size":[
@@ -10087,6 +10115,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -10112,6 +10144,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true,
                             "size":[
@@ -10135,6 +10171,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -10160,6 +10200,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true,
                             "size":[
@@ -10183,6 +10227,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -10208,6 +10256,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true,
                             "size":[
@@ -10232,6 +10284,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true,
                             "size":[
@@ -10255,6 +10311,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -10282,6 +10342,10 @@
                         0,
                         0
                     ],
+                    "scale":[
+                        1,
+                        1
+                    ],
                     "z_index":0,
                     "visible":true
                 },
@@ -10300,6 +10364,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -10343,6 +10411,10 @@
                                 0,
                                 0
                             ],
+                            "scale":[
+                                1,
+                                1
+                            ],
                             "z_index":0,
                             "visible":true
                         },
@@ -10361,6 +10433,10 @@
                                     "rotation":[
                                         0,
                                         0
+                                    ],
+                                    "scale":[
+                                        1,
+                                        1
                                     ],
                                     "z_index":0,
                                     "visible":true
@@ -10382,6 +10458,10 @@
                                         0,
                                         0
                                     ],
+                                    "scale":[
+                                        1,
+                                        1
+                                    ],
                                     "z_index":0,
                                     "visible":true
                                 },
@@ -10401,6 +10481,10 @@
                                     "rotation":[
                                         0,
                                         0
+                                    ],
+                                    "scale":[
+                                        1,
+                                        1
                                     ],
                                     "z_index":0,
                                     "visible":true
@@ -10422,6 +10506,10 @@
                                         0,
                                         0
                                     ],
+                                    "scale":[
+                                        1,
+                                        1
+                                    ],
                                     "z_index":0,
                                     "visible":true
                                 },
@@ -10442,6 +10530,10 @@
                                         0,
                                         0
                                     ],
+                                    "scale":[
+                                        1,
+                                        1
+                                    ],
                                     "z_index":0,
                                     "visible":true
                                 },
@@ -10461,6 +10553,10 @@
                                     "rotation":[
                                         0,
                                         0
+                                    ],
+                                    "scale":[
+                                        1,
+                                        1
                                     ],
                                     "z_index":0,
                                     "visible":true
@@ -10483,6 +10579,96 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
+                            ],
+                            "z_index":0,
+                            "visible":true,
+                            "collision_layers":[
+                                3
+                            ],
+                            "collision_masks":[
+                                1
+                            ],
+                            "velocity":[
+                                0.0,
+                                0.0
+                            ],
+                            "script":{
+                                "__resource__":{
+                                    "name":"Script",
+                                    "resource_path":"scripts/entities/robu.py",
+                                    "script_path":"scripts/entities/robu.py",
+                                    "type":"Script",
+                                    "resource_type":"Script"
+                                }
+                            }
+                        },
+                        "children":[]
+                    },
+                    {
+                        "type":"KinematicBody2D",
+                        "name":"Robu",
+                        "properties":{
+                            "name":"Robu",
+                            "is_linked_scene":true,
+                            "linked_scene_path":"scenes/entities/robu_enemy.kscn",
+                            "position":[
+                                68.91783684573676,
+                                -94.01901822365983
+                            ],
+                            "rotation":[
+                                0,
+                                0
+                            ],
+                            "scale":[
+                                1,
+                                1
+                            ],
+                            "z_index":0,
+                            "visible":true,
+                            "collision_layers":[
+                                3
+                            ],
+                            "collision_masks":[
+                                1
+                            ],
+                            "velocity":[
+                                0.0,
+                                0.0
+                            ],
+                            "script":{
+                                "__resource__":{
+                                    "name":"Script",
+                                    "resource_path":"scripts/entities/robu.py",
+                                    "script_path":"scripts/entities/robu.py",
+                                    "type":"Script",
+                                    "resource_type":"Script"
+                                }
+                            }
+                        },
+                        "children":[]
+                    },
+                    {
+                        "type":"KinematicBody2D",
+                        "name":"Robu",
+                        "properties":{
+                            "name":"Robu",
+                            "is_linked_scene":true,
+                            "linked_scene_path":"scenes/entities/robu_enemy.kscn",
+                            "position":[
+                                -123.5997540010114,
+                                -179.5149089153701
+                            ],
+                            "rotation":[
+                                0,
+                                0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -10525,6 +10711,10 @@
                         0,
                         0
                     ],
+                    "scale":[
+                        1,
+                        1
+                    ],
                     "z_index":0,
                     "visible":true
                 },
@@ -10543,6 +10733,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true
@@ -10563,6 +10757,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true

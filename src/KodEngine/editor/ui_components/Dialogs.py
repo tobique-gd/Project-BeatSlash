@@ -4,6 +4,7 @@ import dearpygui.dearpygui as pygui
 from ...engine import Nodes
 from ...engine.ErrorHandler import ErrorHandler
 from ...engine import ResourceServer
+from ...engine import ExportingServer
 from .. import ResourceEditors
 import os
 
@@ -35,17 +36,147 @@ class BaseDialog:
         return tag
 
 
+class ExportDialog(BaseDialog):
+    def __init__(self, ui):
+        super().__init__(ui)
+
+    def show_export_window(self):
+        modal_width = 720
+        modal_height = 520
+
+        self._show_centered_modal(
+            label="Export Project",
+            tag="export_window",
+            width=modal_width,
+            height=modal_height,
+        )
+
+        project_dir = self.ui.editor.settings.project_settings["file_management"]["project_directory"]
+        main_scene = self.ui.editor.settings.project_settings["project"].get("main_scene_path", "")
+        default_output_name = os.path.basename(project_dir.rstrip(os.sep)) or "game"
+        default_output_dir = os.path.join(project_dir, "dist")
+
+        with pygui.group(parent="export_window"):
+            pygui.add_text("Export Settings")
+            pygui.add_separator()
+
+            pygui.add_text("Project")
+            pygui.add_input_text(default_value=str(project_dir), width=-1, readonly=True, tag="export_project_dir")
+
+            pygui.add_text("Main Scene (project-relative)")
+            pygui.add_input_text(default_value=str(main_scene), width=-1, readonly=True, tag="export_main_scene")
+
+            pygui.add_text("Target Platform")
+            pygui.add_combo(("Windows", "macOS", "Linux"), default_value="Windows", width=-1, tag="export_platform")
+
+            pygui.add_text("Build Mode")
+            pygui.add_combo(("Release", "Debug"), default_value="Release", width=-1, tag="export_build_mode")
+
+            pygui.add_text("Output Folder")
+            pygui.add_input_text(default_value=default_output_dir, width=-1, tag="export_output_dir")
+
+            pygui.add_text("Output Name")
+            pygui.add_input_text(default_value=default_output_name, width=-1, tag="export_output_name")
+
+            pygui.add_checkbox(label="Include assets", default_value=True, tag="export_include_assets")
+            pygui.add_checkbox(label="Include Python runtime", default_value=True, tag="export_include_runtime")
+            pygui.add_checkbox(label="One-file build", default_value=False, tag="export_one_file")
+
+            pygui.add_separator()
+            with pygui.group(horizontal=True):
+                pygui.add_button(label="Export", width=250, callback=self._on_export)
+                pygui.add_button(label="Close", width=250, callback=lambda: pygui.delete_item("export_window"))
+
+    def _on_export(self):
+        try:
+            project_dir = pygui.get_value("export_project_dir")
+            output_dir = pygui.get_value("export_output_dir")
+            output_name = pygui.get_value("export_output_name")
+            platform_name = pygui.get_value("export_platform")
+            build_mode = pygui.get_value("export_build_mode")
+            include_assets = bool(pygui.get_value("export_include_assets"))
+            include_runtime = bool(pygui.get_value("export_include_runtime"))
+            one_file = bool(pygui.get_value("export_one_file"))
+
+            if not output_dir:
+                ErrorHandler.throw_error("Export failed: output folder is empty.")
+                return
+
+            exporter = ExportingServer.Exporter(project_dir, self.ui.editor.settings.project_settings)
+            exporter.export_async(
+                output_dir=output_dir,
+                output_name=output_name,
+                platform_name=platform_name,
+                build_mode=build_mode,
+                one_file=one_file,
+                include_assets=include_assets,
+                include_runtime=include_runtime,
+            )
+        except Exception as e:
+            ErrorHandler.throw_error(f"Export failed: {e}")
+
+
 class NodeDialogs(BaseDialog):
     def __init__(self, ui):
         super().__init__(ui)
 
+    def _build_node_class_tree(self):
+        node_classes = {}
+
+        for _, node_class in inspect.getmembers(Nodes, inspect.isclass):
+            if node_class is Nodes.Node:
+                continue
+            if not issubclass(node_class, Nodes.Node):
+                continue
+
+            node_classes[node_class] = {
+                "class": node_class,
+                "name": node_class.__name__,
+                "children": [],
+            }
+
+        for node_class, node_data in node_classes.items():
+            parent_class = next((base for base in node_class.__bases__ if base in node_classes), None)
+            if parent_class is not None:
+                node_classes[parent_class]["children"].append(node_data)
+
+        def sort_branch(branch):
+            branch.sort(key=lambda item: item["name"])
+            for item in branch:
+                sort_branch(item["children"])
+
+        root_data = {
+            "class": Nodes.Node,
+            "name": Nodes.Node.__name__,
+            "children": [
+                node_data
+                for node_class, node_data in node_classes.items()
+                if Nodes.Node in node_class.__bases__
+            ],
+        }
+
+        sort_branch(root_data["children"])
+        return [root_data]
+
     def get_node_classes(self):
-        node_classes = []
-        for attr_name in dir(Nodes):
-            attr = getattr(Nodes, attr_name)
-            if isinstance(attr, type) and issubclass(attr, Nodes.Node) and not inspect.isabstract(attr):
-                node_classes.append((attr_name, attr))
-        return sorted(node_classes, key=lambda x: x[0])
+        return self._build_node_class_tree()
+
+    def _draw_node_class_tree(self, node_class_data, callback, depth=0):
+        with pygui.group(horizontal=True):
+            pygui.add_spacer(width=depth * 20)
+            pygui.add_button(
+                label=node_class_data["name"],
+                width=-1,
+                user_data=node_class_data["class"],
+                callback=callback,
+            )
+
+        for child_data in node_class_data["children"]:
+            self._draw_node_class_tree(child_data, callback, depth + 1)
+
+    def _draw_node_class_browser(self, callback):
+        for node_class_data in self.get_node_classes():
+            self._draw_node_class_tree(node_class_data, callback)
 
     def show_delete_node_window(self, sender, app_data):
         if not self.ui.state.selected_node:
@@ -205,8 +336,8 @@ class NodeDialogs(BaseDialog):
         if not self.ui.state.selected_node:
             return
 
-        modal_width = 300
-        modal_height = 400
+        modal_width = 560
+        modal_height = 700
 
         self._show_centered_modal(
             label="Add Node",
@@ -214,21 +345,12 @@ class NodeDialogs(BaseDialog):
             width=modal_width,
             height=modal_height,
         )
-
+        # show a window with clear tree structure the shows inheritance of nodes instead of a flat alphabetical list of node types. Also show a search bar to filter node types by name. Bonus points for showing icons for each node type.
         with pygui.group(parent="add_node_window"):
-            pygui.add_text("Select a node type to add:")
+            pygui.add_text("Select node type to add:")
             pygui.add_separator()
-
-            node_classes = self.get_node_classes()
-
-            for node_name, node_class in node_classes:
-                
-                pygui.add_button(
-                    label=node_name,
-                    width=-1,
-                    user_data=node_class,
-                    callback=self.on_node_type_selected
-                )
+            with pygui.child_window(border=True, height=-1):
+                self._draw_node_class_browser(self.on_node_type_selected)
 
     def on_node_type_selected(self, sender, app_data, user_data):
         if not self.ui.state.selected_node:
@@ -251,8 +373,8 @@ class NodeDialogs(BaseDialog):
         if not self.ui.state.selected_node:
             return
 
-        modal_width = 300
-        modal_height = 400
+        modal_width = 560
+        modal_height = 700
         current_type = type(self.ui.state.selected_node).__name__
 
         self._show_centered_modal(
@@ -266,16 +388,8 @@ class NodeDialogs(BaseDialog):
             pygui.add_text(f"Current type: {current_type}")
             pygui.add_text("Select new type:")
             pygui.add_separator()
-
-            node_classes = self.get_node_classes()
-
-            for node_name, node_class in node_classes:
-                pygui.add_button(
-                    label=node_name,
-                    width=-1,
-                    user_data=node_class,
-                    callback=self.on_change_type_selected
-                )
+            with pygui.child_window(border=True, height=-1):
+                self._draw_node_class_browser(self.on_change_type_selected)
 
     def on_change_type_selected(self, sender, app_data, user_data):
         if not self.ui.state.selected_node:
@@ -358,6 +472,10 @@ class SettingsDialog(BaseDialog):
                 return
 
             section[setting_key] = value
+            try:
+                self.ui.editor.save_settings()
+            except Exception:
+                pass
             
         except Exception as e:
             ErrorHandler.throw_error(f"Error updating setting '{section_key}.{setting_key}': {e}")
@@ -565,6 +683,7 @@ class DialogManager:
         self.settings = settings
         self.node = NodeDialogs(ui)
         self.settings_dialog = SettingsDialog(ui, settings)
+        self.export_dialog = ExportDialog(ui)
         self._dialog_tags = (
             "add_node_window",
             "delete_node_window",
@@ -573,6 +692,7 @@ class DialogManager:
             "new_script_window",
             "new_scene_window",
             "link_scene_window",
+            "export_window",
         )
 
     def is_any_dialog_open(self):
@@ -596,4 +716,7 @@ class DialogManager:
 
     def show_settings_window(self, sender=None, app_data=None):
         self.settings_dialog.show_settings_window(sender, app_data)
+
+    def show_export_window(self):
+        self.export_dialog.show_export_window()
 

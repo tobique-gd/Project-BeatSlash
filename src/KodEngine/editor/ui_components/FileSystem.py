@@ -7,7 +7,15 @@ from ..EditorModels import EditorCommandType
 from ...engine import Nodes, Scenes
 
 ignored_file_list = ["__init__.py"]
-ignored_directory_list = ["__pycache__"]
+ignored_directory_list = ["__pycache__", ".git", ".venv", "venv", "build", "dist", "node_modules", ".project.kod", "*.egg-info"]
+MAX_TREE_DEPTH = 5
+
+
+def _should_ignore_directory(name):
+    if name.startswith('.'):
+        return True
+
+    return name in ignored_directory_list or name.endswith('.egg-info')
 
 class FileSystem:
     def __init__(self, ui) -> None:
@@ -31,13 +39,13 @@ class FileSystem:
 
         item = path.split("/")[-1]
         with pygui.tree_node(label=f"{item}", default_open=False):
-            self._build_file_tree(path)
+            self._build_file_tree(path, depth=0)
         
         if not pygui.does_item_exist("file_system_context_menu"):
             self._create_context_menu()
 
     #Recursive building of file tree
-    def _build_file_tree(self, path=None):
+    def _build_file_tree(self, path=None, depth=0):
         if path is None:
             path = self.ui.app.configuration.project_settings["file_management"]["project_directory"]
         
@@ -49,6 +57,11 @@ class FileSystem:
 
                 full_path = os.path.join(path, item)
                 if os.path.isdir(full_path):
+                    if _should_ignore_directory(item):
+                        continue
+
+                    if os.path.islink(full_path):
+                        continue
             
                     tree_tag = f"dir_item_{full_path.replace('/', '_').replace(' ', '_')}"
                     selectable_tag = f"dir_selectable_{full_path.replace('/', '_').replace(' ', '_')}"
@@ -66,7 +79,8 @@ class FileSystem:
                         span_columns=True
                     )
                     with pygui.tree_node(label=f"{item}", default_open=was_open, tag=tree_tag, user_data=full_path, indent=20):
-                        self._build_file_tree(full_path)
+                        if depth < MAX_TREE_DEPTH:
+                            self._build_file_tree(full_path, depth=depth + 1)
                 else:
 
                     selectable_tag = f"file_item_{full_path.replace('/', '_').replace(' ', '_')}"
@@ -169,6 +183,7 @@ class FileSystem:
         root_path = self.ui.app.configuration.project_settings["file_management"]["project_directory"]
 
         for dirpath, dirnames, _ in os.walk(root_path):
+            dirnames[:] = [dirname for dirname in dirnames if not _should_ignore_directory(dirname)]
             for dirname in dirnames:
                 full_path = os.path.join(dirpath, dirname)
                 tree_tag = f"dir_item_{full_path.replace('/', '_').replace(' ', '_')}"

@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from pygame.transform import scale
+
 from . import Resources
 import pygame
 import os
@@ -383,7 +385,8 @@ class Node2D(Node):
     def __init__(self) -> None:
         super().__init__()
         self.position: tuple[float, float] = (0, 0)
-        self.rotation: tuple[float, float] = (0, 0)
+        self.rotation: float = 0.0
+        self.scale: tuple[float, float] = (1, 1)
         self.z_index = 0
         self.visible = True
 
@@ -406,6 +409,17 @@ class Node2D(Node):
             self.position = (value[0] - parent_global[0], value[1] - parent_global[1])
         else:
             self.position = value
+
+    @property
+    def global_scale(self):
+        if self._parent is not None and hasattr(self._parent, 'global_scale'):
+            parent_scale = self._parent.global_scale # type: ignore
+            return (self.scale[0] * parent_scale[0], self.scale[1] * parent_scale[1])
+        return self.scale
+
+    @global_scale.setter
+    def global_scale(self, value: tuple[float, float]):
+        self.scale = value
 
     @property
     def global_visible(self) -> bool:
@@ -1183,9 +1197,23 @@ class Control(Node):
     
 
 class Label(Control):
+    class TextAlignType(Enum):
+        LEFT = "LEFT"
+        CENTER = "CENTER"
+        RIGHT = "RIGHT"
+
     def __init__(self) -> None:
         super().__init__()
         self.text = ""
+        self.text_align = self.TextAlignType.CENTER
+
+    def load_data(self, data: dict):
+        super().load_data(data)
+        if "text_align" in data and isinstance(data["text_align"], str):
+            try:
+                self.text_align = self.TextAlignType[data["text_align"]]
+            except (KeyError, ValueError):
+                self.text_align = self.TextAlignType.CENTER
     
 
 class Button(Control):

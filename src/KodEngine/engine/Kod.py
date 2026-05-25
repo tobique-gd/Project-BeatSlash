@@ -1,7 +1,17 @@
-import pygame
+import os
+import warnings
 import math
 import platform
 from typing import Any
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"pkg_resources is deprecated as an API.*",
+    category=UserWarning,
+    module=r"pygame\.pkgdata",
+)
+
+import pygame
 
 from . import PhysicsServer
 from . import RenderingServer
@@ -13,9 +23,18 @@ from . import Globals
 
 class Settings:
     def __init__(self) -> None:
+        project_directory = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "BeatSlash")
+        )
+
         self.project_settings = {
+            "project" : {
+                "name" : "BeatSlash",
+                "main_scene_path" : "scenes/main_menu/main_menu.kscn"
+            },
+
             "file_management" : {
-                "project_directory" : "/",
+                "project_directory" : project_directory,
             },
 
             "window" : {
@@ -26,9 +45,9 @@ class Settings:
                 "physics_substeps" : 4
             },
             "runtime" : {
-                "main_scene_path" : "src/BeatSlash/scenes/BeatSlashWorld.kscn",
                 "FPS" : 240
-            }
+            },
+            "debug": {"default_background_color": (50, 50, 50)}
 
         }
 
@@ -47,6 +66,7 @@ class App:
         )
         self.resolution = self.configuration.project_settings["window"]["viewport_resolution"]
         self.FPS = self.configuration.project_settings["runtime"]["FPS"]
+        self.editor_mode = editor_mode
 
         if editor_mode:
             self.screen = pygame.display.set_mode(self.internal_resolution, pygame.HIDDEN)
@@ -54,9 +74,9 @@ class App:
             self.screen = self._create_runtime_window(self.resolution)
 
         if self.screen is not None:
-            self.handle_resize(self.screen.get_size())
+            self.handle_resize(self.screen.get_size(), persist_project_resolution=not editor_mode)
         
-
+        pygame.display.set_caption(self.configuration.project_settings["project"]["name"])
         self.internal_surface = pygame.Surface(self.internal_resolution).convert_alpha()
         self.scaled_surface = pygame.transform.scale(self.internal_surface, self.resolution)
 
@@ -81,12 +101,13 @@ class App:
         self.current_camera = None
 
     #handling resizing of window since pygame doesnt do it automatically
-    def handle_resize(self, size):
+    def handle_resize(self, size, persist_project_resolution=True):
         width = max(1, int(size[0]))
         height = max(1, int(size[1]))
 
         self.resolution = (width, height)
-        self.configuration.project_settings["window"]["viewport_resolution"] = self.resolution
+        if persist_project_resolution:
+            self.configuration.project_settings["window"]["viewport_resolution"] = self.resolution
 
         current_surface = pygame.display.get_surface()
         if current_surface is not None:
@@ -138,6 +159,18 @@ class App:
         y = (float(pos[1]) - float(offset_y)) / float(integer_scale)
         return (x, y)
 
+    def _calculate_cover_transform(self, output_w, output_h):
+        internal_w, internal_h = self.internal_resolution
+        if internal_w <= 0 or internal_h <= 0 or output_w <= 0 or output_h <= 0:
+            return (1.0, 1.0, 0, 0, output_w, output_h)
+
+        scale = max(output_w / float(internal_w), output_h / float(internal_h))
+        target_w = int(round(internal_w * scale))
+        target_h = int(round(internal_h * scale))
+        offset_x = (output_w - target_w) // 2
+        offset_y = (output_h - target_h) // 2
+        return (scale, scale, offset_x, offset_y, target_w, target_h)
+
     def _normalize_event_to_internal_space(self, event):
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
             return event
@@ -149,14 +182,30 @@ class App:
         if "pos" not in event_data:
             return event
 
-        _, _, integer_scale, _, _, _, _ = self._calculate_present_transform()
-        event_data["pos"] = self._window_to_internal_pos(event_data["pos"])
+        if self.editor_mode:
+            _, _, integer_scale, _, _, _, _ = self._calculate_present_transform()
+            event_data["pos"] = self._window_to_internal_pos(event_data["pos"])
 
-        if "rel" in event_data and integer_scale > 0:
-            event_data["rel"] = (
-                float(event_data["rel"][0]) / float(integer_scale),
-                float(event_data["rel"][1]) / float(integer_scale),
+            if "rel" in event_data and integer_scale > 0:
+                event_data["rel"] = (
+                    float(event_data["rel"][0]) / float(integer_scale),
+                    float(event_data["rel"][1]) / float(integer_scale),
+                )
+        else:
+            output_w, output_h = self.screen.get_size() if self.screen else self.resolution
+            internal_w, internal_h = self.internal_resolution
+            scale_x, scale_y, offset_x, offset_y, _, _ = self._calculate_cover_transform(output_w, output_h)
+
+            event_data["pos"] = (
+                (float(event_data["pos"][0]) - float(offset_x)) / float(scale_x),
+                (float(event_data["pos"][1]) - float(offset_y)) / float(scale_y),
             )
+
+            if "rel" in event_data and scale_x > 0 and scale_y > 0:
+                event_data["rel"] = (
+                    float(event_data["rel"][0]) / float(scale_x),
+                    float(event_data["rel"][1]) / float(scale_y),
+                )
 
         return pygame.event.Event(event.type, event_data)
         
@@ -176,7 +225,9 @@ class App:
             except Exception:
                 pass
             try:
-                self.current_scene._ready()
+                if not self.editor_mode:
+                    self.current_scene._ready()
+
             except Exception:
                 pass
 
@@ -261,7 +312,7 @@ class App:
         if not self.screen or not self.current_scene:
             return
 
-        self.current_scene._process_ui(self.base_internal_resolution)
+        self.current_scene._process_ui(self.internal_resolution)
         self.running = True
         last_frame_time = pygame.time.get_ticks()
 
@@ -270,7 +321,7 @@ class App:
             delta = (now - last_frame_time) / 1000.0
             last_frame_time = now
 
-            self.current_scene._process_ui(self.base_internal_resolution)
+            self.current_scene._process_ui(self.internal_resolution)
             self.resolve_editor_events(pygame.event.get())
 
             self.current_scene._process(delta)
@@ -289,24 +340,25 @@ class App:
             )
 
             viewport_size = self.configuration.project_settings["window"]["viewport_resolution"] 
+            output_w, output_h = int(viewport_size[0]), int(viewport_size[1])
 
             if self.scaled_surface is None or self.scaled_surface.get_size() != viewport_size:
                 self.scaled_surface = pygame.Surface(viewport_size, pygame.SRCALPHA).convert_alpha()
 
-            pygame.transform.scale(
-                self.internal_surface,
-                viewport_size,
-                self.scaled_surface
-            )
+            self.scaled_surface.fill((0, 0, 0, 255))
+            scale_x, scale_y, offset_x, offset_y, target_w, target_h = self._calculate_cover_transform(output_w, output_h)
+            if target_w > 0 and target_h > 0:
+                scaled_internal = pygame.transform.scale(self.internal_surface, (target_w, target_h))
+                self.scaled_surface.blit(scaled_internal, (offset_x, offset_y))
 
             if self.current_scene is not None:
-                self.current_scene._process_ui(self.base_internal_resolution)
+                self.current_scene._process_ui(self.internal_resolution)
 
             self.renderer.render_ui_frame(
                 self.node_buckets["ui"],
                 viewport_size=viewport_size,
                 target_surface=self.scaled_surface,
-                source_size=self.base_internal_resolution
+                source_size=self.internal_resolution
             )
 
             self.screen.blit(self.scaled_surface, (0, 0))

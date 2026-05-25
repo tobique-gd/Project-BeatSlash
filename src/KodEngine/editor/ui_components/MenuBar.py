@@ -24,6 +24,8 @@ class MenuBar:
                 with pygui.menu(label="Edit"):
                     pygui.add_menu_item(label="Editor Settings", callback=lambda: self.ui.editor.queue_command(EditorCommandType.OPEN_EDITOR_SETTINGS))
                     pygui.add_menu_item(label="Project Settings", callback=lambda: self.ui.editor.queue_command(EditorCommandType.OPEN_PROJECT_SETTINGS))
+                with pygui.menu(label="Project"):
+                    pygui.add_menu_item(label="Export", callback=lambda: self.ui.editor.queue_command(EditorCommandType.OPEN_EXPORT))
 
     def _build_scene_info(self):
         display_text = self._get_scene_display_text()

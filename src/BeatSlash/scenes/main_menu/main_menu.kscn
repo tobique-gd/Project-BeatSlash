@@ -14,7 +14,7 @@
             ],
             "size":[
                 480.0,
-                332.0
+                338.0
             ],
             "z_index":0,
             "font":{
@@ -76,7 +76,7 @@
                     ],
                     "size":[
                         480.0,
-                        332.0
+                        338.0
                     ],
                     "z_index":-5,
                     "font":{
@@ -129,10 +129,10 @@
                     "name":"Label",
                     "is_linked_scene":false,
                     "linked_scene_path":null,
-                    "anchor":"TOP_RIGHT",
+                    "anchor":"CENTER_RIGHT",
                     "position":[
-                        -97.30000305175781,
-                        107.0
+                        -171.60000610351562,
+                        -35.400001525878906
                     ],
                     "size":[
                         0,
@@ -147,7 +147,7 @@
                             "resource_type":"Resource"
                         }
                     },
-                    "font_size":38,
+                    "font_size":56,
                     "font_color":[
                         36,
                         40,
@@ -166,7 +166,8 @@
                         72,
                         255
                     ],
-                    "text":"BeatSlash"
+                    "text":"BEATSLASH",
+                    "text_align":"CENTER"
                 },
                 "children":[]
             },
@@ -184,6 +185,10 @@
                     "rotation":[
                         0,
                         0
+                    ],
+                    "scale":[
+                        1,
+                        1
                     ],
                     "z_index":0,
                     "visible":true,
@@ -359,6 +364,25 @@
                         "children":[]
                     }
                 ]
+            },
+            {
+                "type":"AudioPlayer",
+                "name":"AudioPlayer",
+                "properties":{
+                    "name":"AudioPlayer",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
+                    "audio":{
+                        "__resource__":{
+                            "name":"Audio",
+                            "resource_path":"assets/audio/IMissYou.mp3",
+                            "file_path":"assets/audio/IMissYou.mp3",
+                            "type":"AudioStream",
+                            "resource_type":"AudioStream"
+                        }
+                    }
+                },
+                "children":[]
             }
         ]
     }

@@ -15,6 +15,10 @@
                 0,
                 0
             ],
+            "scale":[
+                1,
+                1
+            ],
             "z_index":0,
             "visible":true,
             "collision_layers":[
@@ -29,7 +33,16 @@
             "velocity":[
                 0,
                 0
-            ]
+            ],
+            "script":{
+                "__resource__":{
+                    "name":"Script",
+                    "resource_path":"scripts/player.py",
+                    "script_path":"scripts/player.py",
+                    "type":"Script",
+                    "resource_type":"Script"
+                }
+            }
         },
         "children":[
             {
@@ -46,6 +59,10 @@
                     "rotation":[
                         0,
                         0
+                    ],
+                    "scale":[
+                        1,
+                        1
                     ],
                     "z_index":0,
                     "visible":true,
@@ -617,12 +634,174 @@
                                 "type":"SpriteAnimation",
                                 "resource_type":"SpriteAnimation"
                             }
+                        },
+                        {
+                            "__resource__":{
+                                "name":"a_death",
+                                "resource_path":null,
+                                "spritesheet":{
+                                    "__resource__":{
+                                        "name":"Texture",
+                                        "resource_path":"assets/textures/spritesheets/player/death.png",
+                                        "texture_path":"assets/textures/spritesheets/player/death.png",
+                                        "type":"Texture2D",
+                                        "resource_type":"Texture2D"
+                                    }
+                                },
+                                "frame_size":[
+                                    27,
+                                    27
+                                ],
+                                "frames":5,
+                                "frame_regions":[
+                                    [
+                                        [
+                                            0,
+                                            0
+                                        ],
+                                        [
+                                            27,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            27,
+                                            0
+                                        ],
+                                        [
+                                            27,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            0,
+                                            27
+                                        ],
+                                        [
+                                            27,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            27,
+                                            27
+                                        ],
+                                        [
+                                            27,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            0,
+                                            54
+                                        ],
+                                        [
+                                            27,
+                                            27
+                                        ]
+                                    ]
+                                ],
+                                "fps":4,
+                                "loop":false,
+                                "type":"SpriteAnimation",
+                                "resource_type":"SpriteAnimation"
+                            }
+                        },
+                        {
+                            "__resource__":{
+                                "name":"a_roll_back",
+                                "resource_path":null,
+                                "spritesheet":{
+                                    "__resource__":{
+                                        "name":"Texture",
+                                        "resource_path":"assets/textures/spritesheets/player/roll_back.png",
+                                        "texture_path":"assets/textures/spritesheets/player/roll_back.png",
+                                        "type":"Texture2D",
+                                        "resource_type":"Texture2D"
+                                    }
+                                },
+                                "frame_size":[
+                                    17,
+                                    27
+                                ],
+                                "frames":6,
+                                "frame_regions":[
+                                    [
+                                        [
+                                            0,
+                                            0
+                                        ],
+                                        [
+                                            17,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            17,
+                                            0
+                                        ],
+                                        [
+                                            17,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            0,
+                                            27
+                                        ],
+                                        [
+                                            17,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            17,
+                                            27
+                                        ],
+                                        [
+                                            17,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            0,
+                                            54
+                                        ],
+                                        [
+                                            17,
+                                            27
+                                        ]
+                                    ],
+                                    [
+                                        [
+                                            17,
+                                            54
+                                        ],
+                                        [
+                                            17,
+                                            27
+                                        ]
+                                    ]
+                                ],
+                                "fps":12,
+                                "loop":false,
+                                "type":"SpriteAnimation",
+                                "resource_type":"SpriteAnimation"
+                            }
                         }
                     ],
                     "current_animation":{
-                        "name":"a_run_side",
-                        "current_frame":1,
-                        "time_accumulator":0.0783333333333963
+                        "name":"a_roll_back",
+                        "current_frame":5,
+                        "time_accumulator":0.008333333333333429
                     }
                 },
                 "children":[]
@@ -641,6 +820,10 @@
                     "rotation":[
                         0,
                         0
+                    ],
+                    "scale":[
+                        1,
+                        1
                     ],
                     "z_index":0,
                     "visible":true,
@@ -665,6 +848,10 @@
                     "rotation":[
                         0,
                         0
+                    ],
+                    "scale":[
+                        1,
+                        1
                     ],
                     "z_index":0,
                     "visible":true,
@@ -700,6 +887,10 @@
                         0,
                         0
                     ],
+                    "scale":[
+                        1,
+                        1
+                    ],
                     "z_index":0,
                     "visible":true,
                     "collision_layers":[],
@@ -722,6 +913,10 @@
                             "rotation":[
                                 0,
                                 0
+                            ],
+                            "scale":[
+                                1,
+                                1
                             ],
                             "z_index":0,
                             "visible":true,
@@ -748,7 +943,7 @@
                     ],
                     "size":[
                         480.0,
-                        332.0
+                        338.0
                     ],
                     "z_index":0,
                     "font":{
@@ -838,7 +1033,7 @@
                                 72,
                                 255
                             ],
-                            "value":10.0,
+                            "value":10,
                             "min_value":0.0,
                             "max_value":10.0,
                             "under_texture":{
@@ -876,7 +1071,7 @@
                             ],
                             "size":[
                                 480.0,
-                                332.0
+                                338.0
                             ],
                             "z_index":0,
                             "font":{
@@ -918,6 +1113,200 @@
                                     "name":"Texture",
                                     "resource_path":"assets/textures/ui/vignette_blue.png",
                                     "texture_path":"assets/textures/ui/vignette_blue.png",
+                                    "type":"Texture2D",
+                                    "resource_type":"Texture2D"
+                                }
+                            }
+                        },
+                        "children":[]
+                    },
+                    {
+                        "type":"TextureRect2D",
+                        "name":"CreditIcon",
+                        "properties":{
+                            "name":"CreditIcon",
+                            "is_linked_scene":false,
+                            "linked_scene_path":null,
+                            "anchor":"TOP_LEFT",
+                            "position":[
+                                8.0,
+                                27.942185751726967
+                            ],
+                            "size":[
+                                16.0,
+                                10.0
+                            ],
+                            "z_index":0,
+                            "font":{
+                                "__resource__":{
+                                    "name":"Font",
+                                    "resource_path":null,
+                                    "size":14,
+                                    "color":[
+                                        255,
+                                        255,
+                                        255,
+                                        255
+                                    ],
+                                    "type":"Font",
+                                    "resource_type":"Font"
+                                }
+                            },
+                            "font_size":14,
+                            "font_color":[
+                                245,
+                                245,
+                                245,
+                                255
+                            ],
+                            "padding":[
+                                4,
+                                4,
+                                4,
+                                4
+                            ],
+                            "bg_color":[
+                                58,
+                                62,
+                                72,
+                                255
+                            ],
+                            "texture":{
+                                "__resource__":{
+                                    "name":"Texture",
+                                    "resource_path":"assets/textures/spritesheets/player/credits/credit.png",
+                                    "texture_path":"assets/textures/spritesheets/player/credits/credit.png",
+                                    "type":"Texture2D",
+                                    "resource_type":"Texture2D"
+                                }
+                            }
+                        },
+                        "children":[]
+                    },
+                    {
+                        "type":"Label",
+                        "name":"CreditsLabel",
+                        "properties":{
+                            "name":"CreditsLabel",
+                            "is_linked_scene":false,
+                            "linked_scene_path":null,
+                            "anchor":"TOP_LEFT",
+                            "position":[
+                                26.324183488376377,
+                                32.361912437393606
+                            ],
+                            "size":[
+                                0,
+                                0
+                            ],
+                            "z_index":0,
+                            "font":{
+                                "__resource__":{
+                                    "name":"Font",
+                                    "resource_path":null,
+                                    "size":14,
+                                    "color":[
+                                        255,
+                                        255,
+                                        255,
+                                        255
+                                    ],
+                                    "type":"Font",
+                                    "resource_type":"Font"
+                                }
+                            },
+                            "font_size":15,
+                            "font_color":[
+                                245,
+                                245,
+                                245,
+                                255
+                            ],
+                            "padding":[
+                                4,
+                                4,
+                                4,
+                                4
+                            ],
+                            "bg_color":[
+                                58,
+                                62,
+                                72,
+                                255
+                            ],
+                            "text":"342",
+                            "text_align":"LEFT"
+                        },
+                        "children":[]
+                    },
+                    {
+                        "type":"TextureProgress",
+                        "name":"StaminaBar",
+                        "properties":{
+                            "name":"StaminaBar",
+                            "is_linked_scene":false,
+                            "linked_scene_path":null,
+                            "anchor":"TOP_LEFT",
+                            "position":[
+                                7.520261944860694,
+                                20.683006648401165
+                            ],
+                            "size":[
+                                80.0,
+                                3.0
+                            ],
+                            "z_index":0,
+                            "font":{
+                                "__resource__":{
+                                    "name":"Font",
+                                    "resource_path":null,
+                                    "size":14,
+                                    "color":[
+                                        255,
+                                        255,
+                                        255,
+                                        255
+                                    ],
+                                    "type":"Font",
+                                    "resource_type":"Font"
+                                }
+                            },
+                            "font_size":14,
+                            "font_color":[
+                                245,
+                                245,
+                                245,
+                                255
+                            ],
+                            "padding":[
+                                4,
+                                4,
+                                4,
+                                4
+                            ],
+                            "bg_color":[
+                                58,
+                                62,
+                                72,
+                                255
+                            ],
+                            "value":417.7248169415656,
+                            "min_value":0.0,
+                            "max_value":417.7248169415656,
+                            "under_texture":{
+                                "__resource__":{
+                                    "name":"Texture",
+                                    "resource_path":"assets/textures/spritesheets/player/stamina_bar/stamina_bar_under.png",
+                                    "texture_path":"assets/textures/spritesheets/player/stamina_bar/stamina_bar_under.png",
+                                    "type":"Texture2D",
+                                    "resource_type":"Texture2D"
+                                }
+                            },
+                            "fill_texture":{
+                                "__resource__":{
+                                    "name":"Texture",
+                                    "resource_path":"assets/textures/spritesheets/player/stamina_bar/stamina_bar_fill.png",
+                                    "texture_path":"assets/textures/spritesheets/player/stamina_bar/stamina_bar_fill.png",
                                     "type":"Texture2D",
                                     "resource_type":"Texture2D"
                                 }

@@ -54,9 +54,7 @@ class ErrorHandler:
                 print(f"ERROR: Failed to write to editor console: {e}", file=sys.stderr)
         elif cls._editor_mode:
             cls._pending_messages.append((msg_type, formatted))
-        
-        if to_stderr or not cls._editor_mode:
-            print(formatted, file=sys.stderr)
+
     
     @classmethod
     def throw_error(cls, message: str):

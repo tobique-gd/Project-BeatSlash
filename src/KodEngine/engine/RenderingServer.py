@@ -1,4 +1,5 @@
 import pygame
+from enum import Enum
 from ..engine import Globals
 from . import Nodes
 from . import Resources
@@ -79,7 +80,7 @@ class Renderer2D:
         
     def render_frame(self, scene, _camera, renderable_nodes):
         self.camera = _camera
-        self.screen.fill(self.configuration.editor_settings["debug"]["default_background_color"])
+        self.screen.fill(self.configuration.project_settings["debug"]["default_background_color"])
 
         if self.debug_renderer is not None:
             self.debug_renderer.render(self.screen, self.pygame, self.camera, draw_pass="before_scene")
@@ -201,7 +202,7 @@ class Renderer2D:
         )
 
 
-    def _render_ui_text(self, text, position, scale_y, surface, _font : str | None = "", _font_size=Globals.THEME_DEFAULTS.get("font_size", 16), color=(255, 255, 255), center=False):
+    def _render_ui_text(self, text, position, scale_y, surface, _font : str | None = "", _font_size=Globals.THEME_DEFAULTS.get("font_size", 16), color=(255, 255, 255), center=False, align="CENTER"):
         font_size = max(1, int(round(_font_size * scale_y)))
         try:
             font = pygame.font.Font(_font, font_size)
@@ -214,7 +215,13 @@ class Renderer2D:
         if center:
             text_rect.center = position
         else:
-            text_rect.topleft = position
+            alignment = str(align).upper() if align is not None else "CENTER"
+            if alignment == "LEFT":
+                text_rect.midleft = position
+            elif alignment == "RIGHT":
+                text_rect.midright = position
+            else:
+                text_rect.center = position
         surface.blit(text_surface, text_rect)
 
     def render_ui_node(self, node, scale_x, scale_y, surface):
@@ -266,6 +273,28 @@ class Renderer2D:
                 (255, 255, 255)
             )
 
+            alignment_value = getattr(node, "text_align", "CENTER")
+            if isinstance(alignment_value, Enum):
+                alignment = alignment_value.value
+            else:
+                alignment = str(alignment_value).upper()
+            padding = getattr(node, "padding", (0, 0, 0, 0))
+            if alignment == "LEFT":
+                text_position = (
+                    rect_x + float(padding[3]),
+                    rect_y + rect_h / 2.0,
+                )
+            elif alignment == "RIGHT":
+                text_position = (
+                    rect_x + rect_w - float(padding[1]),
+                    rect_y + rect_h / 2.0,
+                )
+            else:
+                text_position = (
+                    rect_x + rect_w / 2.0,
+                    rect_y + rect_h / 2.0,
+                )
+
             text = getattr(
                 node,
                 "text",
@@ -274,16 +303,13 @@ class Renderer2D:
 
             self._render_ui_text(
                 text,
-                (
-                    rect_x + rect_w / 2.0,
-                    rect_y + rect_h / 2.0
-                ),
+                text_position,
                 scale_y,
                 surface,
                 _font=node.font.resource_path,
                 _font_size=node.font_size,
                 color=color,
-                center=True
+                align=alignment
             )
 
             return
@@ -523,11 +549,13 @@ class Renderer2D:
             viewport_size = self._viewport_size()
             cam_x, cam_y = self._get_camera_world_position_for_viewport(self.camera, viewport_size)
             zoom = self._get_camera_zoom()
+            scale_x = zoom
+            scale_y = zoom
 
             rect_x = (node.global_position[0] - cam_x + self.camera.offset[0]) * zoom + (viewport_size[0] / 2.0)
             rect_y = (node.global_position[1] - cam_y + self.camera.offset[1]) * zoom + (viewport_size[1] / 2.0)
-            rect_w = max(1, int(getattr(node, "size", (0, 0))[0] * zoom))
-            rect_h = max(1, int(getattr(node, "size", (0, 0))[1] * zoom))
+            rect_w = max(1, int(getattr(node, "size", (0, 0))[0] * abs(scale_x)))
+            rect_h = max(1, int(getattr(node, "size", (0, 0))[1] * abs(scale_y)))
 
             color = getattr(node, "color", (255, 255, 255, 255))
             if color is None or not isinstance(color, (tuple, list)):
@@ -580,10 +608,17 @@ class Renderer2D:
                 camera_offset_centered[1] + 0.0 * zoom,
             )
 
-            if abs(zoom - 1.0) > 0.001:
-                target_w = max(1, int(tex.get_width() * zoom))
-                target_h = max(1, int(tex.get_height() * zoom))
+            scale_x = zoom
+            scale_y = zoom
+
+            if abs(scale_x - 1.0) > 0.001 or abs(scale_y - 1.0) > 0.001:
+                target_w = max(1, int(tex.get_width() * abs(scale_x)))
+                target_h = max(1, int(tex.get_height() * abs(scale_y)))
                 tex = self.pygame.transform.scale(tex, (target_w, target_h))
+                if scale_x < 0 or scale_y < 0:
+                    tex = self.pygame.transform.flip(tex, scale_x < 0, scale_y < 0)
+                if scale_x < 0 or scale_y < 0:
+                    tex = self.pygame.transform.flip(tex, scale_x < 0, scale_y < 0)
 
             self.screen.blit(tex, camera_space_translation)
 
@@ -613,14 +648,17 @@ class Renderer2D:
                 camera_offset_node_position[1] + viewport_size[1] / 2.0
             )
 
+            scale_x = zoom * node.global_scale[0]
+            scale_y = zoom * node.global_scale[1]
+
             camera_space_translation = (
-                camera_offset_centered[0] + node.offset[0] * zoom,
-                camera_offset_centered[1] + node.offset[1] * zoom,
+                camera_offset_centered[0] + node.offset[0] * scale_x,
+                camera_offset_centered[1] + node.offset[1] * scale_y,
             )
 
-            if abs(zoom - 1.0) > 0.001:
-                target_w = max(1, int(tex.get_width() * zoom))
-                target_h = max(1, int(tex.get_height() * zoom))
+            if abs(scale_x - 1.0) > 0.001 or abs(scale_y - 1.0) > 0.001:
+                target_w = max(1, int(tex.get_width() * scale_x))
+                target_h = max(1, int(tex.get_height() * scale_y))
                 tex = self.pygame.transform.scale(tex, (target_w, target_h))
 
             self.screen.blit(tex, camera_space_translation)
@@ -633,6 +671,11 @@ class Renderer2D:
         if tileset is None or not chunked_layers:
             return
 
+        scale_x = node.global_scale[0]
+        scale_y = node.global_scale[1]
+        if scale_x == 0 or scale_y == 0:
+            return
+
         zoom = self._get_camera_zoom()
         viewport_size = self._viewport_size()
         tw, th = tileset.tile_size if hasattr(tileset, "tile_size") else (16, 16)
@@ -641,10 +684,10 @@ class Renderer2D:
         half_w = viewport_size[0] / (2.0 * zoom)
         half_h = viewport_size[1] / (2.0 * zoom)
      
-        view_left = cam_x - half_w - node.global_position[0]
-        view_right = cam_x + half_w - node.global_position[0]
-        view_top = cam_y - half_h - node.global_position[1]
-        view_bottom = cam_y + half_h - node.global_position[1]
+        view_left = (cam_x - half_w - node.global_position[0]) / abs(scale_x)
+        view_right = (cam_x + half_w - node.global_position[0]) / abs(scale_x)
+        view_top = (cam_y - half_h - node.global_position[1]) / abs(scale_y)
+        view_bottom = (cam_y + half_h - node.global_position[1]) / abs(scale_y)
 
         chunk_pixel_w = tw * chunk_size
         chunk_pixel_h = th * chunk_size
@@ -690,19 +733,25 @@ class Renderer2D:
 
                         world_tx, world_ty = node.tile_to_world((tx, ty))
                         
-                        screen_x = (node_x + world_tx - cam_x + self.camera.offset[0]) * zoom + (viewport_size[0] / 2.0)
-                        screen_y = (node_y + world_ty - cam_y + self.camera.offset[1]) * zoom + (viewport_size[1] / 2.0)
+                        screen_x = (node_x + world_tx * scale_x - cam_x + self.camera.offset[0]) * zoom + (viewport_size[0] / 2.0)
+                        screen_y = (node_y + world_ty * scale_y - cam_y + self.camera.offset[1]) * zoom + (viewport_size[1] / 2.0)
 
                         render_texture = texture
-                        if abs(zoom - 1.0) > 0.001:
-                            target_w = max(1, int(texture.get_width() * zoom))
-                            target_h = max(1, int(texture.get_height() * zoom))
+                        final_zoom_x = zoom * abs(scale_x)
+                        final_zoom_y = zoom * abs(scale_y)
+                        
+                        if abs(final_zoom_x - 1.0) > 0.001 or abs(final_zoom_y - 1.0) > 0.001:
+                            target_w = max(1, int(texture.get_width() * final_zoom_x))
+                            target_h = max(1, int(texture.get_height() * final_zoom_y))
                             scaled_key = (id(texture), target_w, target_h)
                             
                             render_texture = scaled_texture_cache.get(scaled_key)
                             if render_texture is None:
                                 render_texture = self.pygame.transform.scale(texture, (target_w, target_h))
                                 scaled_texture_cache[scaled_key] = render_texture
+
+                        if scale_x < 0 or scale_y < 0:
+                            render_texture = self.pygame.transform.flip(render_texture, scale_x < 0, scale_y < 0)
 
                         if is_dim_layer:
                             dim_key = (id(render_texture), int(dim_factor * 1000))

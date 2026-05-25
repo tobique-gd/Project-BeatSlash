@@ -5,11 +5,20 @@ import sys
 import platform
 import subprocess
 import copy
+import warnings
 from collections import deque
 import traceback
 
 import dearpygui.dearpygui as pygui
 import numpy as np
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"pkg_resources is deprecated as an API.*",
+    category=UserWarning,
+    module=r"pygame\.pkgdata",
+)
+
 import pygame
 
 # Run in dummy mode to avoid DPG/Pygame event overlap in the editor process.
@@ -28,6 +37,20 @@ from ..engine.ErrorHandler import ErrorHandler
 def debug(msg):
     print(f"[KodEditor] {msg}")
     sys.stdout.flush()
+
+
+def _merge_settings_dict(target, override):
+    if not isinstance(target, dict) or not isinstance(override, dict):
+        return target
+
+    for key, value in override.items():
+        current = target.get(key)
+        if isinstance(current, dict) and isinstance(value, dict):
+            _merge_settings_dict(current, value)
+            continue
+        target[key] = value
+
+    return target
 
 class EditorSettings:
     def __init__(self):
@@ -76,21 +99,22 @@ class KodEditor:
     def __init__(self):
         ErrorHandler.set_editor_mode(True)
         self.settings = Kod.Settings()
+        self.editor_settings = EditorSettings()
+
+        self._project_directory = self._discover_project_directory()
+        self._load_persistent_settings()
 
         runtime_window_settings = self.settings.project_settings.get("window", {})
         self.runtime_window_settings = {
             "viewport_resolution": tuple(runtime_window_settings.get("viewport_resolution", (640, 360))),
             "internal_viewport_resolution": tuple(runtime_window_settings.get("internal_viewport_resolution", (640, 360))),
         }
-        self.editor_settings = EditorSettings()
 
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        potential_path = os.path.abspath(os.path.join(current_dir, "..", "..", "BeatSlash"))
-        if os.path.exists(potential_path):
-            project_dir = potential_path
-            sys.path.append(os.path.dirname(potential_path))
-
-        self.settings.project_settings["file_management"]["project_directory"] = project_dir
+        project_dir = self.settings.project_settings["file_management"]["project_directory"]
+        self._project_directory = project_dir
+        project_root = os.path.dirname(os.path.dirname(project_dir))
+        if project_root not in sys.path:
+            sys.path.append(project_root)
 
         ResourceServer.ResourceLoader.set_project_root(project_dir)
         self.app = Kod.App(self.settings, editor_mode=True)
@@ -131,6 +155,157 @@ class KodEditor:
         except Exception:
             pass
 
+    def _iter_ancestor_directories(self, start_path):
+        path = os.path.abspath(start_path)
+        while True:
+            yield path
+            parent = os.path.dirname(path)
+            if parent == path:
+                break
+            path = parent
+
+    def _default_project_directory(self):
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "BeatSlash"))
+
+    def _looks_like_project_directory(self, path):
+        if not path:
+            return False
+
+        if not os.path.isdir(path):
+            return False
+
+        return os.path.isdir(os.path.join(path, "assets")) and os.path.isdir(os.path.join(path, "scenes"))
+
+    def _discover_project_directory(self):
+        configured = self.settings.project_settings.get("file_management", {}).get("project_directory")
+        if self._looks_like_project_directory(configured):
+            return os.path.abspath(configured)
+
+        search_roots = [os.getcwd(), os.path.dirname(os.path.abspath(__file__))]
+        for root in search_roots:
+            for ancestor in self._iter_ancestor_directories(root):
+                persistent_dir = os.path.join(ancestor, ".project.kod")
+                if os.path.isdir(persistent_dir):
+                    return os.path.abspath(ancestor)
+
+        return self._default_project_directory()
+
+    def _project_data_dir(self):
+        project_directory = self._project_directory or self.settings.project_settings["file_management"].get("project_directory")
+        if not project_directory:
+            project_directory = self._discover_project_directory()
+        return os.path.join(os.path.abspath(project_directory), ".project.kod")
+
+    def _project_settings_path(self):
+        return os.path.join(self._project_data_dir(), "project_settings.json")
+
+    def _editor_settings_path(self):
+        return os.path.join(self._project_data_dir(), "editor_settings.json")
+
+    def _editor_state_path(self):
+        return os.path.join(self._project_data_dir(), "editor_state.json")
+
+    def _load_settings_file(self, path):
+        if not os.path.exists(path):
+            return None
+
+        try:
+            with open(path, "r", encoding="utf-8") as file_handle:
+                return json.load(file_handle)
+        except Exception:
+            return None
+
+    def _save_settings_file(self, path, data):
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as file_handle:
+                json.dump(data, file_handle, indent=2)
+            return True
+        except Exception:
+            return False
+
+    def _load_persistent_settings(self):
+        project_settings = self._load_settings_file(self._project_settings_path())
+        if project_settings is None:
+            legacy_project_settings_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")), ".kod_project_settings.json")
+            project_settings = self._load_settings_file(legacy_project_settings_path)
+
+        if isinstance(project_settings, dict):
+            _merge_settings_dict(self.settings.project_settings, project_settings)
+
+        editor_settings = self._load_settings_file(self._editor_settings_path())
+        if editor_settings is None:
+            legacy_editor_settings_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")), ".kod_editor_settings.json")
+            editor_settings = self._load_settings_file(legacy_editor_settings_path)
+
+        if isinstance(editor_settings, dict):
+            _merge_settings_dict(self.editor_settings.editor_settings, editor_settings)
+
+        project_dir = self.settings.project_settings.setdefault("file_management", {}).get("project_directory")
+        if self._looks_like_project_directory(project_dir):
+            resolved_project_dir = os.path.abspath(project_dir)
+        else:
+            resolved_project_dir = self._discover_project_directory()
+
+        self.settings.project_settings["file_management"]["project_directory"] = resolved_project_dir
+        self._project_directory = resolved_project_dir
+
+        self._normalize_project_settings_paths()
+
+    def _normalize_project_settings_paths(self):
+        project_dir = self.settings.project_settings.get("file_management", {}).get("project_directory")
+        if not project_dir:
+            return
+
+        runtime_settings = self.settings.project_settings.get("project", {})
+        main_scene = runtime_settings.get("main_scene_path")
+        if not main_scene or not isinstance(main_scene, str):
+            return
+
+        project_dir = os.path.abspath(project_dir)
+        main_scene = os.path.normpath(main_scene)
+
+        if os.path.isabs(main_scene):
+            try:
+                if os.path.commonpath([project_dir, main_scene]) == project_dir:
+                    runtime_settings["main_scene_path"] = os.path.relpath(main_scene, project_dir)
+            except Exception:
+                return
+            return
+
+        legacy_prefix = os.path.join("src", "BeatSlash") + os.sep
+        if main_scene.startswith(legacy_prefix):
+            runtime_settings["main_scene_path"] = main_scene[len(legacy_prefix):]
+
+    def save_settings(self):
+        project_settings = copy.deepcopy(self.settings.project_settings)
+        project_directory = project_settings.setdefault("file_management", {}).get("project_directory")
+        if project_directory:
+            project_directory = os.path.abspath(project_directory)
+            project_settings["file_management"]["project_directory"] = project_directory
+            self._project_directory = project_directory
+
+        runtime_settings = project_settings.get("project", {})
+        main_scene = runtime_settings.get("main_scene_path")
+        if project_directory and isinstance(main_scene, str):
+            main_scene = os.path.normpath(main_scene)
+            if os.path.isabs(main_scene):
+                try:
+                    if os.path.commonpath([project_directory, main_scene]) == project_directory:
+                        runtime_settings["main_scene_path"] = os.path.relpath(main_scene, project_directory)
+                except Exception:
+                    pass
+
+        self._save_settings_file(self._project_settings_path(), project_settings)
+        self._save_settings_file(self._editor_settings_path(), self.editor_settings.editor_settings)
+
+        try:
+            ResourceServer.ResourceLoader.set_project_root(
+                self.settings.project_settings["file_management"]["project_directory"]
+            )
+        except Exception:
+            pass
+
     def _screen_to_world(self, screen_x, screen_y):
         zoom = self._get_camera_zoom()
         return (
@@ -161,12 +336,6 @@ class KodEditor:
         except Exception:
             return
         self.camera.zoom = max(self.min_zoom, min(self.max_zoom, value))
-        if getattr(self, "_restoring_state", False):
-            return
-        try:
-            self._save_editor_state()
-        except Exception:
-            pass
 
     def to_relative_path(self, path_str):
         if not isinstance(path_str, str):
@@ -435,6 +604,9 @@ class KodEditor:
             self.app.internal_surface = new_surface
             self.app.renderer.screen = new_surface
 
+        self.runtime_window_settings["viewport_resolution"] = (self.display_width, self.display_height)
+        self.runtime_window_settings["internal_viewport_resolution"] = (self.width, self.height)
+
         return True, internal_changed
 
     def queue_command(self, command_type, **payload):
@@ -488,13 +660,7 @@ class KodEditor:
             ErrorHandler.throw_error(f"Error occured loading scene: {scene_path}, {e}")
 
     def _state_file_path(self):
-        try:
-            project_directory = self.settings.project_settings["file_management"].get("project_directory")
-            if not project_directory:
-                return os.path.abspath(".kod_editor_state.json")
-            return os.path.join(os.path.abspath(project_directory), ".kod_editor_state.json")
-        except Exception:
-            return os.path.abspath(".kod_editor_state.json")
+        return self._editor_state_path()
 
     def _load_editor_state(self):
         path = self._state_file_path()
@@ -509,6 +675,20 @@ class KodEditor:
             last_scene = data.get("last_opened_scene")
             saved_tabs = data.get("open_scene_tabs") or []
             saved_active = data.get("active_scene_path")
+            
+            window_width = data.get("window_width")
+            window_height = data.get("window_height")
+            window_pos = data.get("window_pos")
+
+            if window_width and window_height:
+                try:
+                    if pygui.is_viewport_ok():
+                        pygui.set_viewport_width(int(window_width))
+                        pygui.set_viewport_height(int(window_height))
+                        if window_pos and len(window_pos) == 2:
+                            pygui.set_viewport_pos(window_pos)
+                except Exception:
+                    pass
 
             if last_zoom is not None:
                 try:
@@ -554,6 +734,15 @@ class KodEditor:
     def _save_editor_state(self):
         path = self._state_file_path()
         data = {}
+        
+        try:
+            if pygui.is_viewport_ok():
+                data["window_width"] = pygui.get_viewport_width()
+                data["window_height"] = pygui.get_viewport_height()
+                data["window_pos"] = pygui.get_viewport_pos()
+        except Exception:
+            pass
+            
         try:
             data["last_zoom"] = self._get_camera_zoom()
         except Exception:
@@ -659,19 +848,13 @@ class KodEditor:
             if current_scene and current_path:
                 self.save_scene(scene=current_scene, scene_path=current_path)
 
-            main_scene_file_path = self.app.configuration.project_settings["runtime"]["main_scene_path"]
+            main_scene_file_path = self.app.configuration.project_settings["project"]["main_scene_path"]
             self.run_scene(main_scene_file_path)
         except Exception as e:
             ErrorHandler.throw_error(f"Failed to run project: {e}")
 
     def _runtime_project_settings(self):
-        
-        runtime_settings = copy.deepcopy(self.settings.project_settings)
-        runtime_window = runtime_settings.setdefault("window", {})
-        runtime_window["viewport_resolution"] = tuple(self.runtime_window_settings["viewport_resolution"])
-        
-        
-        return runtime_settings
+        return copy.deepcopy(self.settings.project_settings)
 
     def drag_file(self):
         pass
@@ -721,6 +904,8 @@ class KodEditor:
                 self.ui.dialogs.show_settings_window(self.editor_settings.editor_settings, "Editor Settings")
             case EditorCommandType.OPEN_PROJECT_SETTINGS:
                 self.ui.dialogs.show_settings_window(self.app.configuration.project_settings, "Project Settings")
+            case EditorCommandType.OPEN_EXPORT:
+                self.ui.dialogs.show_export_window()
 
             case EditorCommandType.COPY_NODE:
                 self.ui.state.copied_node_data = None
@@ -883,6 +1068,8 @@ class KodEditor:
             self._run_editor_frame(delta)
             pygui.render_dearpygui_frame()
 
+        self._save_editor_state()
+        self.save_settings()
         pygui.destroy_context()
 
 def main():
