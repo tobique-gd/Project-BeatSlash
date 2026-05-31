@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath("../src"))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'engine'
+project = 'KodEngine'
 copyright = '2026, Author'
 author = 'Author'
 

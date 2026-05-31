@@ -1,10 +1,10 @@
-.. engine documentation master file, created by
+.. KodEngine master file, created by
    sphinx-quickstart on Sun May 31 15:39:15 2026.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-engine documentation
-====================
+KodEngine
+=========
 
 Add your content using ``reStructuredText`` syntax. See the
 `reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
