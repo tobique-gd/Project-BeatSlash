@@ -1,7 +1,15 @@
 import math
 import random
 
+from KodEngine.engine import Globals
 from ..common import mathlib
+
+
+def _lerp_rgb(start, end, t):
+    return tuple(
+        start[index] + (end[index] - start[index]) * t
+        for index in range(3)
+    )
 
 
 class EnemyState:
@@ -121,6 +129,15 @@ class RobuEnemyController:
         self.player_detect_area = None
         self.bullet_scene = self.node.preload("scenes/bullet.kscn")
         self.player = None
+        self.health = 3
+        self.dead = False
+        self.hit_flash_time = 0.0
+        self.hit_flash_duration = 0.16
+        self.death_time = 0.0
+        self.base_velocity = (0.0, 0.0)
+        self.knockback_velocity = (0.0, 0.0)
+        self.knockback_decay_rate = 18.0
+        self.knockback_strength = 3.0
 
         self.search_speed = 25.0
         self.chase_speed = 50.0
@@ -151,6 +168,24 @@ class RobuEnemyController:
         self.current_state.on_enter()
 
     def _process(self, delta):
+        self._frame_delta = delta
+        if self.hit_flash_time > 0.0:
+            self.hit_flash_time = max(0.0, self.hit_flash_time - delta)
+            if self.animated_sprite is not None:
+                flash_t = self.hit_flash_time / self.hit_flash_duration if self.hit_flash_duration > 0.0 else 0.0
+                self.animated_sprite.tint = _lerp_rgb((1.0, 1.0, 1.0), (2.0, 2.0, 2.0), flash_t)
+        elif self.animated_sprite is not None:
+            self.animated_sprite.tint = (1.0, 1.0, 1.0)
+
+        if self.dead:
+            self.base_velocity = (0.0, 0.0)
+            self._apply_motion(delta)
+
+            self.death_time -= delta
+            if self.death_time <= 0.0:
+                self._die()
+            return
+
         new_state = self.current_state.update(delta)
         if new_state is not None:
             self._switch_state(new_state)
@@ -185,11 +220,36 @@ class RobuEnemyController:
         return None
 
     def move(self, direction, speed, delta):
-        self.node.velocity = (direction[0] * speed * delta, direction[1] * speed * delta)
-        self.node.move_and_slide()
+        self.base_velocity = (direction[0] * speed * delta, direction[1] * speed * delta)
+        self._apply_motion(delta)
 
     def stop(self):
-        self.node.velocity = (0, 0)
+        self.base_velocity = (0.0, 0.0)
+        self._apply_motion(getattr(self, "_frame_delta", 0.0))
+
+    def _apply_motion(self, delta):
+        self.node.velocity = (
+            self.base_velocity[0] + self.knockback_velocity[0],
+            self.base_velocity[1] + self.knockback_velocity[1],
+        )
+        self.node.move_and_slide()
+
+        decay_t = min(1.0, max(0.0, delta * self.knockback_decay_rate))
+        self.knockback_velocity = (
+            self.knockback_velocity[0] + ((0.0 - self.knockback_velocity[0]) * decay_t),
+            self.knockback_velocity[1] + ((0.0 - self.knockback_velocity[1]) * decay_t),
+        )
+
+    def add_knockback(self, direction, amount=None):
+        direction = mathlib.normalized(direction)
+        if direction == (0, 0):
+            direction = (1.0, 0.0)
+
+        knockback_amount = self.knockback_strength if amount is None else float(amount)
+        self.knockback_velocity = (
+            self.knockback_velocity[0] + (direction[0] * knockback_amount),
+            self.knockback_velocity[1] + (direction[1] * knockback_amount),
+        )
 
     def face_direction(self, direction):
         if self.animated_sprite is None:
@@ -292,6 +352,32 @@ class RobuEnemyController:
         if getattr(body, "name", None) == "Player":
             self.player = None
             self._switch_state(SearchState(self))
+
+    def take_damage(self, amount, knockback_direction=None, knockback_amount=None):
+
+        self.health -= int(amount)
+        self.hit_flash_time = self.hit_flash_duration
+
+        if knockback_direction is not None:
+            self.add_knockback(knockback_direction, knockback_amount)
+
+        if self.health <= 0:
+            self.dead = True
+            self.death_time = self.hit_flash_duration
+            self.base_velocity = (0.0, 0.0)
+
+    def _die(self):
+        if self.dead:
+            try:
+                self.node.queue_free()
+            except Exception:
+                pass
+            return
+
+        try:
+            self.node.queue_free()
+        except Exception:
+            pass
 
 
 SCRIPT_CLASS = RobuEnemyController

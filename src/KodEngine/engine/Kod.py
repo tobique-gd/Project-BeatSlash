@@ -22,7 +22,10 @@ from . import Globals
 
 
 class Settings:
+    """Default project and editor configuration container."""
+
     def __init__(self) -> None:
+        """Populate default runtime and project settings."""
         project_directory = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "..", "BeatSlash")
         )
@@ -47,14 +50,28 @@ class Settings:
             "runtime" : {
                 "FPS" : 240
             },
-            "debug": {"default_background_color": (50, 50, 50)}
+            "debug": {
+                "default_background_color": (50, 50, 50),
+                "show_collision_shapes_runtime": False,
+            }
 
         }
 
         self.editor_settings = {}
 
 class App:
+    """Main application runner for the engine runtime and editor."""
+
     def __init__(self, _configuration: Settings, editor_mode = False):
+        """Create the application and initialize pygame.
+
+        Parameters
+        ----------
+        _configuration:
+            Project settings container.
+        editor_mode:
+            When ``True``, the app runs without a visible runtime window.
+        """
         pygame.init()
         pygame.font.init()
 
@@ -82,6 +99,7 @@ class App:
 
         self.clock = pygame.time.Clock()
         self.debug_renderer: Any | None = None
+        self.time_scale = 1.0
         self.renderer = RenderingServer.Renderer2D(
             self.configuration,
             pygame,
@@ -102,6 +120,15 @@ class App:
 
     #handling resizing of window since pygame doesnt do it automatically
     def handle_resize(self, size, persist_project_resolution=True):
+        """Update the runtime viewport and optionally persist it to settings.
+
+        Parameters
+        ----------
+        size:
+            New window size.
+        persist_project_resolution:
+            When ``True``, store the updated size in project settings.
+        """
         width = max(1, int(size[0]))
         height = max(1, int(size[1]))
 
@@ -114,6 +141,7 @@ class App:
             self.screen = current_surface
 
     def _create_runtime_window(self, resolution):
+        """Create the runtime window with platform-specific vsync handling."""
         # macOS vsync causes FPS throttling when window loses focus (dock visibility).
         # Use clock.tick() instead for reliable frame limiting independent of focus.
         if platform.system() == "Darwin":
@@ -125,6 +153,7 @@ class App:
             return pygame.display.set_mode(resolution, pygame.RESIZABLE)
 
     def _present_internal_surface(self):
+        """Scale the internal surface to the output window and present it."""
         internal_w, internal_h, integer_scale, offset_x, offset_y, target_w, target_h = self._calculate_present_transform()
         if internal_w <= 0 or internal_h <= 0:
             return
@@ -133,6 +162,13 @@ class App:
         self.screen.blit(self.scaled_surface, (offset_x, offset_y))
 
     def _calculate_present_transform(self):
+        """Compute integer scaling and centering for the editor presentation.
+
+        Returns
+        -------
+        tuple[int, int, int, int, int, int, int]
+            Internal size, integer scale, offsets, and target size.
+        """
         internal_w, internal_h = self.base_internal_resolution
         output_w, output_h = self.screen.get_size() if self.screen else self.resolution
 
@@ -151,6 +187,7 @@ class App:
         return (internal_w, internal_h, integer_scale, offset_x, offset_y, target_w, target_h)
 
     def _window_to_internal_pos(self, pos):
+        """Convert a window-space mouse position into internal coordinates."""
         internal_w, internal_h, integer_scale, offset_x, offset_y, _, _ = self._calculate_present_transform()
         if internal_w <= 0 or internal_h <= 0:
             return pos
@@ -160,6 +197,13 @@ class App:
         return (x, y)
 
     def _calculate_cover_transform(self, output_w, output_h):
+        """Compute cover scaling for runtime presentation.
+
+        Returns
+        -------
+        tuple[float, float, int, int, int, int]
+            Scale factors, offsets, and target size.
+        """
         internal_w, internal_h = self.internal_resolution
         if internal_w <= 0 or internal_h <= 0 or output_w <= 0 or output_h <= 0:
             return (1.0, 1.0, 0, 0, output_w, output_h)
@@ -172,6 +216,7 @@ class App:
         return (scale, scale, offset_x, offset_y, target_w, target_h)
 
     def _normalize_event_to_internal_space(self, event):
+        """Map mouse events from window space into internal render space."""
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
             return event
 
@@ -211,6 +256,7 @@ class App:
         
 
     def set_scene(self, scene):
+        """Swap the active scene and run enter/ready hooks as needed."""
         if self.current_scene and getattr(self.current_scene, "root", None):
             try:
                 self.current_scene.root.on_exit()
@@ -232,9 +278,11 @@ class App:
                 pass
 
     def set_camera(self, camera: Nodes.Camera2D):
+        """Set the active camera used for rendering."""
         self.current_camera = camera
 
     def find_camera_in_scene(self, node):
+        """Recursively search a node tree for the active camera."""
         if isinstance(node, Nodes.Camera2D) and node.current == True:
             return node
 
@@ -246,6 +294,7 @@ class App:
         return None
 
     def resolve_camera(self):
+        """Return the active camera or the fallback camera."""
         if self.current_camera:
             return self.current_camera
 
@@ -257,6 +306,7 @@ class App:
         return self.fallback_camera
 
     def resolve_editor_events(self, events):
+        """Handle editor-level events and forward them to the current scene."""
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
@@ -269,11 +319,19 @@ class App:
                 self.current_scene._input(scene_event)
 
     def calculate_delta(self, last_frame_time):
+        """Compute frame delta time from the previous tick timestamp."""
         now = pygame.time.get_ticks()
         delta = (now - last_frame_time) / 1000.0
-        return delta
+        return delta * float(self.time_scale)
 
     def distribute_node_buckets(self):
+        """Split the current scene into rendering, physics, and UI buckets.
+
+        Returns
+        -------
+        dict[str, list]
+            Node buckets keyed by ``rendering``, ``physics``, and ``ui``.
+        """
         buckets = {
             "rendering": [],
             "physics": [],
@@ -309,6 +367,7 @@ class App:
         return buckets
 
     def run(self):
+        """Run the main application loop until the app is stopped."""
         if not self.screen or not self.current_scene:
             return
 
@@ -320,23 +379,25 @@ class App:
             now = pygame.time.get_ticks()
             delta = (now - last_frame_time) / 1000.0
             last_frame_time = now
+            scaled_delta = delta * float(self.time_scale)
 
             self.current_scene._process_ui(self.internal_resolution)
             self.resolve_editor_events(pygame.event.get())
 
-            self.current_scene._process(delta)
+            self.current_scene._process(scaled_delta)
             self.node_buckets = self.distribute_node_buckets()
             camera = self.resolve_camera()
 
             self.physics_solver.physics_process(
                 self.node_buckets["physics"],
-                delta
+                scaled_delta
             )
 
             self.renderer.render_frame(
                 self.current_scene,
                 camera,
-                self.node_buckets["rendering"]
+                self.node_buckets["rendering"],
+                self.node_buckets["physics"]
             )
 
             viewport_size = self.configuration.project_settings["window"]["viewport_resolution"] 
@@ -370,5 +431,6 @@ class App:
 
 
     def kill(self):
+        """Request shutdown of the main application loop."""
         self.running = False
         self._shutdown_requested = True

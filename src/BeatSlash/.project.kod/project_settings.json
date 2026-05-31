@@ -27,6 +27,7 @@
       50,
       50,
       50
-    ]
+    ],
+    "show_collision_shapes_runtime": false
   }
 }

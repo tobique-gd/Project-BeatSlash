@@ -5,6 +5,14 @@ class MenuBar:
     def __init__(self, ui) -> None:
         self.ui = ui
 
+    def _set_runtime_collision_shapes_visible(self, _sender=None, value=False):
+        debug_settings = self.ui.app.configuration.project_settings.setdefault("debug", {})
+        debug_settings["show_collision_shapes_runtime"] = bool(value)
+        try:
+            self.ui.editor.save_settings()
+        except Exception:
+            pass
+
     def _get_scene_display_text(self):
         if not self.ui.app.current_scene:
             return "No Scene Loaded"
@@ -24,6 +32,13 @@ class MenuBar:
                 with pygui.menu(label="Edit"):
                     pygui.add_menu_item(label="Editor Settings", callback=lambda: self.ui.editor.queue_command(EditorCommandType.OPEN_EDITOR_SETTINGS))
                     pygui.add_menu_item(label="Project Settings", callback=lambda: self.ui.editor.queue_command(EditorCommandType.OPEN_PROJECT_SETTINGS))
+                with pygui.menu(label="Debug"):
+                    pygui.add_checkbox(
+                        label="Show collision shapes in runtime",
+                        default_value=bool(self.ui.app.configuration.project_settings.get("debug", {}).get("show_collision_shapes_runtime", False)),
+                        callback=self._set_runtime_collision_shapes_visible,
+                        tag="menu_debug_show_collision_shapes_runtime",
+                    )
                 with pygui.menu(label="Project"):
                     pygui.add_menu_item(label="Export", callback=lambda: self.ui.editor.queue_command(EditorCommandType.OPEN_EXPORT))
 

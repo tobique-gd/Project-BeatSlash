@@ -5,11 +5,27 @@ from . import Nodes
 
 class PhysicsSolver2D:
     def __init__(self, configuration) -> None:
+        """Create the physics solver.
+
+        Parameters
+        ----------
+        configuration:
+            Project settings container used for solver configuration.
+        """
         self.substeps = configuration.project_settings["physics"]["physics_substeps"]
         self.delta = 0.0
         self.physics_bodies = []
 
     def physics_process(self, physics_bodies, delta):
+        """Advance physics for a frame using substep resolution.
+
+        Parameters
+        ----------
+        physics_bodies:
+            Sequence of bodies to simulate.
+        delta:
+            Frame delta time in seconds.
+        """
         self.physics_bodies = physics_bodies or []
         if self.substeps <= 0:
             self.substeps = 1
@@ -26,12 +42,15 @@ class PhysicsSolver2D:
         self.resolve_area_overlaps()
 
     def _is_moving_body(self, body):
+        """Return whether a body should be integrated by the solver."""
         return isinstance(body, (Nodes.DynamicBody2D, Nodes.KinematicBody2D))
 
     def _is_solid_body(self, body):
+        """Return whether a body participates as a solid collider."""
         return isinstance(body, (Nodes.StaticBody2D, Nodes.DynamicBody2D, Nodes.KinematicBody2D))
 
     def _get_rect_shapes(self, body):
+        """Return rectangle collision shapes attached to a body."""
         if body is None:
             return []
         try:
@@ -40,12 +59,14 @@ class PhysicsSolver2D:
             return []
 
     def _get_shape_world_position(self, body, shape):
+        """Return the world-space position of a collision shape."""
         return (
             body.global_position[0] + shape.position[0],
             body.global_position[1] + shape.position[1],
         )
 
     def _layers_match(self, a, b):
+        """Return whether two nodes' collision layers and masks overlap."""
         try:
             def to_masks(obj):
                 layer_vals = getattr(obj, "collision_layers", None)
@@ -89,6 +110,7 @@ class PhysicsSolver2D:
             return False
 
     def check_collision_pair(self, body1, shape1, body2, shape2):
+        """Return whether two rectangle collision shapes overlap."""
         pos1 = self._get_shape_world_position(body1, shape1)
         pos2 = self._get_shape_world_position(body2, shape2)
 
@@ -100,6 +122,7 @@ class PhysicsSolver2D:
         )
 
     def _get_mtv(self, body, shape, other, other_shape):
+        """Return the minimum translation vector for a rectangle overlap."""
         pos1 = self._get_shape_world_position(body, shape)
         pos2 = self._get_shape_world_position(other, other_shape)
 
@@ -120,6 +143,7 @@ class PhysicsSolver2D:
         return overlap_x, overlap_y
 
     def resolve_physics_step_x(self, body):
+        """Resolve horizontal movement and collisions for a body."""
         if body is None or not self._is_moving_body(body):
             return
 
@@ -154,6 +178,7 @@ class PhysicsSolver2D:
                                 body.velocity = (0, body.velocity[1])
 
     def resolve_physics_step_y(self, body):
+        """Resolve vertical movement and collisions for a body."""
         if body is None or not self._is_moving_body(body):
             return
 
@@ -189,6 +214,7 @@ class PhysicsSolver2D:
                                 body.velocity = (body.velocity[0], 0)
 
     def _has_any_shape_overlap(self, body, other):
+        """Return whether any attached shapes overlap between two nodes."""
         body_shapes = self._get_rect_shapes(body)
         if not body_shapes:
             return False
@@ -205,6 +231,7 @@ class PhysicsSolver2D:
         return False
 
     def _emit_overlap_transition_signals(self, area, previous_nodes, current_nodes, entered_signal, exited_signal):
+        """Emit area enter/exit signals for overlap state changes."""
         previous_set = set(previous_nodes)
         current_set = set(current_nodes)
 
@@ -215,6 +242,7 @@ class PhysicsSolver2D:
             area.emit_signal(exited_signal, node)
 
     def resolve_area_overlaps(self):
+        """Update area overlap caches and emit transition signals."""
         area_nodes = [
             node for node in self.physics_bodies
             if isinstance(node, Nodes.Area2D)

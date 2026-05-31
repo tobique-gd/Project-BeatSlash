@@ -5,13 +5,17 @@ from pygame.transform import scale
 from . import Resources
 import pygame
 import os
+import math
 from . import ResourceServer
 from .ErrorHandler import ErrorHandler
 from enum import Enum
 from . import Globals
 
 class Node:
+    """Base node for the engine scene tree."""
+
     def __init__(self) -> None:
+        """Create a node with default tree, signal, and script state."""
         self.name = self.__class__.__name__
         self._children = []
         self._parent: 'Node | None' = None
@@ -25,6 +29,28 @@ class Node:
         self._next_signal_connection_id = 1
 
     def connect(self, signal, callback=None, target=None, method=None, oneshot=False, allow_duplicate=False):
+        """Connect a signal to a callback or method.
+
+        Parameters
+        ----------
+        signal:
+            Signal name to connect.
+        callback:
+            Callable or method name to invoke.
+        target:
+            Optional explicit target object for method callbacks.
+        method:
+            Optional method name override.
+        oneshot:
+            When ``True``, remove the connection after the first emit.
+        allow_duplicate:
+            When ``True``, permit duplicate connections.
+
+        Returns
+        -------
+        int | None
+            Connection id when successful, otherwise ``None``.
+        """
         callback_fn = None
         method_name = None
 
@@ -80,6 +106,13 @@ class Node:
         return connection_id
 
     def disconnect(self, connection_id: int):
+        """Remove a signal connection by id.
+
+        Returns
+        -------
+        bool
+            ``True`` when the connection was removed.
+        """
         for signal_name, connections in list(self._signal_connections.items()):
             for idx, connection in enumerate(connections):
                 if connection.get("id") == connection_id:
@@ -90,6 +123,13 @@ class Node:
         return False
 
     def disconnect_signal(self, signal, callback=None, target=None, method=None):
+        """Remove all matching connections for a signal.
+
+        Returns
+        -------
+        int
+            Number of removed connections.
+        """
         if signal not in self._signal_connections:
             return 0
 
@@ -108,11 +148,24 @@ class Node:
         return removed
 
     def get_signal_connections(self, signal=None):
+        """Return signal connection metadata.
+
+        Parameters
+        ----------
+        signal:
+            Optional signal name to filter by.
+
+        Returns
+        -------
+        list | dict
+            Connections for one signal or all connections grouped by signal.
+        """
         if signal is not None:
             return list(self._signal_connections.get(signal, []))
         return {name: list(connections) for name, connections in self._signal_connections.items()}
 
     def _signal_connection_matches(self, connection, callback=None, target=None, method=None):
+        """Return whether a stored connection matches the provided filter."""
         expected_method = method
         expected_callback = callback
 
@@ -126,6 +179,7 @@ class Node:
         return callback_matches and method_matches and target_matches
 
     def _invoke_signal_target_method(self, target, method_name: str, *args, **kwargs):
+        """Invoke a named method on a signal target when possible."""
         script_proxy_call = getattr(target, "_call", None)
         script_proxy_module = getattr(target, "_module", None)
         if callable(script_proxy_call) and script_proxy_module is not None and hasattr(script_proxy_module, method_name):
@@ -144,6 +198,18 @@ class Node:
         return False
 
     def change_scene_to(self, scene_path):
+        """Load a scene and make it the active scene.
+
+        Parameters
+        ----------
+        scene_path:
+            Path to the scene file.
+
+        Returns
+        -------
+        bool
+            ``True`` when the scene switch succeeds.
+        """
         if not scene_path:
             ErrorHandler.throw_warning(f"change_scene_to() called on node '{self.name}' without a scene path")
             return False
@@ -163,6 +229,13 @@ class Node:
         return True
 
     def quit(self):
+        """Request application shutdown.
+
+        Returns
+        -------
+        bool
+            ``True`` when an active app was found and marked for exit.
+        """
         app = getattr(Globals, "APP", None)
         if app is None:
             ErrorHandler.throw_warning(f"quit() called on node '{self.name}' but no active app is available")
@@ -172,6 +245,13 @@ class Node:
         return True
 
     def _invoke_signal_connection(self, connection, *args, **kwargs):
+        """Invoke one stored signal connection.
+
+        Returns
+        -------
+        bool
+            ``True`` when a callable or target method was executed.
+        """
         callback = connection.get("callback")
         if callable(callback):
             callback(*args, **kwargs)
@@ -200,6 +280,7 @@ class Node:
         return False
     
     def preload(self, scene_path: str):
+        """Load a scene without making it the active scene."""
         resolved_scene_path = ResourceServer.ResourceLoader.resolve_path(scene_path)
         scene = ResourceServer.SceneLoader.load(resolved_scene_path)
         if scene is None:
@@ -208,10 +289,18 @@ class Node:
         return scene
     
     def instantiate(self, scene):
+        """Return the root node of a loaded scene."""
         return scene.root if scene else None
         
 
     def emit_signal(self, signal, *args, **kwargs):
+        """Emit a signal and invoke all matching connections.
+
+        Returns
+        -------
+        int
+            Number of callbacks that were successfully called.
+        """
         callbacks = list(self._signal_connections.get(signal, []))
         oneshot_to_remove = []
         called_count = 0
@@ -238,6 +327,7 @@ class Node:
         return called_count
 
     def _on_enter(self):
+        """Propagate enter notifications to child nodes."""
         for child in getattr(self, "_children", []):
             try:
                 child._on_enter()
@@ -245,6 +335,7 @@ class Node:
                 pass
 
     def on_exit(self):
+        """Propagate exit notifications to child nodes."""
         for child in getattr(self, "_children", []):
             try:
                 child.on_exit()
@@ -252,6 +343,7 @@ class Node:
                 pass
 
     def add_child(self, _node):
+        """Attach a child node to this node."""
         self._children.append(_node)
         _node._parent = self
 
@@ -263,20 +355,24 @@ class Node:
                 pass
 
     def remove_child(self, _node):
+        """Detach a child node from this node."""
         if _node in self._children:
             _node._parent = None
             self._children.remove(_node)
     
     def queue_free(self):
+        """Mark the node for deferred deletion."""
         self._queued_for_deletion = True
     
     def clone(self):
+        """Create a serialized copy of the node tree."""
         data = ResourceServer.SceneLoader.serialize_node(self)
         data_copy = data.copy()
         des = ResourceServer.SceneLoader.deserialize_node(data_copy)
         return des
 
     def get_node(self, _path_to_child: str):
+        """Resolve a descendant by slash-separated path."""
         parts = _path_to_child.split("/")
         current_node = self
         for part in parts:
@@ -291,11 +387,13 @@ class Node:
         return current_node
     
     def get_child(self, index: int):
+        """Return the child at ``index`` or ``None`` when out of range."""
         if index < 0 or index >= len(self._children):
             return None
         return self._children[index]
 
     def get_nodes_by_type(self, node_type):
+        """Return all direct children that match ``node_type``."""
         found_nodes = []
         for child in self._children:
             if isinstance(child, node_type):
@@ -304,9 +402,11 @@ class Node:
         return found_nodes
 
     def set_script(self, module_name: str):
+        """Assign a script resource or script path to the node."""
         self.script = module_name
 
     def reparent_to(self, new_parent: 'Node'):
+        """Move the node under a new parent."""
         if self._parent is not None:
             self._parent.remove_child(self)
         new_parent.add_child(self)
@@ -340,15 +440,19 @@ class Node:
 
     
     def _update(self, _delta):
+        """Per-frame update hook for subclasses."""
         pass
 
     def editor_update(self, delta):
+        """Editor-only update hook for subclasses."""
         pass
 
     def _input(self, _event):
+        """Input hook for subclasses."""
         pass
 
     def save_data(self) -> dict:
+        """Serialize node state into a dictionary."""
         data = {}
 
         for name, value in vars(self).items():
@@ -367,6 +471,7 @@ class Node:
         return data
 
     def load_data(self, data: dict):
+        """Load node state from serialized data."""
         for name, value in data.items():
             if hasattr(self, name):
                 try:
@@ -382,7 +487,10 @@ class Node:
 
 
 class Node2D(Node):
+    """Base node type with 2D transform state."""
+
     def __init__(self) -> None:
+        """Create a 2D node with default transform values."""
         super().__init__()
         self.position: tuple[float, float] = (0, 0)
         self.rotation: float = 0.0
@@ -390,13 +498,66 @@ class Node2D(Node):
         self.z_index = 0
         self.visible = True
 
+    @staticmethod
+    def _coerce_rotation_value(value) -> float:
+        """Convert a rotation-like value to a float in degrees."""
+        if isinstance(value, (list, tuple)):
+            if not value:
+                return 0.0
+            value = value[0]
+
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+
+    def load_data(self, data: dict):
+        """Load transform state from serialized data."""
+        super().load_data(data)
+        self.rotation = self._coerce_rotation_value(self.rotation)
+
+    @staticmethod
+    def _rotate_point(point: tuple[float, float], angle_degrees: float) -> tuple[float, float]:
+        """Rotate a 2D point around the origin by ``angle_degrees``."""
+        radians = math.radians(float(angle_degrees))
+        cos_angle = math.cos(radians)
+        sin_angle = math.sin(radians)
+        x, y = float(point[0]), float(point[1])
+        return (
+            (x * cos_angle) - (y * sin_angle),
+            (x * sin_angle) + (y * cos_angle),
+        )
+
+    @staticmethod
+    def _safe_divide(point: tuple[float, float], scale: tuple[float, float]) -> tuple[float, float]:
+        """Divide a point by scale values while avoiding division by zero."""
+        scale_x = float(scale[0]) if len(scale) > 0 else 1.0
+        scale_y = float(scale[1]) if len(scale) > 1 else 1.0
+        return (
+            point[0] / scale_x if scale_x not in (0.0, -0.0) else point[0],
+            point[1] / scale_y if scale_y not in (0.0, -0.0) else point[1],
+        )
+
+
+
     @property
     def global_position(self):
         if self._parent is None:
             return self.position
         if isinstance(self._parent, Node2D):
-            p = self._parent.global_position
-            return (self.position[0] + p[0], self.position[1] + p[1])
+            parent_position = self._parent.global_position
+            parent_rotation = self._coerce_rotation_value(self._parent.global_rotation)
+            parent_scale = getattr(self._parent, "global_scale", (1, 1))
+            scaled_position = self._safe_divide(self.position, (1.0, 1.0))
+            scaled_position = (
+                scaled_position[0] * float(parent_scale[0]),
+                scaled_position[1] * float(parent_scale[1]),
+            )
+            rotated_position = self._rotate_point(scaled_position, parent_rotation)
+            return (
+                parent_position[0] + rotated_position[0],
+                parent_position[1] + rotated_position[1],
+            )
         return self.position
 
 
@@ -406,7 +567,15 @@ class Node2D(Node):
             self.position = value
         elif isinstance(self._parent, Node2D):
             parent_global = self._parent.global_position
-            self.position = (value[0] - parent_global[0], value[1] - parent_global[1])
+            parent_rotation = self._coerce_rotation_value(self._parent.global_rotation)
+            parent_scale = getattr(self._parent, "global_scale", (1, 1))
+            relative_position = (
+                float(value[0]) - float(parent_global[0]),
+                float(value[1]) - float(parent_global[1]),
+            )
+            unrotated_position = self._rotate_point(relative_position, -parent_rotation)
+            local_position = self._safe_divide(unrotated_position, parent_scale)
+            self.position = local_position
         else:
             self.position = value
 
@@ -422,6 +591,20 @@ class Node2D(Node):
         self.scale = value
 
     @property
+    def global_rotation(self) -> float:
+        rotation = self._coerce_rotation_value(self.rotation)
+        if self._parent is not None and isinstance(self._parent, Node2D):
+            return rotation + self._coerce_rotation_value(self._parent.global_rotation)
+        return rotation
+
+    @global_rotation.setter
+    def global_rotation(self, value: float):
+        if self._parent is not None and isinstance(self._parent, Node2D):
+            self.rotation = self._coerce_rotation_value(value) - self._coerce_rotation_value(self._parent.global_rotation)
+        else:
+            self.rotation = self._coerce_rotation_value(value)
+
+    @property
     def global_visible(self) -> bool:
         if not self.visible:
             return False
@@ -431,7 +614,10 @@ class Node2D(Node):
 
 
 class CollisionObject2D(Node2D, ABC):
+    """Base node for 2D collision bodies and areas."""
+
     def __init__(self) -> None:
+        """Create a collision object with empty layers and masks."""
         super().__init__()
         
         self.collision_layers = []
@@ -443,7 +629,10 @@ class CollisionObject2D(Node2D, ABC):
         pass
 
 class CollisionShape2D(Node2D, ABC):
+    """Base node for collision shape components."""
+
     def __init__(self) -> None:
+        """Create a collision shape node."""
         super().__init__()
 
     @abstractmethod
@@ -451,29 +640,39 @@ class CollisionShape2D(Node2D, ABC):
         pass
 
 class RectangleCollisionShape2D(CollisionShape2D):
+    """Axis-aligned rectangle collision shape node."""
+
     def __init__(self) -> None:
+        """Create a default rectangle collision shape."""
         super().__init__()
         self.size = (32, 32)
 
     def _abstract_collision_shape(self) -> None:
+        """Placeholder implementation for the abstract collision hook."""
         pass
 
 class Sprite2D(Node2D):
+    """Renderable 2D sprite node."""
+
     def __init__(self) -> None:
+        """Create a sprite node with default texture state."""
         super().__init__()
 
         self.flip_h, self.flip_v = False, False
+        self.tint = (1.0, 1.0, 1.0)
         self._texture_resource = None
         self.position = (0,0)
         self.offset = (0,0)
     
     def save_data(self) -> dict:
+        """Serialize sprite-specific properties."""
         data = super().save_data()
         if self._texture_resource:
             data["texture"] = self._texture_resource
         return data
 
     def load_data(self, data: dict):
+        """Load sprite-specific properties from serialized data."""
         super().load_data(data)
         if "texture" in data:
             self.texture = data["texture"]
@@ -484,6 +683,7 @@ class Sprite2D(Node2D):
 
     @texture.setter
     def texture(self, value):
+        """Assign a texture resource or resolve one from a file path."""
         from .Resources import Texture2D
 
         if isinstance(value, Texture2D):
@@ -503,15 +703,19 @@ class Sprite2D(Node2D):
 
     @property
     def image(self):
-         if self._texture_resource:
-             surf = self._texture_resource.get_texture()
-             if surf:
+        """Return the rendered sprite surface or ``None``."""
+        if self._texture_resource:
+            surf = self._texture_resource.get_texture()
+            if surf:
                 return pygame.transform.flip(surf, self.flip_h, self.flip_v)
-         return None
+        return None
 
 
 class AnimatedSprite2D(Sprite2D):
+    """Sprite node that advances through a resource-backed animation."""
+
     def __init__(self):
+        """Create an animated sprite with no active animation."""
         super().__init__()
         self.animations: list[Resources.SpriteAnimation] = []
         self.name = "AnimatedSprite2D"
@@ -524,6 +728,7 @@ class AnimatedSprite2D(Sprite2D):
 
     @current_animation.setter
     def current_animation(self, value):
+        """Assign the active animation resource or resolve it from a path."""
         if isinstance(value, Resources.SpriteAnimation):
             self._current_animation = value
         elif isinstance(value, str):
@@ -540,6 +745,7 @@ class AnimatedSprite2D(Sprite2D):
              self._current_animation = None
 
     def save_data(self) -> dict:
+        """Serialize the sprite and current animation state."""
         data = super().save_data()
         if self.current_animation:
              data["current_animation"] = {
@@ -550,6 +756,7 @@ class AnimatedSprite2D(Sprite2D):
         return data
 
     def load_data(self, data: dict):
+        """Restore animated sprite state from serialized data."""
         data_copy = data.copy()
         curr_anim_data = data_copy.pop("current_animation", None)
         
@@ -565,9 +772,11 @@ class AnimatedSprite2D(Sprite2D):
 
 
     def add_animation(self, animation: Resources.SpriteAnimation):
+        """Register an animation resource on the sprite."""
         self.animations.append(animation)
 
     def play(self, name: str):
+        """Activate an animation by name and rewind it."""
         if self._current_animation and name == self._current_animation.name and not self._current_animation.finished:
             return
 
@@ -580,6 +789,7 @@ class AnimatedSprite2D(Sprite2D):
                 break
 
     def _update(self, delta: float):
+        """Advance the active animation during runtime."""
         if self.current_animation:
             was_finished = self.current_animation.finished
             self.current_animation.update(delta)
@@ -587,6 +797,7 @@ class AnimatedSprite2D(Sprite2D):
                 self.emit_signal("animation_finished", self.current_animation.name)
     
     def editor_update(self, delta):
+        """Advance the active animation while running in the editor."""
         if self.current_animation:
             was_finished = self.current_animation.finished
             self.current_animation.update(delta)
@@ -595,6 +806,7 @@ class AnimatedSprite2D(Sprite2D):
 
     @property
     def image(self):
+        """Return the current animation frame as a surface."""
         if self.current_animation:
             frames = getattr(self.current_animation, "frames_surfaces", None)
             frame_index = getattr(self.current_animation, "current_frame", 0)
@@ -606,29 +818,42 @@ class AnimatedSprite2D(Sprite2D):
         return None
 
 class StaticBody2D(CollisionObject2D):
+    """Non-moving collision body."""
+
     def __init__(self) -> None:
+        """Create a static body."""
         super().__init__()
 
     def _abstract_collision_object(self) -> None:
+        """Placeholder implementation for the abstract collision hook."""
         pass
 
 class DynamicBody2D(CollisionObject2D):
+    """Physics body that integrates velocity each frame."""
+
     def __init__(self) -> None:
+        """Create a dynamic body with zero velocity."""
         super().__init__()
         self.velocity = (0, 0)
 
     def _abstract_collision_object(self) -> None:
+        """Placeholder implementation for the abstract collision hook."""
         pass
 
 class KinematicBody2D(CollisionObject2D):
+    """Collision body that moves explicitly via script or solver."""
+
     def __init__(self) -> None:
+        """Create a kinematic body with zero velocity."""
         super().__init__()
         self.velocity = (0, 0)
 
     def _abstract_collision_object(self) -> None:
+        """Placeholder implementation for the abstract collision hook."""
         pass
 
     def move_and_slide(self):
+        """Apply the stored velocity directly to the global position."""
         self.global_position = (
             self.global_position[0] + self.velocity[0],
             self.global_position[1] + self.velocity[1]
@@ -637,7 +862,10 @@ class KinematicBody2D(CollisionObject2D):
     
 
 class Camera2D(Node2D):
+    """2D camera node used by the renderer."""
+
     def __init__(self) -> None:
+        """Create a camera with default offset, zoom, and limits."""
         super().__init__()
 
         self.offset = (0, 0)
@@ -647,23 +875,29 @@ class Camera2D(Node2D):
         self.limit_max : tuple[float, float] = (float(-1), float(-1))
 
 class AudioPlayer(Node):
+    """Node that plays an audio resource through pygame mixer."""
+
     def __init__(self) -> None:
+        """Create an audio player with no assigned sound."""
         super().__init__()
         self._audio_resource = None
         self._volume = 1.0
 
     def save_data(self) -> dict:
+        """Serialize the audio player state."""
         data = super().save_data()
         if self._audio_resource:
             data["audio"] = self._audio_resource
         return data
 
     def load_data(self, data: dict):
+        """Restore the audio player state from serialized data."""
         super().load_data(data)
         if "audio" in data:
             self.audio = data["audio"]
 
     def play(self):
+        """Play the assigned audio resource if one is loaded."""
         if self._audio_resource:
             sound = self._audio_resource.get_sound()
             if sound:
@@ -675,6 +909,7 @@ class AudioPlayer(Node):
 
     @volume.setter
     def volume(self, _vol: float):
+        """Set playback volume for the assigned audio resource."""
         self._volume = _vol
         if self._audio_resource:
             sound = self._audio_resource.get_sound()
@@ -687,6 +922,7 @@ class AudioPlayer(Node):
 
     @audio.setter
     def audio(self, value):
+        """Assign an audio resource or resolve one from a file path."""
         from .Resources import AudioStream
         from .ResourceServer import ResourceLoader
 
@@ -710,6 +946,7 @@ class AudioPlayer(Node):
                 sound.set_volume(self._volume)
 
     def on_exit(self):
+        """Stop audio playback before the node leaves the scene tree."""
         try:
             if self._audio_resource:
                 sound = self._audio_resource.get_sound()
@@ -722,7 +959,10 @@ class AudioPlayer(Node):
 
     
 class TileMap2D(Node2D):
+    """Node that stores and renders layered tile data."""
+
     def __init__(self) -> None:
+        """Create an empty tilemap with a default 0-layer grid."""
         super().__init__()
         self._tileset_resource: Resources.Tileset2D | None = None
         self._bounds: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (1, 1))
@@ -732,6 +972,7 @@ class TileMap2D(Node2D):
         self._chunk_size = 8
     
     def _on_enter(self):
+        """Rebuild chunk data when the tilemap enters the scene tree."""
         self.preprocess_tile_data()
 
     @property
@@ -749,6 +990,7 @@ class TileMap2D(Node2D):
             pass
 
     def preprocess_tile_data(self):
+        """Convert layer grids into chunked tile data for rendering."""
         self._chunked_tile_data = {}
         (min_x, min_y), _ = self._bounds
         
@@ -776,6 +1018,7 @@ class TileMap2D(Node2D):
             self._chunked_tile_data[layer_index] = chunked_layer
 
     def shrink_to_fit(self, fill_value: int = -1):
+        """Trim tile bounds to the smallest rectangle that contains tiles."""
         min_x, min_y = None, None
         max_x, max_y = None, None
         for layer in self._tile_layers.values():
@@ -799,6 +1042,7 @@ class TileMap2D(Node2D):
 
     @staticmethod
     def _normalize_bounds(bounds) -> tuple[tuple[int, int], tuple[int, int]]:
+        """Normalize a bounds payload into ordered integer corners."""
         if isinstance(bounds, (list, tuple)) and len(bounds) >= 2:
             min_raw, max_raw = bounds[0], bounds[1]
             if isinstance(min_raw, (list, tuple)) and isinstance(max_raw, (list, tuple)):
@@ -814,15 +1058,18 @@ class TileMap2D(Node2D):
 
     @staticmethod
     def _grid_dimensions(bounds) -> tuple[int, int]:
+        """Return the width and height implied by a bounds tuple."""
         (min_x, min_y), (max_x, max_y) = TileMap2D._normalize_bounds(bounds)
         return (max_x - min_x + 1, max_y - min_y + 1)
 
     def _empty_grid(self, bounds=None, fill_value: int = -1):
+        """Create a grid filled with the provided value."""
         target_bounds = self._bounds if bounds is None else self._normalize_bounds(bounds)
         width, height = self._grid_dimensions(target_bounds)
         return [[int(fill_value) for _ in range(width)] for _ in range(height)]
 
     def _normalize_tile_data(self, value, bounds=None, fill_value: int = -1):
+        """Normalize arbitrary tile data into a rectangular integer grid."""
         target_bounds = self._bounds if bounds is None else self._normalize_bounds(bounds)
         width, height = self._grid_dimensions(target_bounds)
         normalized = self._empty_grid(target_bounds, fill_value=fill_value)
@@ -844,12 +1091,14 @@ class TileMap2D(Node2D):
 
     @staticmethod
     def _normalize_layer_index(layer) -> int:
+        """Coerce a layer key into an integer index."""
         try:
             return int(layer)
         except Exception:
             return 0
 
     def _normalize_tile_layers(self, value, bounds=None, fill_value: int = -1):
+        """Normalize one or more tile layers into internal storage format."""
         target_bounds = self._bounds if bounds is None else self._normalize_bounds(bounds)
         normalized_layers: dict[int, list[list[int]]] = {}
 
@@ -871,10 +1120,12 @@ class TileMap2D(Node2D):
 
     @property
     def tileset(self):
+        """Return the active tileset resource."""
         return self._tileset_resource
 
     @property
     def bounds(self):
+        """Return the tilemap bounds in tile coordinates."""
         return self._bounds
 
     @bounds.setter
@@ -883,6 +1134,7 @@ class TileMap2D(Node2D):
 
     @property
     def tile_layers(self):
+        """Return the internal tile layer mapping."""
         return self._tile_layers
 
     @tile_layers.setter
@@ -892,6 +1144,7 @@ class TileMap2D(Node2D):
 
     @tileset.setter
     def tileset(self, value):
+        """Assign a tileset resource or resolve one from a file path."""
         if isinstance(value, Resources.Tileset2D):
             self._tileset_resource = value
         elif isinstance(value, str):
@@ -909,6 +1162,7 @@ class TileMap2D(Node2D):
             self._tileset_resource = None
 
     def set_bounds(self, bounds, preserve: bool = True, fill_value: int = -1):
+        """Resize the tilemap bounds, optionally preserving existing tiles."""
         normalized_bounds = self._normalize_bounds(bounds)
         previous_bounds = self._bounds
         previous_layers = self._normalize_tile_layers(self._tile_layers, bounds=previous_bounds, fill_value=fill_value)
@@ -941,6 +1195,7 @@ class TileMap2D(Node2D):
         self._tile_layers = {layer: remapped_layers[layer] for layer in sorted(remapped_layers.keys())}
 
     def ensure_layer(self, layer: int, fill_value: int = -1):
+        """Ensure a layer grid exists and return it."""
         layer_index = self._normalize_layer_index(layer)
         if layer_index not in self._tile_layers:
             self._tile_layers[layer_index] = self._empty_grid(self._bounds, fill_value=fill_value)
@@ -948,6 +1203,7 @@ class TileMap2D(Node2D):
         return self._tile_layers[layer_index]
 
     def get_tile_id(self, tile_pos: tuple[int, int], layer: int = 0) -> int:
+        """Return the tile id at a coordinate for the requested layer."""
         tile_x, tile_y = int(tile_pos[0]), int(tile_pos[1])
         (min_x, min_y), (max_x, max_y) = self._bounds
         if tile_x < min_x or tile_y < min_y or tile_x > max_x or tile_y > max_y:
@@ -961,6 +1217,13 @@ class TileMap2D(Node2D):
         return int(layer_data[row_index][column_index])
 
     def set_tile_id(self, tile_pos: tuple[int, int], tile_id: int, layer: int = 0):
+        """Set a tile id and grow the tilemap bounds when needed.
+
+        Returns
+        -------
+        bool
+            Always returns ``True`` after the tile is written.
+        """
         tile_x, tile_y = int(tile_pos[0]), int(tile_pos[1])
         (min_x, min_y), (max_x, max_y) = self._bounds
         layer_index = self._normalize_layer_index(layer)
@@ -981,9 +1244,11 @@ class TileMap2D(Node2D):
         return True
 
     def get_layer_indices(self) -> list[int]:
+        """Return the sorted list of layer indices in the tilemap."""
         return sorted(int(layer) for layer in self._tile_layers.keys())
 
     def save_data(self) -> dict:
+        """Serialize the tilemap state."""
         data = super().save_data()
         data["bounds"] = [list(self._bounds[0]), list(self._bounds[1])]
         data["tile_layers"] = {
@@ -995,6 +1260,7 @@ class TileMap2D(Node2D):
         return data
 
     def load_data(self, data: dict):
+        """Restore tilemap state from serialized data."""
         base_data = {
             key: value
             for key, value in data.items()
@@ -1012,10 +1278,12 @@ class TileMap2D(Node2D):
 
 
     def tile_to_world(self, tile_pos: tuple[int, int]) -> tuple[int, int]:
+        """Convert tile coordinates into world coordinates."""
         tw, th = self.tileset.tile_size if self.tileset and getattr(self.tileset, "tile_size", None) else (16, 16)
         return (tile_pos[0] * tw, tile_pos[1] * th)
 
     def world_to_tile(self, world_pos: tuple[int, int]) -> tuple[int, int]:
+        """Convert world coordinates into tile coordinates."""
         tw, th = self.tileset.tile_size if self.tileset and getattr(self.tileset, "tile_size", None) else (16, 16)
         if tw <= 0 or th <= 0:
             return (0, 0)
@@ -1023,17 +1291,24 @@ class TileMap2D(Node2D):
 
     @property
     def world_bounds(self) -> tuple[tuple[int, int], tuple[int, int]]:
+        """Return world-space bounds for the tilemap."""
         (min_x, min_y), (max_x, max_y) = self._bounds
         min_world = self.tile_to_world((min_x, min_y))
         max_world = self.tile_to_world((max_x + 1, max_y + 1))
         return (min_world, max_world)
 
 class YSort2D(Node2D):
+    """Marker node that causes descendants to render sorted by Y value."""
+
     def __init__(self) -> None:
+        """Create a Y-sort node."""
         super().__init__()
 
 class Area2D(CollisionObject2D):
+    """Collision area node that tracks overlapping bodies and areas."""
+
     def __init__(self) -> None:
+        """Create an area with body and area overlap tracking enabled."""
         super().__init__()
 
         self.collide_with_areas = True
@@ -1042,12 +1317,15 @@ class Area2D(CollisionObject2D):
         self._overlapping_bodies = []
 
     def _abstract_collision_object(self) -> None:
+        """Placeholder implementation for the abstract collision hook."""
         pass
 
     def get_overlapping_bodies(self) -> list[CollisionObject2D]:
+        """Return bodies currently overlapping the area."""
         return self._overlapping_bodies
 
     def get_overlapping_areas(self) -> list['Area2D']:
+        """Return areas currently overlapping the area."""
         return self._overlapping_areas
     
 
@@ -1055,6 +1333,8 @@ class Area2D(CollisionObject2D):
 
 
 class Control(Node):
+    """Base UI node with anchoring, layout, and font settings."""
+
     DEFAULT_FONT_SIZE = 14
     DEFAULT_FONT_COLOR = (245, 245, 245, 255)
     DEFAULT_PADDING = (4, 4, 4, 4)
@@ -1076,6 +1356,7 @@ class Control(Node):
 
 
     def __init__(self) -> None:
+        """Create a control with default layout and typography state."""
         super().__init__()
         self.anchor = self.AnchorType.NONE
         self.position: tuple[float, float] = (0, 0)
@@ -1091,6 +1372,7 @@ class Control(Node):
         
 
     def load_data(self, data: dict):
+        """Restore control-specific state from serialized data."""
         super().load_data(data)
         if "anchor" in data and isinstance(data["anchor"], str):
             try:
@@ -1099,6 +1381,7 @@ class Control(Node):
                 self.anchor = self.AnchorType.NONE
 
     def _layout_parent_rect(self, viewport_size=None, parent_rect=None):
+        """Return the rectangle used to resolve this control's anchors."""
         if parent_rect is not None:
             return parent_rect
 
@@ -1116,6 +1399,7 @@ class Control(Node):
         return (float(self.global_position[0]), float(self.global_position[1]), float(self.size[0]), float(self.size[1]))
 
     def _resolve_anchor(self, parent_rect):
+        """Compute the control's anchor offset from a parent rectangle."""
         _, _, parent_w, parent_h = parent_rect
         width = float(self.size[0])
         height = float(self.size[1])
@@ -1146,6 +1430,7 @@ class Control(Node):
             self._anchor_offset = local_position
 
     def _content_rect(self):
+        """Return the control's content rectangle in global coordinates."""
         return (
             float(self.global_position[0]),
             float(self.global_position[1]),
@@ -1154,11 +1439,13 @@ class Control(Node):
         )
 
     def _layout_children(self, viewport_size=None):
+        """Lay out child controls within this control's content area."""
         for child in self._children:
             if isinstance(child, Control):
                 child.process_ui(viewport_size, parent_rect=self._content_rect(), apply_anchor=True)
 
     def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        """Resolve anchors and lay out child controls."""
         if apply_anchor:
             self._resolve_anchor(self._layout_parent_rect(viewport_size, parent_rect))
 
@@ -1166,6 +1453,7 @@ class Control(Node):
 
     @property
     def global_position(self):
+        """Return the control's global position including anchor offset."""
         if self._parent is None:
             return (self.position[0] + self._anchor_offset[0], self.position[1] + self._anchor_offset[1])
         if isinstance(self._parent, Control):
@@ -1178,6 +1466,7 @@ class Control(Node):
 
     @global_position.setter
     def global_position(self, value: tuple[float, float]) -> None:
+        """Set the control's global position while respecting anchors."""
         if self._parent is None:
             self.position = (
                 value[0] - self._anchor_offset[0],
@@ -1197,17 +1486,21 @@ class Control(Node):
     
 
 class Label(Control):
+    """Text label control."""
+
     class TextAlignType(Enum):
         LEFT = "LEFT"
         CENTER = "CENTER"
         RIGHT = "RIGHT"
 
     def __init__(self) -> None:
+        """Create a label with centered text alignment."""
         super().__init__()
         self.text = ""
         self.text_align = self.TextAlignType.CENTER
 
     def load_data(self, data: dict):
+        """Restore label-specific state from serialized data."""
         super().load_data(data)
         if "text_align" in data and isinstance(data["text_align"], str):
             try:
@@ -1217,7 +1510,10 @@ class Label(Control):
     
 
 class Button(Control):
+    """Clickable text button control."""
+
     def __init__(self) -> None:
+        """Create a button with default state."""
         super().__init__()
         self.text = ""
         self.flat = False
@@ -1225,6 +1521,7 @@ class Button(Control):
         self._text_size_cache: tuple[int, int] | None = None
 
     def _contains_point(self, point: tuple[float, float]) -> bool:
+        """Return whether a point lies inside the button rectangle."""
         x, y = float(self.global_position[0]), float(self.global_position[1])
         w, h = float(self.size[0]), float(self.size[1])
         if w <= 0 or h <= 0:
@@ -1233,6 +1530,7 @@ class Button(Control):
         return x <= px <= (x + w) and y <= py <= (y + h)
 
     def _input(self, event):
+        """Handle pointer input for button press state."""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._contains_point(event.pos):
                 self.pressed = True
@@ -1242,6 +1540,7 @@ class Button(Control):
 
     
     def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        """Size the button from text content and then lay it out."""
         size_w, size_h = float(self.size[0]), float(self.size[1])
         if (size_w < 1 or size_h < 1) and self.text:
             text_w, text_h = self._text_size_cache if self._text_size_cache else (0, 0)
@@ -1254,23 +1553,29 @@ class Button(Control):
     
 
 class TextureRect2D(Control):
+    """UI control that displays a texture resource."""
+
     def __init__(self) -> None:
+        """Create an empty texture rect control."""
         super().__init__()
         self._texture_resource = None
 
     def save_data(self) -> dict:
+        """Serialize the texture rect state."""
         data = super().save_data()
         if self._texture_resource:
             data["texture"] = self._texture_resource
         return data
 
     def load_data(self, data: dict):
+        """Restore texture rect state from serialized data."""
         super().load_data(data)
         if "texture" in data:
             self.texture = data["texture"]
 
     @property
     def image(self):
+        """Return the loaded texture surface or ``None``."""
         if self._texture_resource:
             return self._texture_resource.get_texture()
         return None
@@ -1281,6 +1586,7 @@ class TextureRect2D(Control):
 
     @texture.setter
     def texture(self, value):
+        """Assign a texture resource or resolve one from a file path."""
         if isinstance(value, Resources.Texture2D):
             self._texture_resource = value
         elif isinstance(value, str):
@@ -1296,12 +1602,16 @@ class TextureRect2D(Control):
             self._texture_resource = None
 
 class VBoxContainer(Control):
+    """Vertical container that stacks child controls."""
+
     def __init__(self) -> None:
+        """Create a vertical container with default spacing."""
         super().__init__()
 
         self.gap = self.DEFAULT_GAP
 
     def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        """Lay out child controls vertically."""
         if apply_anchor:
             self._resolve_anchor(self._layout_parent_rect(viewport_size, parent_rect))
 
@@ -1316,10 +1626,14 @@ class VBoxContainer(Control):
                 current_y += float(getattr(child, "size", (0, 0))[1]) if hasattr(child, "size") else 0.0
 
 class HBoxContainer(Control):
+    """Horizontal container that stacks child controls."""
+
     def __init__(self) -> None:
+        """Create a horizontal container with default spacing."""
         super().__init__()
         self.gap = self.DEFAULT_GAP
     def process_ui(self, viewport_size=None, parent_rect=None, apply_anchor=True):
+        """Lay out child controls horizontally."""
         if apply_anchor:
             self._resolve_anchor(self._layout_parent_rect(viewport_size, parent_rect))
 
@@ -1334,12 +1648,18 @@ class HBoxContainer(Control):
                 current_x += float(getattr(child, "size", (0, 0))[0]) if hasattr(child, "size") else 0.0    
 
 class ColorRect2D(Control):
+    """Solid-color rectangle control."""
+
     def __init__(self) -> None:
+        """Create a solid color rectangle control."""
         super().__init__()
         self.color : tuple[int, int, int, int] = (255, 255, 255, 255)
 
 class TextureProgress(Control):
+    """Progress bar control with separate background and fill textures."""
+
     def __init__(self) -> None:
+        """Create a progress bar control."""
         super().__init__()
         self.value = 0.0
         self.min_value = 0.0
@@ -1349,10 +1669,12 @@ class TextureProgress(Control):
 
     @property
     def under_texture(self):
+        """Return the background texture resource."""
         return self._under_texture_resource
     
     @under_texture.setter
     def under_texture(self, value):
+        """Assign the background texture resource or resolve it from a path."""
         if isinstance(value, Resources.Texture2D):
             self._under_texture_resource = value
         elif isinstance(value, str):
@@ -1369,10 +1691,12 @@ class TextureProgress(Control):
     
     @property
     def fill_texture(self):
+        """Return the fill texture resource."""
         return self._fill_texture_resource
     
     @fill_texture.setter
     def fill_texture(self, value):
+        """Assign the fill texture resource or resolve it from a path."""
         if isinstance(value, Resources.Texture2D):
             self._fill_texture_resource = value
         elif isinstance(value, str):

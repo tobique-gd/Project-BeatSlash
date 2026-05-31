@@ -11,10 +11,7 @@
                 0,
                 0
             ],
-            "rotation":[
-                0,
-                0
-            ],
+            "rotation":0.0,
             "scale":[
                 1,
                 1
@@ -56,10 +53,7 @@
                         0.0,
                         0.0
                     ],
-                    "rotation":[
-                        0,
-                        0
-                    ],
+                    "rotation":0.0,
                     "scale":[
                         1,
                         1
@@ -68,6 +62,11 @@
                     "visible":true,
                     "flip_h":false,
                     "flip_v":false,
+                    "tint":[
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
                     "offset":[
                         -8.5,
                         -26.0
@@ -799,9 +798,9 @@
                         }
                     ],
                     "current_animation":{
-                        "name":"a_roll_back",
-                        "current_frame":5,
-                        "time_accumulator":0.008333333333333429
+                        "name":"a_idle_front",
+                        "current_frame":0,
+                        "time_accumulator":0.05900000000010991
                     }
                 },
                 "children":[]
@@ -817,10 +816,7 @@
                         -7.5,
                         -13.0
                     ],
-                    "rotation":[
-                        0,
-                        0
-                    ],
+                    "rotation":0.0,
                     "scale":[
                         1,
                         1
@@ -845,10 +841,7 @@
                         0.0,
                         0.0
                     ],
-                    "rotation":[
-                        0,
-                        0
-                    ],
+                    "rotation":0.0,
                     "scale":[
                         1,
                         1
@@ -871,63 +864,6 @@
                     ]
                 },
                 "children":[]
-            },
-            {
-                "type":"Area2D",
-                "name":"Area2D",
-                "properties":{
-                    "name":"Area2D",
-                    "is_linked_scene":false,
-                    "linked_scene_path":null,
-                    "position":[
-                        0,
-                        0
-                    ],
-                    "rotation":[
-                        0,
-                        0
-                    ],
-                    "scale":[
-                        1,
-                        1
-                    ],
-                    "z_index":0,
-                    "visible":true,
-                    "collision_layers":[],
-                    "collision_masks":[],
-                    "collide_with_areas":false,
-                    "collide_with_bodies":false
-                },
-                "children":[
-                    {
-                        "type":"RectangleCollisionShape2D",
-                        "name":"RectangleCollisionShape2D",
-                        "properties":{
-                            "name":"RectangleCollisionShape2D",
-                            "is_linked_scene":false,
-                            "linked_scene_path":null,
-                            "position":[
-                                -14.584482279574353,
-                                -29.59288898625445
-                            ],
-                            "rotation":[
-                                0,
-                                0
-                            ],
-                            "scale":[
-                                1,
-                                1
-                            ],
-                            "z_index":0,
-                            "visible":true,
-                            "size":[
-                                32,
-                                32
-                            ]
-                        },
-                        "children":[]
-                    }
-                ]
             },
             {
                 "type":"Control",
@@ -1311,6 +1247,124 @@
                                     "resource_type":"Texture2D"
                                 }
                             }
+                        },
+                        "children":[]
+                    }
+                ]
+            },
+            {
+                "type":"Node2D",
+                "name":"WeaponPivot",
+                "properties":{
+                    "name":"WeaponPivot",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
+                    "position":[
+                        0.0,
+                        -11.910878481710764
+                    ],
+                    "rotation":2.0,
+                    "scale":[
+                        1,
+                        1
+                    ],
+                    "z_index":0,
+                    "visible":true
+                },
+                "children":[
+                    {
+                        "type":"Sprite2D",
+                        "name":"Sprite2D",
+                        "properties":{
+                            "name":"Sprite2D",
+                            "is_linked_scene":false,
+                            "linked_scene_path":null,
+                            "position":[
+                                15.368000030517578,
+                                -1.4780000448226929
+                            ],
+                            "rotation":0.0,
+                            "scale":[
+                                1,
+                                1
+                            ],
+                            "z_index":-1,
+                            "visible":true,
+                            "flip_h":true,
+                            "flip_v":true,
+                            "tint":[
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
+                            "offset":[
+                                -2.799999952316284,
+                                -12.699999809265137
+                            ],
+                            "texture":{
+                                "__resource__":{
+                                    "name":"Texture",
+                                    "resource_path":"assets/textures/weapons/sword_main_big.png",
+                                    "texture_path":"assets/textures/weapons/sword_main_big.png",
+                                    "type":"Texture2D",
+                                    "resource_type":"Texture2D"
+                                }
+                            }
+                        },
+                        "children":[]
+                    }
+                ]
+            },
+            {
+                "type":"Area2D",
+                "name":"Hurtbox",
+                "properties":{
+                    "name":"Hurtbox",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
+                    "position":[
+                        0.0,
+                        -11.910878481710764
+                    ],
+                    "rotation":0.0,
+                    "scale":[
+                        1,
+                        1
+                    ],
+                    "z_index":0,
+                    "visible":true,
+                    "collision_layers":[
+                        1
+                    ],
+                    "collision_masks":[
+                        3
+                    ],
+                    "collide_with_areas":false,
+                    "collide_with_bodies":true
+                },
+                "children":[
+                    {
+                        "type":"RectangleCollisionShape2D",
+                        "name":"RectangleCollisionShape2D",
+                        "properties":{
+                            "name":"RectangleCollisionShape2D",
+                            "is_linked_scene":false,
+                            "linked_scene_path":null,
+                            "position":[
+                                10.0,
+                                -14.577720001897411
+                            ],
+                            "rotation":0.0,
+                            "scale":[
+                                1,
+                                1
+                            ],
+                            "z_index":0,
+                            "visible":true,
+                            "size":[
+                                51.79999923706055,
+                                29.600000381469727
+                            ]
                         },
                         "children":[]
                     }

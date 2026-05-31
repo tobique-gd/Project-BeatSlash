@@ -19,6 +19,7 @@ nav:
   - Engine Runtime: EngineRuntimeReference.md
   - Nodes and Resources: EngineDataReference.md
   - Editor: EditorReference.md
+  - API Docs: ApiReference.md
   - Node Class Reference:
       - Overview:
           - Intro: NodesReference.md

@@ -7,15 +7,37 @@ from .ErrorHandler import ErrorHandler
 #ResourceLoader handles caching, loading and saving resources liek audio, textures
 #might need to redo this to be extendable easily and i wont have to manually define acceptable formats its just a little hacky
 class ResourceLoader:
+    """Load, resolve, and cache resource files for the engine."""
+
     _cache = {}
     _project_root = None
 
     @staticmethod
     def set_project_root(path: str):
+        """Set the root directory used to resolve project-relative paths.
+
+        Parameters
+        ----------
+        path:
+            Absolute or relative path to the project root.
+        """
         ResourceLoader._project_root = os.path.abspath(path)
 
     @staticmethod
     def resolve_path(path: str):
+        """Resolve a possibly project-relative path to an absolute path.
+
+        Parameters
+        ----------
+        path:
+            Path to resolve.
+
+        Returns
+        -------
+        str
+            Absolute path when the file can be resolved, otherwise the input
+            path unchanged.
+        """
         if not os.path.isabs(path) and ResourceLoader._project_root:
              potential_path = os.path.join(ResourceLoader._project_root, path)
              if os.path.exists(potential_path):
@@ -24,6 +46,19 @@ class ResourceLoader:
 
     @staticmethod
     def load(path: str):
+        """Load a resource from disk and cache the loaded instance.
+
+        Parameters
+        ----------
+        path:
+            Path to the resource file.
+
+        Returns
+        -------
+        object | None
+            Loaded resource instance, or ``None`` when the file cannot be
+            resolved or decoded.
+        """
         path = ResourceLoader.resolve_path(path)
         path = os.path.abspath(path)
         if path in ResourceLoader._cache:
@@ -51,21 +86,27 @@ class ResourceLoader:
 #SceneLoader handles saving and loading scenes
 # its structured as staticmethods to allow for clean calling of the load and save functions 
 class SceneLoader:
+    """Serialize and deserialize scene trees to the on-disk JSON format."""
+
     RESOURCE_KEY = "__resource__"
 
     def __init__(self) -> None:
+        """Create a scene loader instance."""
         pass
 
     @staticmethod
     def _warn(message: str):
+        """Send a warning through the engine error handler."""
         ErrorHandler.throw_warning(message)
 
     @staticmethod
     def _error(message: str):
+        """Send an error through the engine error handler."""
         ErrorHandler.throw_error(message)
 
     @staticmethod
     def _to_project_relative(path: str):
+        """Convert an absolute path into a project-relative path when possible."""
         if not isinstance(path, str) or not path:
             return path
 
@@ -85,6 +126,19 @@ class SceneLoader:
 
     @staticmethod
     def _normalize_resource_payload(data: dict):
+        """Normalize a resource payload before serialization.
+
+        Parameters
+        ----------
+        data:
+            Resource dictionary to normalize.
+
+        Returns
+        -------
+        dict
+            Normalized dictionary with project-relative paths and JSON-safe
+            sequence values.
+        """
         normalized = {}
         for key, value in data.items():
             if isinstance(value, str) and (key == "resource_path" or key.endswith("_path")):
@@ -97,6 +151,7 @@ class SceneLoader:
 
     @staticmethod
     def _resolve_resource_payload(data: dict):
+        """Resolve project-relative paths in a decoded resource payload."""
         resolved = {}
         for key, value in data.items():
             if isinstance(value, str) and (key == "resource_path" or key.endswith("_path")):
@@ -107,6 +162,19 @@ class SceneLoader:
 
     @staticmethod
     def _encode_value(value):
+        """Encode a scene value into JSON-safe data.
+
+        Parameters
+        ----------
+        value:
+            Value to encode.
+
+        Returns
+        -------
+        object | None
+            JSON-serializable value, or ``None`` when the value cannot be
+            represented safely.
+        """
         if isinstance(value, Enum):
             return value.value
 
@@ -143,6 +211,7 @@ class SceneLoader:
 
     @staticmethod
     def _decode_sequence(values):
+        """Decode a JSON sequence back into engine data types."""
         decoded = [SceneLoader._decode_value(v) for v in values]
         if all(isinstance(item, (str, int, float, bool)) or item is None for item in decoded):
             return tuple(decoded)
@@ -150,6 +219,7 @@ class SceneLoader:
 
     @staticmethod
     def _decode_value(value):
+        """Decode a JSON value back into engine data types."""
         if isinstance(value, dict):
             if SceneLoader.RESOURCE_KEY in value:
                 payload = value.get(SceneLoader.RESOURCE_KEY)
@@ -183,10 +253,12 @@ class SceneLoader:
 
     @staticmethod
     def _json_pretty_with_compact_tile_rows(value):
+        """Serialize scene data to indented JSON text."""
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"), indent=4)
 
     @staticmethod
     def _read_json(file_path):
+        """Read JSON from disk and report loader errors through the engine."""
         try:
             with open(file_path, "r") as f:
                 return json.load(f)
@@ -200,6 +272,13 @@ class SceneLoader:
 
     @staticmethod
     def _write_json(file_path, data):
+        """Write scene JSON to disk.
+
+        Returns
+        -------
+        bool
+            ``True`` when the write succeeds, otherwise ``False``.
+        """
         try:
             serialized = SceneLoader._json_pretty_with_compact_tile_rows(data)
             with open(file_path, "w", encoding="utf-8") as f:
@@ -212,6 +291,20 @@ class SceneLoader:
 
     @staticmethod
     def save(save_data, file_path):
+        """Serialize a scene object and write it to disk.
+
+        Parameters
+        ----------
+        save_data:
+            Scene-like object with a ``root`` attribute.
+        file_path:
+            Output file path.
+
+        Returns
+        -------
+        bool
+            ``True`` when saving succeeds, otherwise ``False``.
+        """
         try:
             data = SceneLoader.serialize_scene(save_data)
         except Exception as e:
@@ -224,6 +317,18 @@ class SceneLoader:
     
     @staticmethod
     def load(file_path):
+        """Load a scene from a JSON file.
+
+        Parameters
+        ----------
+        file_path:
+            Scene file to load.
+
+        Returns
+        -------
+        Scene | Node | None
+            Loaded scene object, root node, or ``None`` on failure.
+        """
         data = SceneLoader._read_json(file_path)
         if data is None:
             return None
@@ -240,6 +345,7 @@ class SceneLoader:
     #deserialization of saved scene on disk
     @staticmethod
     def deserialize_node(node_data):
+            """Rebuild a node tree from serialized node data."""
             props = node_data.get("properties", {})
             
 
@@ -296,6 +402,7 @@ class SceneLoader:
 
     @staticmethod
     def deserialize_scene(scene):
+        """Rebuild a scene object from serialized scene data."""
         if not isinstance(scene, dict) or "root" not in scene:
             return None
 
@@ -312,6 +419,7 @@ class SceneLoader:
 
     @staticmethod
     def serialize_node(node):
+        """Convert a node tree into a serializable dictionary."""
         node_dict = {
             "type": type(node).__name__,
             "name": node.name,
@@ -339,6 +447,7 @@ class SceneLoader:
 
     @staticmethod
     def serialize_scene(scene):
+        """Convert a scene object into a serializable dictionary."""
         
 
         scene_dict = {"name": getattr(scene, "name", None), "root": SceneLoader.serialize_node(scene.root)}

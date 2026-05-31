@@ -43,7 +43,10 @@ class BulletController:
             target = getattr(body, "runtime_script", None)
 
         if target is not None and hasattr(target, "health"):
-            target.health -= self.damage
+            if hasattr(target, "take_damage"):
+                target.take_damage(self.damage)
+            else:
+                target.health -= self.damage
             self.has_hit = True
     
 

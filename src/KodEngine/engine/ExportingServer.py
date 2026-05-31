@@ -11,7 +11,18 @@ from .ErrorHandler import ErrorHandler
 
 
 class Exporter:
+	"""Package a project into a distributable build."""
+
 	def __init__(self, project_dir: str, project_settings: dict[str, Any]):
+		"""Create an exporter instance.
+
+		Parameters
+		----------
+		project_dir:
+			Project root directory.
+		project_settings:
+			Project settings dictionary to embed in the exported runtime.
+		"""
 		self.project_dir = os.path.abspath(project_dir)
 		self.project_settings = json.loads(json.dumps(project_settings))
 
@@ -26,6 +37,7 @@ class Exporter:
 		include_assets: bool,
 		include_runtime: bool,
 	) -> threading.Thread:
+		"""Run an export in a background thread and return the worker."""
 		worker = threading.Thread(
 			target=self.export,
 			kwargs={
@@ -53,6 +65,13 @@ class Exporter:
 		include_assets: bool,
 		include_runtime: bool,
 	) -> bool:
+		"""Export the project to disk.
+
+		Returns
+		-------
+		bool
+			``True`` when the export completes successfully.
+		"""
 		if not os.path.isdir(self.project_dir):
 			ErrorHandler.throw_error(f"Export failed: project directory not found: {self.project_dir}")
 			return False
@@ -110,6 +129,7 @@ class Exporter:
 			self._cleanup_staging(staging_root)
 
 	def _cleanup_staging(self, staging_root: str):
+		"""Remove the temporary staging directory used for exports."""
 		if not os.path.exists(staging_root):
 			return
 			
@@ -119,6 +139,7 @@ class Exporter:
 			pass
 
 	def _platform_supported(self, platform_name: str) -> bool:
+		"""Validate that the requested export platform matches the host OS."""
 		platform_key = platform_name.lower()
 		current = sys.platform
 		
@@ -135,16 +156,19 @@ class Exporter:
 		return True
 
 	def _copy_project(self, project_stage: str, include_assets: bool):
+		"""Copy the project tree into the staging area."""
 		ignore = None
 		if not include_assets:
 			ignore = shutil.ignore_patterns("assets")
 		shutil.copytree(self.project_dir, project_stage, dirs_exist_ok=True, ignore=ignore)
 
 	def _copy_engine(self, engine_stage: str):
+		"""Copy the engine package into the staging area."""
 		engine_src = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 		shutil.copytree(engine_src, engine_stage, dirs_exist_ok=True)
 
 	def _write_runtime(self, runtime_path: str):
+		"""Generate the temporary runtime entry script used for exporting."""
 		settings_json = json.dumps(self.project_settings, ensure_ascii=True)
 
 		runtime_code = f"""import json
