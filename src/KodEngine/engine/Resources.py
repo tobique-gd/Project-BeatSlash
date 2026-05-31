@@ -8,6 +8,20 @@ from . import ErrorHandler
 
 
 def _coerce_int_pair(value, fallback=(0, 0)):
+    """Coerce a two-item sequence into an integer pair.
+
+    Parameters
+    ----------
+    value:
+        Value to coerce.
+    fallback:
+        Pair returned when coercion fails.
+
+    Returns
+    -------
+    tuple[int, int]
+        Integer pair or the fallback value.
+    """
     if isinstance(value, (list, tuple)) and len(value) >= 2:
         try:
             return (int(value[0]), int(value[1]))
@@ -17,6 +31,7 @@ def _coerce_int_pair(value, fallback=(0, 0)):
 
 
 def _coerce_texture_region(value, fallback=((0, 0), (16, 16))):
+    """Coerce a texture region into ``((x, y), (w, h))`` form."""
     if isinstance(value, (list, tuple)) and len(value) >= 2:
         origin = _coerce_int_pair(value[0], fallback[0])
         size = _coerce_int_pair(value[1], fallback[1])
@@ -26,6 +41,8 @@ def _coerce_texture_region(value, fallback=((0, 0), (16, 16))):
 
 #resource is a custom data structure that just hase a name and path with a template function for serializing data
 class Resource:
+    """Base serializable resource type used by the engine."""
+
     type_id = "Resource"
     extensions: tuple[str, ...] = ()
     _type_registry: dict[str, type] = {}
@@ -33,6 +50,7 @@ class Resource:
     _resource_marker = "__resource__"
 
     def __init_subclass__(cls, **kwargs):
+        """Register subclasses by type name and supported file extension."""
         super().__init_subclass__(**kwargs)
         if cls is Resource:
             return
@@ -46,27 +64,51 @@ class Resource:
                 Resource._extension_registry[ext.lower()] = cls
 
     def __init__(self, name: str = "Resource", resource_path: str | None = None):
+        """Create a resource.
+
+        Parameters
+        ----------
+        name:
+            Resource display name.
+        resource_path:
+            Optional source path for the resource.
+        """
         self.name = name
         self.resource_path = resource_path
 
     @classmethod
     def class_for_extension(cls, extension: str):
+        """Look up a registered resource class for a file extension."""
         if not isinstance(extension, str):
             return None
         return cls._extension_registry.get(extension.lower())
 
     @classmethod
     def class_for_type(cls, type_name: str):
+        """Look up a registered resource class for a serialized type name."""
         if not isinstance(type_name, str):
             return None
         return cls._type_registry.get(type_name)
 
     @classmethod
     def from_path(cls, path: str):
+        """Construct a resource instance from a file path."""
         return cls(resource_path=path)
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize a resource from a dictionary payload.
+
+        Parameters
+        ----------
+        data:
+            Serialized resource data.
+
+        Returns
+        -------
+        Resource | None
+            Deserialized resource instance, or ``None`` for invalid input.
+        """
         if not isinstance(data, dict):
             return None
 
@@ -86,6 +128,7 @@ class Resource:
         return obj
         
     def to_dict(self) -> dict:
+        """Serialize the resource into a dictionary payload."""
         data = self.save_data()
         data["type"] = self.__class__.__name__
         data["resource_type"] = getattr(self, "type_id", self.__class__.__name__)
@@ -93,6 +136,7 @@ class Resource:
 
     @classmethod
     def encode_value(cls, value):
+        """Encode nested resource values for serialization."""
         if isinstance(value, Resource):
             return {cls._resource_marker: value.to_dict()}
 
@@ -109,6 +153,7 @@ class Resource:
 
     @classmethod
     def decode_value(cls, value):
+        """Decode a previously encoded resource value."""
         if isinstance(value, dict):
             payload = value.get(cls._resource_marker)
             if isinstance(payload, dict):
@@ -122,16 +167,19 @@ class Resource:
         return value
 
     def save_data(self) -> dict:
+        """Return the serializable state for the resource."""
         return {
             "name": self.name,
             "resource_path": self.resource_path,
         }
 
     def load_data(self, data: dict):
+        """Load resource state from serialized data."""
         self.name = data.get("name", self.name)
         self.resource_path = data.get("resource_path", self.resource_path)
 
     def save(self, path: str | None = None):
+        """Write the resource to disk as JSON."""
         if path:
             self.resource_path = path
         
@@ -147,10 +195,13 @@ class Resource:
 
 #audio preloading, loading with pygame mixer
 class AudioStream(Resource):
+    """Audio resource backed by a pygame mixer sound object."""
+
     type_id = "AudioStream"
     extensions = (".mp3", ".wav", ".ogg")
 
     def __init__(self, name: str = "Audio", resource_path: str | None = None):
+        """Create an audio resource and optionally load it immediately."""
         super().__init__(name=name, resource_path=resource_path)
         self.file_path = resource_path
         self._sound = None
@@ -159,6 +210,7 @@ class AudioStream(Resource):
             self.load_audio(resource_path)
 
     def load_audio(self, path: str):
+        """Load audio from the given path into the internal sound cache."""
         self.file_path = path
         self.resource_path = path
         try:
@@ -170,16 +222,19 @@ class AudioStream(Resource):
             self._sound = None
 
     def get_sound(self):
+        """Return the loaded ``pygame.mixer.Sound`` instance, if available."""
         if not self._sound and self.resource_path:
             self.load_audio(self.resource_path)
         return self._sound
 
     def save_data(self) -> dict:
+        """Serialize audio resource state."""
         data = super().save_data()
         data["file_path"] = self.resource_path
         return data
 
     def load_data(self, data: dict):
+         """Restore audio resource state from serialized data."""
          super().load_data(data)
          path = data.get("file_path") or data.get("resource_path")
          if path:
@@ -187,26 +242,33 @@ class AudioStream(Resource):
 
     @classmethod
     def from_path(cls, path: str):
+        """Load an audio resource from a file path."""
         return cls(resource_path=path)
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize an audio resource from a dictionary payload."""
         return super().from_dict(data)
 
 class Script(Resource):
+    """Resource describing a Python script attached to a node."""
+
     type_id = "Script"
     extensions = (".py",)
 
     def __init__(self, name="Script", resource_path: str | None = None):
+        """Create a script resource."""
         super().__init__(name=name, resource_path=resource_path)
         self.script_path = resource_path
     
     def save_data(self) -> dict:
+        """Serialize the script resource state."""
         data = super().save_data()
         data["script_path"] = self.resource_path
         return data
 
     def load_data(self, data: dict):
+        """Restore the script resource state from serialized data."""
         super().load_data(data)
         path = data.get("script_path") or data.get("resource_path")
         if path:
@@ -214,18 +276,23 @@ class Script(Resource):
 
     @classmethod
     def from_path(cls, path: str):
+        """Create a script resource from a file path."""
         return cls(resource_path=path)
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize a script resource from a dictionary payload."""
         return super().from_dict(data)
 
 #texture resources load textures into alpha converted textures so we can have transparent backgrounds
 class Texture2D(Resource):
+    """Image resource that loads textures with alpha support."""
+
     type_id = "Texture2D"
     extensions = (".png", ".jpg", ".jpeg", ".bmp")
 
     def __init__(self, name="Texture", resource_path: str | None = None):
+        """Create a texture resource and optionally load it immediately."""
         super().__init__(name=name, resource_path=resource_path)
         self.texture_path = resource_path
         self._surface = None
@@ -234,16 +301,19 @@ class Texture2D(Resource):
             self.load_texture(resource_path)
     
     def get_width(self):
+        """Return the texture width in pixels."""
         if self._surface:
             return self._surface.get_width()
         return 0
 
     def get_height(self):
+        """Return the texture height in pixels."""
         if self._surface:
             return self._surface.get_height()
         return 0
 
     def load_texture(self, path: str):
+        """Load texture data from a file path."""
         #loading from project directory relative path
         self.texture_path = path
         self.resource_path = path
@@ -256,16 +326,19 @@ class Texture2D(Resource):
             self._surface = None
 
     def get_texture(self):
+        """Return the loaded ``pygame.Surface`` instance, if available."""
         if not self._surface and self.resource_path:
             self.load_texture(self.resource_path)
         return self._surface
 
     def save_data(self) -> dict:
+        """Serialize the texture resource state."""
         data = super().save_data()
         data["texture_path"] = self.resource_path
         return data
 
     def load_data(self, data: dict):
+        """Restore texture state from serialized data."""
         super().load_data(data)
         path = data.get("texture_path") or data.get("resource_path")
         if path:
@@ -273,31 +346,49 @@ class Texture2D(Resource):
 
     @classmethod
     def from_path(cls, path: str):
+        """Create a texture resource from a file path."""
         return cls(resource_path=path)
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize a texture resource from a dictionary payload."""
         return super().from_dict(data)
 
 class CollisionShape(Resource):
+    """Base resource for collision shape definitions."""
+
     type_id = "CollisionShape"
 
     def __init__(self, name="CollisionShape", resource_path=None):
+        """Create a collision shape resource."""
         super().__init__(name, resource_path)
 
 class CollisionRectangleShape(CollisionShape):
+    """Axis-aligned rectangle collision shape resource."""
+
     type_id = "CollisionRectangleShape"
 
     def __init__(self, size: tuple[float, float] = (32, 32), resource_path: str | None = None):
+        """Create a rectangle collision shape resource.
+
+        Parameters
+        ----------
+        size:
+            Rectangle size in pixels.
+        resource_path:
+            Optional source path.
+        """
         super().__init__(name="Rectangle", resource_path=resource_path)
         self.size = size
     
     def save_data(self):
+        """Serialize the rectangle collision shape state."""
         data = super().save_data()
         data["size"] = self.size
         return data
 
     def load_data(self, data: dict):
+        """Restore the rectangle collision shape from serialized data."""
         super().load_data(data)
         if "size" in data:
              sz = data["size"]
@@ -307,45 +398,68 @@ class CollisionRectangleShape(CollisionShape):
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize a rectangle collision shape from a dictionary."""
         return super().from_dict(data)
 
 
 
 #script proxy for handling runtime loading of scripts to be executed on nodes
 class ScriptProxy:
+    """Lightweight wrapper that forwards runtime callbacks into a module."""
+
     def __init__(self, node, script_path: str):
+        """Create a proxy for a node-backed script module."""
         self.node = node
         self._script_path = script_path
         self._module = _load_module_from_path(script_path)
 
     def _call(self, name: str, *args):
+        """Call a function on the proxied module when it exists."""
         fn = getattr(self._module, name, None)
         if callable(fn):
             return fn(self, *args)
         return None
 
     def _ready(self):
+        """Invoke the script's ``_ready`` hook."""
         return self._call("_ready")
 
     def _process(self, delta):
+        """Invoke the script's ``_process`` hook.
+
+        Parameters
+        ----------
+        delta:
+            Frame delta time in seconds.
+        """
         return self._call("_process", delta)
 
     def _input(self, event):
+        """Invoke the script's ``_input`` hook."""
         return self._call("_input", event)
 
     def __getattr__(self, name):
+        """Expose attributes from the underlying module as bound callables."""
         module = object.__getattribute__(self, "_module")
         if hasattr(module, name):
-            return getattr(module, name)
+            attr = getattr(module, name)
+            if callable(attr):
+                def bound(*args, **kwargs):
+                    return attr(self, *args, **kwargs)
+
+                return bound
+            return attr
         raise AttributeError(name)
 
 #helper functions for file management
 
 def _is_file_path(path: str) -> bool:
+    """Return ``True`` when a script path points to a file on disk."""
     return path.endswith('.py') or os.path.sep in path or (os.name == 'nt' and ':' in path)
 
 
 def _path_to_module_name(file_path: str) -> tuple[str, str]:
+    """Convert a file path into an importable module name and package root."""
     abs_path = os.path.abspath(file_path)
     
     current = os.path.dirname(abs_path)
@@ -368,6 +482,7 @@ def _path_to_module_name(file_path: str) -> tuple[str, str]:
 
 
 def _load_module_from_path(script_path: str):
+    """Import a module either by file path or dotted module name."""
     if _is_file_path(script_path):
         resolved_path = script_path
         try:
@@ -397,6 +512,7 @@ def _load_module_from_path(script_path: str):
 
 
 def _resolve_script_class(module):
+    """Resolve a script class from a module's exported metadata."""
     script_cls = getattr(module, "SCRIPT_CLASS", None) or getattr(module, "__script_class__", None)
     if isinstance(script_cls, str):
         script_cls = getattr(module, script_cls, None)
@@ -406,6 +522,7 @@ def _resolve_script_class(module):
 
 
 def load_script(script_path: str, node):
+    """Load a script module and return a ready-to-use script instance."""
     module = _load_module_from_path(script_path)
     script_cls = _resolve_script_class(module)
     if script_cls:
@@ -414,6 +531,7 @@ def load_script(script_path: str, node):
 
 
 def get_script_path(script) -> str | None:
+    """Return the originating script path for a script instance when known."""
     if isinstance(script, str):
         return script
     if hasattr(script, "_script_path"):
@@ -430,10 +548,31 @@ def get_script_path(script) -> str | None:
 #sprite animation is a resource that manages animations in the AnimatedSprite2D
 #it precomputes all surfaces and stores them in an array for fast O(1) look up when looping through the animation
 class SpriteAnimation(Resource):
+    """Animation resource that slices frames from a sprite sheet."""
+
     type_id = "SpriteAnimation"
     extensions = (".anim", ".json")
 
     def __init__(self, name="Animation", spritesheet=None, frame_size: tuple[int,int]=(0,0), frames: int=0, _loop: bool=True, fps: int = 12, resource_path: str | None = None):
+        """Create an animation resource.
+
+        Parameters
+        ----------
+        name:
+            Animation name.
+        spritesheet:
+            Sprite sheet resource or path.
+        frame_size:
+            Frame size used when explicit regions are not provided.
+        frames:
+            Number of frames in the animation.
+        _loop:
+            Whether the animation loops after the last frame.
+        fps:
+            Playback rate in frames per second.
+        resource_path:
+            Optional source path.
+        """
         super().__init__(name=name, resource_path=resource_path)
         self.frames_surfaces = []
         self.frames_local_rects = []
@@ -462,6 +601,7 @@ class SpriteAnimation(Resource):
         self.reload()
 
     def _normalized_frame_regions(self):
+        """Return explicit frame regions normalized to integer tuples."""
         normalized: list[tuple[tuple[int, int], tuple[int, int]]] = []
         for item in self.frame_regions:
             region = _coerce_texture_region(item, fallback=((0, 0), _coerce_int_pair(self.frame_size, (0, 0))))
@@ -472,6 +612,7 @@ class SpriteAnimation(Resource):
         return normalized
 
     def reload(self):
+        """Rebuild cached frame surfaces from the current sprite sheet."""
         spritesheet_surface = None
         if self.spritesheet:
             spritesheet_surface = self.spritesheet.get_texture()
@@ -527,6 +668,13 @@ class SpriteAnimation(Resource):
                          print(f"Error processing frame {i} of {self.name}: {e}")
 
     def update(self, delta: float):
+        """Advance the animation timer.
+
+        Parameters
+        ----------
+        delta:
+            Frame delta time in seconds.
+        """
         if self.finished or self.frames == 0 or not self.frames_surfaces:
             return
 
@@ -546,6 +694,7 @@ class SpriteAnimation(Resource):
                     break
 
     def get_current_frame_rect(self) -> pygame.Rect:
+        """Return the current frame rectangle on the sprite sheet."""
         if not self.spritesheet:
             return pygame.Rect(0, 0, 0, 0)
         
@@ -564,6 +713,7 @@ class SpriteAnimation(Resource):
         return pygame.Rect(frame_x, frame_y, *self.frame_size)
 
     def save_data(self) -> dict:
+        """Serialize the animation resource state."""
         data = super().save_data()
         
         ss_path = None
@@ -584,6 +734,7 @@ class SpriteAnimation(Resource):
         return data
 
     def load_data(self, data: dict):
+        """Restore animation state from serialized data."""
         super().load_data(data)
    
         path_val = data.get("spritesheet_path")
@@ -626,6 +777,7 @@ class SpriteAnimation(Resource):
 
     @classmethod
     def from_path(cls, path: str):
+        """Load animation data from a file path."""
         if os.path.exists(path):
             try:
                 with open(path, 'r') as f:
@@ -639,6 +791,7 @@ class SpriteAnimation(Resource):
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize an animation resource from a dictionary payload."""
         obj = cls(
             name=data.get("name", "Animation"),
             resource_path=data.get("resource_path")
@@ -647,10 +800,13 @@ class SpriteAnimation(Resource):
         return obj
 
 class Tileset2D(Resource):
+    """Tileset resource used by ``TileMap2D`` nodes."""
+
     type_id = "Tileset"
     extensions = (".tileset", ".json")
 
     def __init__(self, name="Tileset", resource_path: str | None = None):
+        """Create a tileset resource."""
         super().__init__(name=name, resource_path=resource_path)
         self.tile_size = (16, 16)
         self.tilesheet : Texture2D | None = None
@@ -658,9 +814,11 @@ class Tileset2D(Resource):
         self._tile_surface_cache: dict[int, pygame.Surface] = {}
 
     def clear_runtime_cache(self):
+        """Clear cached tile surfaces built at runtime."""
         self._tile_surface_cache = {}
 
     def ensure_default_tile(self):
+        """Ensure the tileset always contains at least one valid tile."""
         if not isinstance(self.tiles, list):
             self.tiles = []
 
@@ -672,6 +830,7 @@ class Tileset2D(Resource):
         self.tiles = valid_tiles
 
     def next_available_tile_id(self) -> int:
+        """Return the next unused tile identifier."""
         self.ensure_default_tile()
         existing_ids = {tile.id for tile in self.tiles}
         new_id = 0
@@ -680,6 +839,7 @@ class Tileset2D(Resource):
         return new_id
 
     def get_tile_by_id(self, tile_id: int):
+        """Return a tile by id or ``None`` when it does not exist."""
         self.ensure_default_tile()
         for tile in self.tiles:
             if tile.id == tile_id:
@@ -687,6 +847,19 @@ class Tileset2D(Resource):
         return None
 
     def add_tile(self, tile=None):
+        """Add a tile to the tileset and return it.
+
+        Parameters
+        ----------
+        tile:
+            Optional tile instance to append. When omitted, a default tile is
+            created automatically.
+
+        Returns
+        -------
+        Tile2D | None
+            Added tile, or ``None`` when the input is invalid.
+        """
         self.ensure_default_tile()
         if tile is None:
             tile = Tile2D(self.next_available_tile_id())
@@ -705,6 +878,7 @@ class Tileset2D(Resource):
         return tile
 
     def remove_tile(self, tile_id: int):
+        """Remove a tile by id and keep the default tile fallback in place."""
         self.ensure_default_tile()
         self.tiles = [tile for tile in self.tiles if tile.id != tile_id]
         if not self.tiles:
@@ -712,6 +886,7 @@ class Tileset2D(Resource):
         self.clear_runtime_cache()
 
     def get_tile_surface(self, tile_id: int):
+        """Return a cached surface for a tile region when available."""
         if tile_id in self._tile_surface_cache:
             return self._tile_surface_cache[tile_id]
 
@@ -743,6 +918,7 @@ class Tileset2D(Resource):
         return surface
 
     def save_data(self) -> dict:
+        """Serialize the tileset resource state."""
         self.ensure_default_tile()
         data = super().save_data()
         data["tile_size"] = list(_coerce_int_pair(self.tile_size, (16, 16)))
@@ -752,6 +928,7 @@ class Tileset2D(Resource):
         return data
 
     def load_data(self, data: dict):
+        """Restore tileset state from serialized data."""
         super().load_data(data)
         self.tile_size = _coerce_int_pair(data.get("tile_size"), self.tile_size)
 
@@ -787,6 +964,7 @@ class Tileset2D(Resource):
 
     @classmethod
     def from_path(cls, path: str):
+        """Load a tileset from disk."""
         if os.path.exists(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
@@ -801,6 +979,7 @@ class Tileset2D(Resource):
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize a tileset resource from a dictionary payload."""
         obj = cls(
             name=data.get("name", "Tileset"),
             resource_path=data.get("resource_path")
@@ -809,15 +988,29 @@ class Tileset2D(Resource):
         return obj
 
 class Tile2D(Resource):
+    """Individual tile definition stored inside a tileset."""
+
     type_id = "Tile"
 
     def __init__(self, id: int, name="Tile", resource_path: str | None = None):
+        """Create a tile definition.
+
+        Parameters
+        ----------
+        id:
+            Tile identifier.
+        name:
+            Tile display name.
+        resource_path:
+            Optional source path.
+        """
         super().__init__(name=name, resource_path=resource_path)
         self.texture_region: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (16, 16))
         self.collision_shape: CollisionShape | None = None
         self.id = id
 
     def save_data(self) -> dict:
+        """Serialize the tile definition."""
         data = super().save_data()
         data["id"] = int(self.id)
         data["texture_region"] = self.encode_value(self.texture_region)
@@ -825,6 +1018,7 @@ class Tile2D(Resource):
         return data
 
     def load_data(self, data: dict):
+        """Restore tile data from serialized input."""
         super().load_data(data)
         self.id = int(data.get("id", self.id))
         self.texture_region = _coerce_texture_region(data.get("texture_region"), self.texture_region)
@@ -836,6 +1030,7 @@ class Tile2D(Resource):
 
     @classmethod
     def from_dict(cls, data: dict):
+        """Deserialize a tile definition from a dictionary payload."""
         obj = cls(
             id=int(data.get("id", 0)),
             name=data.get("name", "Tile"),
@@ -843,3 +1038,70 @@ class Tile2D(Resource):
         )
         obj.load_data(data)
         return obj
+
+
+class Font(Resource):
+    """Font resource used by UI rendering."""
+
+    type_id = "Font"
+    extensions = (".font", ".json")
+
+    def __init__(self, name="Font", size: int = 14, resource_path: str | None = None):
+        """Create a font resource.
+
+        Parameters
+        ----------
+        name:
+            Font display name.
+        size:
+            Font size in points.
+        resource_path:
+            Optional source path.
+        """
+        super().__init__(name=name, resource_path=resource_path)
+        self.size: int = size
+        self.color: tuple[int, int, int, int] = (255, 255, 255, 255)
+
+    def save_data(self) -> dict:
+        """Serialize the font resource state."""
+        data = super().save_data()
+        data["size"] = self.size
+        data["color"] = list(self.color)
+        return data
+
+    def load_data(self, data: dict):
+        """Restore font state from serialized data."""
+        super().load_data(data)
+        self.size = int(data.get("size", 14))
+        color_data = data.get("color", [255, 255, 255, 255])
+        if isinstance(color_data, (list, tuple)):
+            self.color = self.color
+        else:
+            self.color = (255, 255, 255, 255)
+
+    @classmethod
+    def from_path(cls, path: str):
+        """Load a font resource from a file path."""
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                obj = cls.from_dict(data)
+                if obj is not None:
+                    obj.resource_path = path
+                    return obj
+            except Exception as e:
+                print(f"Failed to load font from {path}: {e}")
+        return cls(resource_path=path)
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Deserialize a font resource from a dictionary payload."""
+        obj = cls(
+            name=data.get("name", "Font"),
+            size=int(data.get("size", 14)),
+            resource_path=data.get("resource_path")
+        )
+        obj.load_data(data)
+        return obj
+

@@ -70,7 +70,7 @@ class EditorGizmoController:
 
     def update_interaction(self):
         node = self.editor.ui.state.selected_node
-        if not isinstance(node, Nodes.Node2D):
+        if not isinstance(node, Nodes.Node2D) and not isinstance(node, Nodes.Control):
             self._drag_active = False
             self._left_mouse_was_down = pygui.is_mouse_button_down(pygui.mvMouseButton_Left)
             return

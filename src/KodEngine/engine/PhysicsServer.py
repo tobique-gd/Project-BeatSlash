@@ -5,11 +5,27 @@ from . import Nodes
 
 class PhysicsSolver2D:
     def __init__(self, configuration) -> None:
+        """Create the physics solver.
+
+        Parameters
+        ----------
+        configuration:
+            Project settings container used for solver configuration.
+        """
         self.substeps = configuration.project_settings["physics"]["physics_substeps"]
         self.delta = 0.0
         self.physics_bodies = []
 
     def physics_process(self, physics_bodies, delta):
+        """Advance physics for a frame using substep resolution.
+
+        Parameters
+        ----------
+        physics_bodies:
+            Sequence of bodies to simulate.
+        delta:
+            Frame delta time in seconds.
+        """
         self.physics_bodies = physics_bodies or []
         if self.substeps <= 0:
             self.substeps = 1
@@ -23,10 +39,18 @@ class PhysicsSolver2D:
             for body in self.physics_bodies:
                 self.resolve_physics_step_y(body)
 
+        self.resolve_area_overlaps()
+
     def _is_moving_body(self, body):
+        """Return whether a body should be integrated by the solver."""
         return isinstance(body, (Nodes.DynamicBody2D, Nodes.KinematicBody2D))
 
+    def _is_solid_body(self, body):
+        """Return whether a body participates as a solid collider."""
+        return isinstance(body, (Nodes.StaticBody2D, Nodes.DynamicBody2D, Nodes.KinematicBody2D))
+
     def _get_rect_shapes(self, body):
+        """Return rectangle collision shapes attached to a body."""
         if body is None:
             return []
         try:
@@ -35,12 +59,58 @@ class PhysicsSolver2D:
             return []
 
     def _get_shape_world_position(self, body, shape):
+        """Return the world-space position of a collision shape."""
         return (
             body.global_position[0] + shape.position[0],
             body.global_position[1] + shape.position[1],
         )
 
+    def _layers_match(self, a, b):
+        """Return whether two nodes' collision layers and masks overlap."""
+        try:
+            def to_masks(obj):
+                layer_vals = getattr(obj, "collision_layers", None)
+                mask_vals = getattr(obj, "collision_masks", None)
+
+                def norm_values(val):
+                    if val is None:
+                        return []
+                    if isinstance(val, (list, tuple)):
+                        return list(val)[:10]
+                    return [val]
+
+                def interpret_index(x):
+                    masks = set()
+                    try:
+                        xi = int(x)
+                        if 1 <= xi <= 32:
+                            masks.add(1 << (xi - 1))
+                    except Exception:
+                        pass
+                    return masks
+
+                layer_masks = set()
+                for v in norm_values(layer_vals):
+                    layer_masks.update(interpret_index(v))
+
+                mask_masks = set()
+                for v in norm_values(mask_vals):
+                    mask_masks.update(interpret_index(v))
+
+                return layer_masks, mask_masks
+
+            a_layer_masks, a_mask_masks = to_masks(a)
+            b_layer_masks, b_mask_masks = to_masks(b)
+
+            # A and B collide if any layer bit of A is in B's mask and vice versa
+            a_in_b = any((al & bm) != 0 for al in a_layer_masks for bm in b_mask_masks)
+            b_in_a = any((bl & am) != 0 for bl in b_layer_masks for am in a_mask_masks)
+            return a_in_b and b_in_a
+        except Exception:
+            return False
+
     def check_collision_pair(self, body1, shape1, body2, shape2):
+        """Return whether two rectangle collision shapes overlap."""
         pos1 = self._get_shape_world_position(body1, shape1)
         pos2 = self._get_shape_world_position(body2, shape2)
 
@@ -52,6 +122,7 @@ class PhysicsSolver2D:
         )
 
     def _get_mtv(self, body, shape, other, other_shape):
+        """Return the minimum translation vector for a rectangle overlap."""
         pos1 = self._get_shape_world_position(body, shape)
         pos2 = self._get_shape_world_position(other, other_shape)
 
@@ -72,6 +143,7 @@ class PhysicsSolver2D:
         return overlap_x, overlap_y
 
     def resolve_physics_step_x(self, body):
+        """Resolve horizontal movement and collisions for a body."""
         if body is None or not self._is_moving_body(body):
             return
 
@@ -84,6 +156,12 @@ class PhysicsSolver2D:
 
         for other in self.physics_bodies:
             if other is body:
+                continue
+            if not self._is_solid_body(other):
+                continue
+
+            # respect collision layers/masks
+            if not self._layers_match(body, other):
                 continue
 
             other_shapes = self._get_rect_shapes(other)
@@ -100,6 +178,7 @@ class PhysicsSolver2D:
                                 body.velocity = (0, body.velocity[1])
 
     def resolve_physics_step_y(self, body):
+        """Resolve vertical movement and collisions for a body."""
         if body is None or not self._is_moving_body(body):
             return
 
@@ -112,6 +191,12 @@ class PhysicsSolver2D:
 
         for other in self.physics_bodies:
             if other is body:
+                continue
+            if not self._is_solid_body(other):
+                continue
+
+            # respect collision layers/masks
+            if not self._layers_match(body, other):
                 continue
 
             other_shapes = self._get_rect_shapes(other)
@@ -127,3 +212,94 @@ class PhysicsSolver2D:
                             body.position = (body.position[0], body.position[1] + overlap_y)
                             if hasattr(body, 'velocity'):
                                 body.velocity = (body.velocity[0], 0)
+
+    def _has_any_shape_overlap(self, body, other):
+        """Return whether any attached shapes overlap between two nodes."""
+        body_shapes = self._get_rect_shapes(body)
+        if not body_shapes:
+            return False
+
+        other_shapes = self._get_rect_shapes(other)
+        if not other_shapes:
+            return False
+
+        for body_shape in body_shapes:
+            for other_shape in other_shapes:
+                if self.check_collision_pair(body, body_shape, other, other_shape):
+                    return True
+
+        return False
+
+    def _emit_overlap_transition_signals(self, area, previous_nodes, current_nodes, entered_signal, exited_signal):
+        """Emit area enter/exit signals for overlap state changes."""
+        previous_set = set(previous_nodes)
+        current_set = set(current_nodes)
+
+        for node in current_set - previous_set:
+            area.emit_signal(entered_signal, node)
+
+        for node in previous_set - current_set:
+            area.emit_signal(exited_signal, node)
+
+    def resolve_area_overlaps(self):
+        """Update area overlap caches and emit transition signals."""
+        area_nodes = [
+            node for node in self.physics_bodies
+            if isinstance(node, Nodes.Area2D)
+        ]
+
+        previous_overlaps = {
+            area: {
+                "areas": list(getattr(area, "_overlapping_areas", [])),
+                "bodies": list(getattr(area, "_overlapping_bodies", [])),
+            }
+            for area in area_nodes
+        }
+
+        for area in area_nodes:
+            area._overlapping_areas = []
+            area._overlapping_bodies = []
+
+        for area in area_nodes:
+            for other in self.physics_bodies:
+                if other is area:
+                    continue
+
+                # respect area collision flags
+                if isinstance(other, Nodes.Area2D):
+                    if not area.collide_with_areas:
+                        continue
+                else:
+                    if not area.collide_with_bodies:
+                        continue
+
+                # respect collision layers/masks
+                if not self._layers_match(area, other):
+                    continue
+
+                if not self._has_any_shape_overlap(area, other):
+                    continue
+
+                if isinstance(other, Nodes.Area2D):
+                    if other not in area._overlapping_areas:
+                        area._overlapping_areas.append(other)
+                else:
+                    if other not in area._overlapping_bodies:
+                        area._overlapping_bodies.append(other)
+
+        for area in area_nodes:
+            previous = previous_overlaps.get(area, {"areas": [], "bodies": []})
+            self._emit_overlap_transition_signals(
+                area,
+                previous["bodies"],
+                area._overlapping_bodies,
+                "body_entered",
+                "body_exited",
+            )
+            self._emit_overlap_transition_signals(
+                area,
+                previous["areas"],
+                area._overlapping_areas,
+                "area_entered",
+                "area_exited",
+            )

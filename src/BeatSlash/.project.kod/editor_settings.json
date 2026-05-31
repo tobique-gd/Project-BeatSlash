@@ -1,0 +1,107 @@
+{
+  "debug": {
+    "editor_resolution": [
+      1920,
+      1080
+    ],
+    "default_background_color": [
+      50,
+      50,
+      50
+    ],
+    "default_gizmo_color": [
+      255,
+      165,
+      0
+    ],
+    "default_camera_gizmo_color": [
+      181,
+      102,
+      237
+    ],
+    "default_collision_color": [
+      0,
+      162,
+      255
+    ],
+    "default_x_axis_color": [
+      255,
+      0,
+      0
+    ],
+    "default_y_axis_color": [
+      0,
+      255,
+      0
+    ]
+  },
+  "file_management": {
+    "file_extension_commands": {
+      ".kscn": "--editor",
+      ".py": "--default",
+      ".png": "--default",
+      ".jpg": "--default",
+      ".jpeg": "--default",
+      ".bmp": "--default",
+      ".tga": "--default",
+      ".gif": "--default",
+      ".wav": "--default",
+      ".ogg": "--default",
+      ".mp3": "--default"
+    }
+  },
+  "keyboard_shortcuts": {
+    "save_scene": {
+      "modifiers": [
+        "ctrl"
+      ],
+      "key": "s"
+    },
+    "load_scene": {
+      "modifiers": [
+        "ctrl"
+      ],
+      "key": "o"
+    },
+    "run_scene": {
+      "modifiers": [
+        "ctrl"
+      ],
+      "key": "r"
+    },
+    "run_project": {
+      "modifiers": [
+        "ctrl",
+        "shift"
+      ],
+      "key": "r"
+    },
+    "open_editor_settings": {
+      "modifiers": [
+        "ctrl"
+      ],
+      "key": ","
+    },
+    "duplicate_node": {
+      "modifiers": [
+        "ctrl"
+      ],
+      "key": "d"
+    },
+    "copy_node": {
+      "modifiers": [
+        "ctrl"
+      ],
+      "key": "c"
+    },
+    "paste_node": {
+      "modifiers": [
+        "ctrl"
+      ],
+      "key": "v"
+    }
+  },
+  "selection": {
+    "selected_node_id": null
+  }
+}

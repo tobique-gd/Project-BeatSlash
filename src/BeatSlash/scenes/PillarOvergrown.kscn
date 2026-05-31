@@ -2,9 +2,11 @@
     "name":"Pillar.kscn",
     "root":{
         "type":"Node2D",
-        "name":"/Users/tobiaszilvar/Documents/Project BeatSlash/Project-BeatSlash/src/BeatSlash/PillarOvergrown",
+        "name":"PillarOvergrown",
         "properties":{
             "name":"PillarOvergrown",
+            "is_linked_scene":false,
+            "linked_scene_path":null,
             "position":[
                 0,
                 0
@@ -13,7 +15,8 @@
                 0,
                 0
             ],
-            "z_index":0
+            "z_index":0,
+            "visible":true
         },
         "children":[
             {
@@ -21,6 +24,8 @@
                 "name":"Sprite2D",
                 "properties":{
                     "name":"Sprite2D",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
                     "position":[
                         0,
                         0
@@ -30,6 +35,7 @@
                         0
                     ],
                     "z_index":0,
+                    "visible":true,
                     "flip_h":false,
                     "flip_v":false,
                     "offset":[
@@ -53,6 +59,8 @@
                 "name":"StaticBody2D",
                 "properties":{
                     "name":"StaticBody2D",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
                     "position":[
                         0,
                         0
@@ -61,7 +69,15 @@
                         0,
                         0
                     ],
-                    "z_index":0
+                    "z_index":0,
+                    "visible":true,
+                    "collision_layers":[
+                        1
+                    ],
+                    "collision_masks":[
+                        2,
+                        5
+                    ]
                 },
                 "children":[
                     {
@@ -69,6 +85,8 @@
                         "name":"RectangleCollisionShape2D",
                         "properties":{
                             "name":"RectangleCollisionShape2D",
+                            "is_linked_scene":false,
+                            "linked_scene_path":null,
                             "position":[
                                 0.0,
                                 -16.0
@@ -78,9 +96,10 @@
                                 0
                             ],
                             "z_index":0,
+                            "visible":true,
                             "size":[
                                 16.0,
-                                4.0
+                                9.0
                             ]
                         },
                         "children":[]

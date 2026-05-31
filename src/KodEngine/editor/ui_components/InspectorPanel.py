@@ -2,6 +2,7 @@ import dearpygui.dearpygui as pygui
 import numpy as np
 import pygame
 import os
+from enum import Enum
 from typing import Any, Callable
 from ...engine import ErrorHandler
 from ...engine import Nodes
@@ -33,6 +34,11 @@ class InspectorPanel:
             (Nodes.AnimatedSprite2D, "animations"): self._draw_animations_property,
         }
 
+        self._custom_property_editors.update({
+            (Nodes.CollisionObject2D, "collision_layers"): self._draw_collision_layers_property,
+            (Nodes.CollisionObject2D, "collision_masks"): self._draw_collision_masks_property,
+        })
+
     def _resource_slot_info(self, node, attr, value):
         if isinstance(value, Resource):
             return True, value
@@ -54,6 +60,26 @@ class InspectorPanel:
                 return True, None
 
         return False, None
+
+    def _set_node_property(self, node, attr, value):
+        setattr(node, attr, value)
+        self.ui._update_hierarchy()
+
+    def _should_show_property(self, node, attr: str) -> bool:
+        """Determine if a property should be shown in the inspector for this node type"""
+        node_type_name = type(node).__name__
+        
+        # Properties to exclude for specific node types
+        exclusions = {
+            "ColorRect2D": {"font_size", "font_color", "padding", "bg_color"},  # ColorRect doesn't need any styling props
+            "VBoxContainer": {"font_size", "font_color", "padding", "bg_color"},  # Containers only use gap
+            "HBoxContainer": {"font_size", "font_color", "padding", "bg_color"},  # Containers only use gap
+            "TextureRect2D": {"font_size", "font_color", "padding", "bg_color"},  # Images don't need text styling
+            "Label": {"bg_color"},  # Labels don't have background
+        }
+        
+        excluded_for_type = exclusions.get(node_type_name, set())
+        return attr not in excluded_for_type
 
     def _resource_display_value(self, value):
         if value is None:
@@ -216,10 +242,79 @@ class InspectorPanel:
                 pygui.add_table_column(init_width_or_weight=0.65)
 
                 for attr, value, _ in items:
-                    self.draw_property(node, attr, value)
+                    if self._should_show_property(node, attr):
+                        self.draw_property(node, attr, value)
 
         if isinstance(node, Nodes.TileMap2D):
             self._draw_tilemap_palette(node)
+
+    def _layers_from_node(self, node, which: str):
+        # which: "layers" or "masks"
+        attr_list = f"collision_{which}"
+        list_attr = f"collision_{which}s"
+
+        vals = []
+        if hasattr(node, list_attr):
+            v = getattr(node, list_attr)
+            if isinstance(v, (list, tuple)):
+                vals = [int(x) for x in v]
+        if not vals and hasattr(node, attr_list):
+            # support legacy single int (index or bitmask)
+            v = getattr(node, attr_list)
+            try:
+                iv = int(v)
+                # if it's a small number, interpret as 1-based index
+                if 1 <= iv <= 32:
+                    vals = [iv]
+                else:
+                    # treat as bitmask
+                    for i in range(32):
+                        if (iv >> i) & 1:
+                            vals.append(i + 1)
+            except Exception:
+                pass
+        return sorted(set(vals))
+
+    def _set_layers_on_node(self, node, which: str, selections):
+        list_attr = f"collision_{which}s"
+        try:
+            setattr(node, list_attr, sorted(int(x) for x in selections))
+            self.ui._update_hierarchy()
+        except Exception:
+            pass
+
+    def _draw_layer_grid(self, node, which: str, label_text: str):
+        # draws 32 toggles for layers 1..32
+        selections = set(self._layers_from_node(node, which))
+        with pygui.table_row():
+            pygui.add_text(label_text)
+            # layout grid in 4 rows of 8
+            with pygui.child_window(width=-1, height=80):
+                for row in range(4):
+                    with pygui.group(horizontal=True):
+                        for col in range(8):
+                            idx = row * 8 + col + 1
+                            tag = f"{which}_{id(node)}_{idx}"
+                            default = idx in selections
+                            pygui.add_checkbox(label=str(idx), tag=tag, default_value=default,
+                                               callback=lambda s, v, ud: self._on_layer_toggle(ud, v),
+                                               user_data=(node, which, idx))
+
+    def _on_layer_toggle(self, user_data, value):
+        node, which, idx = user_data
+        current = set(self._layers_from_node(node, which))
+        if value:
+            current.add(idx)
+        else:
+            current.discard(idx)
+        self._set_layers_on_node(node, which, sorted(current))
+
+    def _draw_collision_layers_property(self, node, attr, value, label_text):
+        self._draw_layer_grid(node, "layer", "Layers")
+
+    def _draw_collision_masks_property(self, node, attr, value, label_text):
+        self._draw_layer_grid(node, "mask", "Masks")
+        
 
 
     def draw_property(self, node, attr, value):
@@ -253,6 +348,22 @@ class InspectorPanel:
                 )
             return
 
+        if isinstance(value, Enum):
+            enum_type = type(value)
+            enum_members = [member.name for member in enum_type]
+            current_value = value.name
+            
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                pygui.add_combo(
+                    items=enum_members,
+                    default_value=current_value,
+                    width=-1,
+                    callback=lambda s, v: self._set_node_property(node, attr, enum_type[v]),
+                    user_data=(node, attr)
+                )
+            return
+
         if isinstance(value, str):
             display_value = self.ui.editor.to_relative_path(value)
 
@@ -266,7 +377,7 @@ class InspectorPanel:
                     user_data=(node, attr),
                     drop_callback=self._drop_resource_file,
                     payload_type="file_payload",
-                    callback=lambda s, a: setattr(
+                    callback=lambda s, a: self._set_node_property(
                         node,
                         attr,
                         self._from_relative_path(a)
@@ -281,7 +392,7 @@ class InspectorPanel:
                 pygui.add_checkbox(
                     label=f"##{attr}",
                     default_value=value,
-                    callback=lambda s, v: setattr(node, attr, v)
+                    callback=lambda s, v: self._set_node_property(node, attr, v)
                 )
             return
 
@@ -294,7 +405,7 @@ class InspectorPanel:
                     min_value=INT_MIN,
                     max_value=INT_MAX,
                     width=-1,
-                    callback=lambda s, v: setattr(node, attr, int(v))
+                    callback=lambda s, v: self._set_node_property(node, attr, int(v))
                 )
             return
 
@@ -307,7 +418,34 @@ class InspectorPanel:
                     min_value=FLOAT_MIN,
                     max_value=FLOAT_MAX,
                     width=-1,
-                    callback=lambda s, v: setattr(node, attr, float(v))
+                    callback=lambda s, v: self._set_node_property(node, attr, float(v))
+                )
+            return
+
+        if isinstance(value, (list, tuple)) and len(value) in (3, 4) and all(isinstance(v, int) for v in value) and all(0 <= v <= 255 for v in value):
+            color_tuple = tuple(value)
+            color_list = list(color_tuple) if len(color_tuple) >= 3 else [255, 255, 255, 255]
+            color_list = [int(c) for c in color_list[:4]]
+            while len(color_list) < 4:
+                color_list.append(255)
+            
+            def on_color_changed(s, v, user_data):
+                node, attr = user_data
+                #color is in 0-1 need to convert to 0-255
+
+
+                new_color = tuple(int(c * 255) for c in v[:4])
+                self._set_node_property(node, attr, new_color)
+            
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                pygui.add_color_edit(
+                    label=f"##{attr}",
+                    default_value=color_list,
+                    width=-1,
+                    no_alpha=False,
+                    callback=lambda s, v: on_color_changed(s, v, (node, attr)),
+                    user_data=(node, attr)
                 )
             return
 
@@ -323,7 +461,7 @@ class InspectorPanel:
                     min_value=FLOAT_MIN,
                     max_value=FLOAT_MAX,
                     width=-1,
-                    callback=lambda s, v: setattr(node, attr, (v[0], v[1]))
+                    callback=lambda s, v: self._set_node_property(node, attr, (v[0], v[1]))
                 )
             return
 
@@ -933,13 +1071,16 @@ class InspectorPanel:
                     ErrorHandler.throw_error(f"{attr} expects {slot_cls.__name__}, got {type(resource_value).__name__}")
                     return
 
-                setattr(node, attr, resource_value)
-                self.update(node)
+                self._set_node_property(node, attr, resource_value)
                 return
             
             try:
-                setattr(node, attr, file_path)
-                self.update(node)
+                # For non-resource string properties, convert to relative path
+                if isinstance(getattr(node, attr, None), str):
+                    relative_path = self.ui.editor.to_relative_path(file_path)
+                    self._set_node_property(node, attr, relative_path)
+                else:
+                    self._set_node_property(node, attr, file_path)
             except Exception as e:
                 ErrorHandler.throw_error(f"Failed to set {attr}: {e}")
                 

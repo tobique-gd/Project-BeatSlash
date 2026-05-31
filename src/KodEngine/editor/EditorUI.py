@@ -1,8 +1,9 @@
 import dearpygui.dearpygui as pygui
-
+from ..engine import ResourceServer
 from . import ui_components as UIComp
 from .EditorModels import EditorSessionState
 from ..engine.ErrorHandler import ErrorHandler
+from ..engine.Globals import THEME_DEFAULTS
 
 
 class EditorUI:
@@ -17,15 +18,17 @@ class EditorUI:
         self.dialogs = UIComp.Dialogs.DialogManager(self, self.editor.editor_settings)
         self.menubar = UIComp.MenuBar(self)
         self.file_system = UIComp.FileSystem(self)
+    
 
         pygui.create_context()
         with pygui.font_registry():
-            default_font = pygui.add_font("src/KodEngine/editor/assets/fonts/kod_default_font.otf", 16)
-            pygui.bind_font(default_font)
+            self.default_font = pygui.add_font("src/KodEngine/editor/assets/fonts/kod_default_font.otf", THEME_DEFAULTS["font_size"])
+            pygui.bind_font(self.default_font)
 
         self.viewport.create_texture()
         self._create_layout()
         self._setup_dpg()
+        self.viewport.build_tabs()
 
         ErrorHandler.set_console_callback(self._handle_console_message)
 
@@ -67,8 +70,11 @@ class EditorUI:
                                 )
 
                     with pygui.group():
-                        with pygui.child_window(tag="viewport_container", border=True, height=-250, no_scrollbar=True):
+                        with pygui.child_window(tag="viewport_container", border=True, height=-250, no_scrollbar=True, no_scroll_with_mouse=True):
                             pygui.add_text("Engine Viewport", color=(150, 150, 150))
+                            with pygui.child_window(tag="viewport_tabs", border=False, height=28, no_scrollbar=True, no_scroll_with_mouse=True):
+                                pass
+                            pygui.add_separator()
                             pygui.add_image("engine_texture", tag="viewport_image")
 
                         with pygui.child_window(border=True, height=-1):

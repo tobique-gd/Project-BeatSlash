@@ -45,13 +45,12 @@ def main():
         if args.editor_settings_json:
             _merge_settings_dict(settings.editor_settings, json.loads(args.editor_settings_json))
 
-        potential_path = os.path.abspath(os.path.join(os.path.dirname(runtime_file), "..", "..", "..", "BeatSlash"))
-        if os.path.exists(potential_path):
-            project_dir = potential_path
-        else:
+        project_dir = settings.project_settings["file_management"].get("project_directory")
+        if not project_dir:
             scene_dir = os.path.dirname(scene_path)
             project_dir = os.path.dirname(scene_dir)
-            
+
+        project_dir = os.path.abspath(project_dir)
         settings.project_settings["file_management"]["project_directory"] = project_dir
         ResourceServer.ResourceLoader.set_project_root(project_dir)
         app = Kod.App(settings, editor_mode=False)

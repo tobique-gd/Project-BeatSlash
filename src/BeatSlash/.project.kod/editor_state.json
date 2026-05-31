@@ -1,0 +1,17 @@
+{
+  "window_width": 1710,
+  "window_height": 1040,
+  "window_pos": [
+    -1,
+    72
+  ],
+  "last_zoom": 1.006865434658881,
+  "last_opened_scene": "scenes/map_tiles/tile_left_right.kscn",
+  "open_scene_tabs": [
+    "scenes/map_tiles/tile_left_right.kscn",
+    "scenes/Player.kscn",
+    "scenes/main_menu/main_menu.kscn",
+    "scenes/main_menu/start_screen.kscn"
+  ],
+  "active_scene_path": "scenes/map_tiles/tile_left_right.kscn"
+}

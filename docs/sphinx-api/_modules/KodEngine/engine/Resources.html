@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KodEngine.engine.Resources &#8212; engine  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for KodEngine.engine.Resources</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pygame</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">ErrorHandler</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_coerce_int_pair</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">fallback</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Coerce a two-item sequence into an integer pair.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    value:</span>
+<span class="sd">        Value to coerce.</span>
+<span class="sd">    fallback:</span>
+<span class="sd">        Pair returned when coercion fails.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple[int, int]</span>
+<span class="sd">        Integer pair or the fallback value.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">fallback</span>
+    <span class="k">return</span> <span class="n">fallback</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_coerce_texture_region</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">fallback</span><span class="o">=</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">))):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Coerce a texture region into ``((x, y), (w, h))`` form.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">origin</span> <span class="o">=</span> <span class="n">_coerce_int_pair</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">fallback</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="n">_coerce_int_pair</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">fallback</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">origin</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">fallback</span>
+
+
+<span class="c1">#resource is a custom data structure that just hase a name and path with a template function for serializing data</span>
+<div class="viewcode-block" id="Resource">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Resource</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base serializable resource type used by the engine.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;Resource&quot;</span>
+    <span class="n">extensions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">_type_registry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">type</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">_extension_registry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">type</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">_resource_marker</span> <span class="o">=</span> <span class="s2">&quot;__resource__&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__init_subclass__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register subclasses by type name and supported file extension.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init_subclass__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">cls</span> <span class="ow">is</span> <span class="n">Resource</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">type_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;type_id&quot;</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+        <span class="n">Resource</span><span class="o">.</span><span class="n">_type_registry</span><span class="p">[</span><span class="n">type_id</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span>
+        <span class="n">Resource</span><span class="o">.</span><span class="n">_type_registry</span><span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span>
+
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;extensions&quot;</span><span class="p">,</span> <span class="p">()):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">ext</span><span class="p">:</span>
+                <span class="n">Resource</span><span class="o">.</span><span class="n">_extension_registry</span><span class="p">[</span><span class="n">ext</span><span class="o">.</span><span class="n">lower</span><span class="p">()]</span> <span class="o">=</span> <span class="bp">cls</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Resource&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a resource.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name:</span>
+<span class="sd">            Resource display name.</span>
+<span class="sd">        resource_path:</span>
+<span class="sd">            Optional source path for the resource.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">resource_path</span>
+
+<div class="viewcode-block" id="Resource.class_for_extension">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.class_for_extension">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">class_for_extension</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">extension</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Look up a registered resource class for a file extension.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">extension</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_extension_registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">extension</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="Resource.class_for_type">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.class_for_type">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">class_for_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Look up a registered resource class for a serialized type name.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">type_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_type_registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">type_name</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Resource.from_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.from_path">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a resource instance from a file path.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Resource.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize a resource from a dictionary payload.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data:</span>
+<span class="sd">            Serialized resource data.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Resource | None</span>
+<span class="sd">            Deserialized resource instance, or ``None`` for invalid input.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">resource_type</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_type&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span>
+        <span class="n">target_cls</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">class_for_type</span><span class="p">(</span><span class="n">resource_type</span><span class="p">)</span> <span class="k">if</span> <span class="n">resource_type</span> <span class="k">else</span> <span class="bp">cls</span>
+        <span class="k">if</span> <span class="n">target_cls</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">target_cls</span> <span class="o">=</span> <span class="bp">cls</span>
+
+        <span class="k">if</span> <span class="n">target_cls</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">cls</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">target_cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;Resource&quot;</span><span class="p">),</span>
+            <span class="n">resource_path</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">obj</span></div>
+
+        
+<div class="viewcode-block" id="Resource.to_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.to_dict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the resource into a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;resource_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;type_id&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="Resource.encode_value">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.encode_value">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode_value</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode nested resource values for serialization.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Resource</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span><span class="bp">cls</span><span class="o">.</span><span class="n">_resource_marker</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">encode_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">encode_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">):</span> <span class="bp">cls</span><span class="o">.</span><span class="n">encode_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="k">return</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="Resource.decode_value">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.decode_value">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decode_value</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decode a previously encoded resource value.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">payload</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_resource_marker</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="c1"># Decode using the payload&#39;s declared resource type, not the caller class.</span>
+                <span class="k">return</span> <span class="n">Resource</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="bp">cls</span><span class="o">.</span><span class="n">decode_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">decode_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="Resource.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the serializable state for the resource.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="s2">&quot;resource_path&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="Resource.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load resource state from serialized data.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Resource.save">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Resource.save">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write the resource to disk as JSON.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">path</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: Cannot save </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">, no path specified.&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error saving resource </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+</div>
+
+
+<span class="c1">#audio preloading, loading with pygame mixer</span>
+<div class="viewcode-block" id="AudioStream">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.AudioStream">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AudioStream</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Audio resource backed by a pygame mixer sound object.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;AudioStream&quot;</span>
+    <span class="n">extensions</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;.mp3&quot;</span><span class="p">,</span> <span class="s2">&quot;.wav&quot;</span><span class="p">,</span> <span class="s2">&quot;.ogg&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Audio&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an audio resource and optionally load it immediately.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">file_path</span> <span class="o">=</span> <span class="n">resource_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sound</span> <span class="o">=</span> <span class="kc">None</span>
+        
+        <span class="k">if</span> <span class="n">resource_path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_audio</span><span class="p">(</span><span class="n">resource_path</span><span class="p">)</span>
+
+<div class="viewcode-block" id="AudioStream.load_audio">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.AudioStream.load_audio">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load audio from the given path into the internal sound cache.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">file_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">.ResourceServer</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResourceLoader</span>
+            <span class="n">resolved_path</span> <span class="o">=</span> <span class="n">ResourceLoader</span><span class="o">.</span><span class="n">resolve_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sound</span> <span class="o">=</span> <span class="n">pygame</span><span class="o">.</span><span class="n">mixer</span><span class="o">.</span><span class="n">Sound</span><span class="p">(</span><span class="n">resolved_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load audio from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sound</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="AudioStream.get_sound">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.AudioStream.get_sound">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_sound</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the loaded ``pygame.mixer.Sound`` instance, if available.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sound</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_audio</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sound</span></div>
+
+
+<div class="viewcode-block" id="AudioStream.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.AudioStream.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize audio resource state.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;file_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="AudioStream.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.AudioStream.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">         </span><span class="sd">&quot;&quot;&quot;Restore audio resource state from serialized data.&quot;&quot;&quot;</span>
+         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+         <span class="n">path</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;file_path&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">)</span>
+         <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+             <span class="bp">self</span><span class="o">.</span><span class="n">load_audio</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="AudioStream.from_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.AudioStream.from_path">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load an audio resource from a file path.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="AudioStream.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.AudioStream.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize an audio resource from a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="Script">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Script">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Script</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resource describing a Python script attached to a node.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;Script&quot;</span>
+    <span class="n">extensions</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;.py&quot;</span><span class="p">,)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Script&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a script resource.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">script_path</span> <span class="o">=</span> <span class="n">resource_path</span>
+    
+<div class="viewcode-block" id="Script.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Script.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the script resource state.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;script_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="Script.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Script.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore the script resource state from serialized data.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;script_path&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">script_path</span> <span class="o">=</span> <span class="n">path</span></div>
+
+
+<div class="viewcode-block" id="Script.from_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Script.from_path">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a script resource from a file path.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Script.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Script.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize a script resource from a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+</div>
+
+
+<span class="c1">#texture resources load textures into alpha converted textures so we can have transparent backgrounds</span>
+<div class="viewcode-block" id="Texture2D">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Texture2D</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Image resource that loads textures with alpha support.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;Texture2D&quot;</span>
+    <span class="n">extensions</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;.png&quot;</span><span class="p">,</span> <span class="s2">&quot;.jpg&quot;</span><span class="p">,</span> <span class="s2">&quot;.jpeg&quot;</span><span class="p">,</span> <span class="s2">&quot;.bmp&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Texture&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a texture resource and optionally load it immediately.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">texture_path</span> <span class="o">=</span> <span class="n">resource_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">resource_path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_texture</span><span class="p">(</span><span class="n">resource_path</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="Texture2D.get_width">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.get_width">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_width</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the texture width in pixels.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span><span class="o">.</span><span class="n">get_width</span><span class="p">()</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="Texture2D.get_height">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.get_height">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_height</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the texture height in pixels.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span><span class="o">.</span><span class="n">get_height</span><span class="p">()</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="Texture2D.load_texture">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.load_texture">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_texture</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load texture data from a file path.&quot;&quot;&quot;</span>
+        <span class="c1">#loading from project directory relative path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">texture_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">.ResourceServer</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResourceLoader</span>
+            <span class="n">resolved_path</span> <span class="o">=</span> <span class="n">ResourceLoader</span><span class="o">.</span><span class="n">resolve_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span> <span class="o">=</span> <span class="n">pygame</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">resolved_path</span><span class="p">)</span><span class="o">.</span><span class="n">convert_alpha</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load texture from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Texture2D.get_texture">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.get_texture">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_texture</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the loaded ``pygame.Surface`` instance, if available.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_texture</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_surface</span></div>
+
+
+<div class="viewcode-block" id="Texture2D.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the texture resource state.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;texture_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="Texture2D.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore texture state from serialized data.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;texture_path&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_texture</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Texture2D.from_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.from_path">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a texture resource from a file path.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Texture2D.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Texture2D.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize a texture resource from a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="CollisionShape">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.CollisionShape">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CollisionShape</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base resource for collision shape definitions.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;CollisionShape&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;CollisionShape&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a collision shape resource.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CollisionRectangleShape">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.CollisionRectangleShape">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CollisionRectangleShape</span><span class="p">(</span><span class="n">CollisionShape</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Axis-aligned rectangle collision shape resource.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;CollisionRectangleShape&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">),</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a rectangle collision shape resource.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        size:</span>
+<span class="sd">            Rectangle size in pixels.</span>
+<span class="sd">        resource_path:</span>
+<span class="sd">            Optional source path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Rectangle&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span>
+    
+<div class="viewcode-block" id="CollisionRectangleShape.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.CollisionRectangleShape.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the rectangle collision shape state.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="CollisionRectangleShape.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.CollisionRectangleShape.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore the rectangle collision shape from serialized data.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">&quot;size&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+             <span class="n">sz</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;size&quot;</span><span class="p">]</span>
+             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sz</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                 <span class="n">sz</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">sz</span><span class="p">)</span>
+             <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">sz</span></div>
+
+
+<div class="viewcode-block" id="CollisionRectangleShape.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.CollisionRectangleShape.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize a rectangle collision shape from a dictionary.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+</div>
+
+
+
+
+<span class="c1">#script proxy for handling runtime loading of scripts to be executed on nodes</span>
+<div class="viewcode-block" id="ScriptProxy">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.ScriptProxy">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ScriptProxy</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lightweight wrapper that forwards runtime callbacks into a module.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a proxy for a node-backed script module.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node</span> <span class="o">=</span> <span class="n">node</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_script_path</span> <span class="o">=</span> <span class="n">script_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_module</span> <span class="o">=</span> <span class="n">_load_module_from_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Call a function on the proxied module when it exists.&quot;&quot;&quot;</span>
+        <span class="n">fn</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_module</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">fn</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Invoke the script&#39;s ``_ready`` hook.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_call</span><span class="p">(</span><span class="s2">&quot;_ready&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">delta</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Invoke the script&#39;s ``_process`` hook.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        delta:</span>
+<span class="sd">            Frame delta time in seconds.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_call</span><span class="p">(</span><span class="s2">&quot;_process&quot;</span><span class="p">,</span> <span class="n">delta</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Invoke the script&#39;s ``_input`` hook.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_call</span><span class="p">(</span><span class="s2">&quot;_input&quot;</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Expose attributes from the underlying module as bound callables.&quot;&quot;&quot;</span>
+        <span class="n">module</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_module&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+            <span class="n">attr</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">attr</span><span class="p">):</span>
+                <span class="k">def</span><span class="w"> </span><span class="nf">bound</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">attr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="n">bound</span>
+            <span class="k">return</span> <span class="n">attr</span>
+        <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+
+
+<span class="c1">#helper functions for file management</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_file_path</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return ``True`` when a script path points to a file on disk.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span> <span class="ow">in</span> <span class="n">path</span> <span class="ow">or</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;nt&#39;</span> <span class="ow">and</span> <span class="s1">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">path</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_path_to_module_name</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a file path into an importable module name and package root.&quot;&quot;&quot;</span>
+    <span class="n">abs_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+    
+    <span class="n">current</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">abs_path</span><span class="p">)</span>
+    <span class="n">package_root</span> <span class="o">=</span> <span class="kc">None</span>
+    
+    <span class="k">while</span> <span class="n">current</span> <span class="o">!=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">current</span><span class="p">):</span>
+        <span class="n">parent</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="s1">&#39;__init__.py&#39;</span><span class="p">)):</span>
+            <span class="n">package_root</span> <span class="o">=</span> <span class="n">current</span>
+            <span class="k">break</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="n">parent</span>
+    
+    <span class="k">if</span> <span class="n">package_root</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">package_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">abs_path</span><span class="p">)</span>
+    
+    <span class="n">rel_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">relpath</span><span class="p">(</span><span class="n">abs_path</span><span class="p">,</span> <span class="n">package_root</span><span class="p">)</span>
+    <span class="n">module_name</span> <span class="o">=</span> <span class="n">rel_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.py&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">module_name</span><span class="p">,</span> <span class="n">package_root</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_module_from_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Import a module either by file path or dotted module name.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">_is_file_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">):</span>
+        <span class="n">resolved_path</span> <span class="o">=</span> <span class="n">script_path</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">.ResourceServer</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResourceLoader</span>
+            <span class="n">resolved_path</span> <span class="o">=</span> <span class="n">ResourceLoader</span><span class="o">.</span><span class="n">resolve_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">resolved_path</span> <span class="o">=</span> <span class="n">script_path</span>
+
+        <span class="n">abs_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">resolved_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">abs_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Script file not found: </span><span class="si">{</span><span class="n">abs_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+        
+        <span class="n">module_name</span><span class="p">,</span> <span class="n">package_root</span> <span class="o">=</span> <span class="n">_path_to_module_name</span><span class="p">(</span><span class="n">abs_path</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">package_root</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">package_root</span><span class="p">)</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">package_root</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">package_root</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">script_path</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolve_script_class</span><span class="p">(</span><span class="n">module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve a script class from a module&#39;s exported metadata.&quot;&quot;&quot;</span>
+    <span class="n">script_cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">&quot;SCRIPT_CLASS&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">&quot;__script_class__&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">script_cls</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">script_cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">script_cls</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">script_cls</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">script_cls</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="load_script">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.load_script">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_script</span><span class="p">(</span><span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load a script module and return a ready-to-use script instance.&quot;&quot;&quot;</span>
+    <span class="n">module</span> <span class="o">=</span> <span class="n">_load_module_from_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">)</span>
+    <span class="n">script_cls</span> <span class="o">=</span> <span class="n">_resolve_script_class</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">script_cls</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">script_cls</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ScriptProxy</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">script_path</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_script_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.get_script_path">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_script_path</span><span class="p">(</span><span class="n">script</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the originating script path for a script instance when known.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">script</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">script</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">script</span><span class="p">,</span> <span class="s2">&quot;_script_path&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">script</span><span class="p">,</span> <span class="s2">&quot;_script_path&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">script</span><span class="p">,</span> <span class="s2">&quot;_module_name&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">script</span><span class="p">,</span> <span class="s2">&quot;_module_name&quot;</span><span class="p">)</span>
+    <span class="n">module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">script</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">module</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">&quot;__module__&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+
+<span class="c1">#sprite animation is a resource that manages animations in the AnimatedSprite2D</span>
+<span class="c1">#it precomputes all surfaces and stores them in an array for fast O(1) look up when looping through the animation</span>
+<div class="viewcode-block" id="SpriteAnimation">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SpriteAnimation</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Animation resource that slices frames from a sprite sheet.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;SpriteAnimation&quot;</span>
+    <span class="n">extensions</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;.anim&quot;</span><span class="p">,</span> <span class="s2">&quot;.json&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Animation&quot;</span><span class="p">,</span> <span class="n">spritesheet</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">frame_size</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span><span class="nb">int</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="n">frames</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">_loop</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an animation resource.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name:</span>
+<span class="sd">            Animation name.</span>
+<span class="sd">        spritesheet:</span>
+<span class="sd">            Sprite sheet resource or path.</span>
+<span class="sd">        frame_size:</span>
+<span class="sd">            Frame size used when explicit regions are not provided.</span>
+<span class="sd">        frames:</span>
+<span class="sd">            Number of frames in the animation.</span>
+<span class="sd">        _loop:</span>
+<span class="sd">            Whether the animation loops after the last frame.</span>
+<span class="sd">        fps:</span>
+<span class="sd">            Playback rate in frames per second.</span>
+<span class="sd">        resource_path:</span>
+<span class="sd">            Optional source path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames_surfaces</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames_local_rects</span> <span class="o">=</span> <span class="p">[]</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">spritesheet</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span> <span class="o">=</span> <span class="n">Texture2D</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">spritesheet</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span> <span class="o">=</span> <span class="n">spritesheet</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">spritesheet</span><span class="p">,</span> <span class="n">Texture2D</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span> <span class="o">=</span> <span class="n">spritesheet</span>
+            <span class="k">if</span> <span class="n">spritesheet</span><span class="o">.</span><span class="n">resource_path</span><span class="p">:</span>
+                 <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span> <span class="o">=</span> <span class="n">spritesheet</span><span class="o">.</span><span class="n">resource_path</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span> <span class="o">=</span> <span class="n">frame_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">=</span> <span class="n">frames</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fps</span> <span class="o">=</span> <span class="n">fps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loop</span> <span class="o">=</span> <span class="n">_loop</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_accumulator</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">finished</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_normalized_frame_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return explicit frame regions normalized to integer tuples.&quot;&quot;&quot;</span>
+        <span class="n">normalized</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span><span class="p">:</span>
+            <span class="n">region</span> <span class="o">=</span> <span class="n">_coerce_texture_region</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">fallback</span><span class="o">=</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">_coerce_int_pair</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))))</span>
+            <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">region</span>
+            <span class="k">if</span> <span class="n">w</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">h</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">normalized</span><span class="o">.</span><span class="n">append</span><span class="p">(((</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">y</span><span class="p">)),</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">w</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">h</span><span class="p">))))</span>
+        <span class="k">return</span> <span class="n">normalized</span>
+
+<div class="viewcode-block" id="SpriteAnimation.reload">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation.reload">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reload</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rebuild cached frame surfaces from the current sprite sheet.&quot;&quot;&quot;</span>
+        <span class="n">spritesheet_surface</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="p">:</span>
+            <span class="n">spritesheet_surface</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="o">.</span><span class="n">get_texture</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span><span class="p">:</span>
+             <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span> <span class="o">=</span> <span class="n">Texture2D</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span><span class="p">)</span>
+             <span class="n">spritesheet_surface</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="o">.</span><span class="n">get_texture</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames_surfaces</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames_local_rects</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">spritesheet_surface</span><span class="p">:</span>
+             <span class="n">sheet_width</span> <span class="o">=</span> <span class="n">spritesheet_surface</span><span class="o">.</span><span class="n">get_width</span><span class="p">()</span>
+             <span class="n">sheet_height</span> <span class="o">=</span> <span class="n">spritesheet_surface</span><span class="o">.</span><span class="n">get_height</span><span class="p">()</span>
+
+             <span class="n">explicit_regions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalized_frame_regions</span><span class="p">()</span>
+             <span class="k">if</span> <span class="n">explicit_regions</span><span class="p">:</span>
+                 <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span> <span class="o">=</span> <span class="n">explicit_regions</span>
+                 <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">explicit_regions</span><span class="p">)</span>
+                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">region</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">explicit_regions</span><span class="p">):</span>
+                     <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">region</span>
+                     <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">y</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                         <span class="k">continue</span>
+                     <span class="k">if</span> <span class="n">x</span> <span class="o">+</span> <span class="n">w</span> <span class="o">&gt;</span> <span class="n">sheet_width</span> <span class="ow">or</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span> <span class="o">&gt;</span> <span class="n">sheet_height</span><span class="p">:</span>
+                         <span class="k">continue</span>
+                     <span class="n">rect</span> <span class="o">=</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+                     <span class="k">try</span><span class="p">:</span>
+                         <span class="n">surface</span> <span class="o">=</span> <span class="n">spritesheet_surface</span><span class="o">.</span><span class="n">subsurface</span><span class="p">(</span><span class="n">rect</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                         <span class="bp">self</span><span class="o">.</span><span class="n">frames_surfaces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">surface</span><span class="p">)</span>
+                         <span class="n">sw</span><span class="p">,</span> <span class="n">sh</span> <span class="o">=</span> <span class="n">surface</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+                         <span class="bp">self</span><span class="o">.</span><span class="n">frames_local_rects</span><span class="o">.</span><span class="n">append</span><span class="p">(((</span><span class="o">-</span><span class="n">sw</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="n">sh</span> <span class="o">/</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="n">sw</span><span class="p">,</span> <span class="n">sh</span><span class="p">)))</span>
+                     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing explicit frame </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+             <span class="k">else</span><span class="p">:</span>
+                 <span class="n">frame_w</span><span class="p">,</span> <span class="n">frame_h</span> <span class="o">=</span> <span class="n">_coerce_int_pair</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+                 <span class="k">if</span> <span class="n">frame_w</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">frame_h</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                     <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">=</span> <span class="mi">0</span>
+                     <span class="k">return</span>
+
+                 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">):</span>
+                     <span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="n">frame_w</span><span class="p">)</span> <span class="o">%</span> <span class="n">sheet_width</span>
+                     <span class="n">y</span> <span class="o">=</span> <span class="p">((</span><span class="n">i</span> <span class="o">*</span> <span class="n">frame_w</span><span class="p">)</span> <span class="o">//</span> <span class="n">sheet_width</span><span class="p">)</span> <span class="o">*</span> <span class="n">frame_h</span>
+
+                     <span class="k">if</span> <span class="n">x</span> <span class="o">+</span> <span class="n">frame_w</span> <span class="o">&gt;</span> <span class="n">sheet_width</span> <span class="ow">or</span> <span class="n">y</span> <span class="o">+</span> <span class="n">frame_h</span> <span class="o">&gt;</span> <span class="n">sheet_height</span><span class="p">:</span>
+                         <span class="k">continue</span>
+
+                     <span class="n">rect</span> <span class="o">=</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">frame_w</span><span class="p">,</span> <span class="n">frame_h</span><span class="p">)</span>
+                     <span class="k">try</span><span class="p">:</span>
+                         <span class="n">surface</span> <span class="o">=</span> <span class="n">spritesheet_surface</span><span class="o">.</span><span class="n">subsurface</span><span class="p">(</span><span class="n">rect</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                         <span class="bp">self</span><span class="o">.</span><span class="n">frames_surfaces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">surface</span><span class="p">)</span>
+                         <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">surface</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+                         <span class="bp">self</span><span class="o">.</span><span class="n">frames_local_rects</span><span class="o">.</span><span class="n">append</span><span class="p">(((</span><span class="o">-</span><span class="n">w</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="n">h</span> <span class="o">/</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">)))</span>
+                     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing frame </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SpriteAnimation.update">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation.update">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">delta</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Advance the animation timer.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        delta:</span>
+<span class="sd">            Frame delta time in seconds.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">finished</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames_surfaces</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_accumulator</span> <span class="o">+=</span> <span class="n">delta</span>
+        <span class="n">frame_time</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">fps</span>
+
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_accumulator</span> <span class="o">&gt;=</span> <span class="n">frame_time</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">time_accumulator</span> <span class="o">-=</span> <span class="n">frame_time</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">loop</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">-</span> <span class="mi">1</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">finished</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span></div>
+
+
+<div class="viewcode-block" id="SpriteAnimation.get_current_frame_rect">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation.get_current_frame_rect">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_current_frame_rect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the current frame rectangle on the sprite sheet.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        
+        <span class="n">tex</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="o">.</span><span class="n">get_texture</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tex</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span><span class="p">:</span>
+            <span class="n">frame_index</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+            <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span><span class="p">[</span><span class="n">frame_index</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">w</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">h</span><span class="p">))</span>
+
+        <span class="n">sheet_width</span> <span class="o">=</span> <span class="n">tex</span><span class="o">.</span><span class="n">get_width</span><span class="p">()</span>
+        <span class="n">frame_x</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">%</span> <span class="n">sheet_width</span>
+        <span class="n">frame_y</span> <span class="o">=</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">current_frame</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">//</span> <span class="n">sheet_width</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">(</span><span class="n">frame_x</span><span class="p">,</span> <span class="n">frame_y</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SpriteAnimation.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the animation resource state.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        
+        <span class="n">ss_path</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="p">:</span>
+            <span class="n">ss_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="o">.</span><span class="n">resource_path</span>
+            
+        <span class="n">data</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="s2">&quot;spritesheet&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="p">,</span> 
+            <span class="s2">&quot;frame_size&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">,</span>
+            <span class="s2">&quot;frames&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">,</span>
+            <span class="s2">&quot;frame_regions&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">[[</span><span class="nb">int</span><span class="p">(</span><span class="n">region</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">region</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])],</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">region</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">region</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">])]]</span>
+                <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalized_frame_regions</span><span class="p">()</span>
+            <span class="p">],</span>
+            <span class="s2">&quot;fps&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">fps</span><span class="p">,</span>
+            <span class="s2">&quot;loop&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">loop</span>
+        <span class="p">})</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="SpriteAnimation.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore animation state from serialized data.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+   
+        <span class="n">path_val</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;spritesheet_path&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path_val</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span> <span class="o">=</span> <span class="n">path_val</span>
+
+        <span class="n">ss_val</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;spritesheet&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ss_val</span><span class="p">,</span> <span class="n">Texture2D</span><span class="p">):</span>
+             <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span> <span class="o">=</span> <span class="n">ss_val</span>
+             <span class="k">if</span> <span class="n">ss_val</span><span class="o">.</span><span class="n">resource_path</span><span class="p">:</span>
+                 <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span> <span class="o">=</span> <span class="n">ss_val</span><span class="o">.</span><span class="n">resource_path</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ss_val</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+             <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span> <span class="o">=</span> <span class="n">ss_val</span>
+             <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span> <span class="o">=</span> <span class="n">Texture2D</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">ss_val</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span><span class="p">:</span>
+             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span><span class="p">:</span>
+                  <span class="bp">self</span><span class="o">.</span><span class="n">spritesheet</span> <span class="o">=</span> <span class="n">Texture2D</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spritesheet_path</span><span class="p">)</span>
+
+        <span class="n">frame_size_raw</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frame_size&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">frame_size_raw</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">frame_size_raw</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span> <span class="o">=</span> <span class="n">frame_size_raw</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">frames</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frames&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">))</span>
+        <span class="n">raw_regions</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frame_regions&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw_regions</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">raw_regions</span><span class="p">:</span>
+                <span class="n">region</span> <span class="o">=</span> <span class="n">_coerce_texture_region</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">fallback</span><span class="o">=</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">_coerce_int_pair</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))))</span>
+                <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">region</span>
+                <span class="k">if</span> <span class="n">w</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">h</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">frame_regions</span><span class="o">.</span><span class="n">append</span><span class="p">(((</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">y</span><span class="p">)),</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">w</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">h</span><span class="p">))))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fps</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fps&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fps</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loop</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;loop&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">loop</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="SpriteAnimation.from_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation.from_path">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load animation data from a file path.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">obj</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">path</span>
+                <span class="k">return</span> <span class="n">obj</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load animation from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SpriteAnimation.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.SpriteAnimation.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize an animation resource from a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;Animation&quot;</span><span class="p">),</span>
+            <span class="n">resource_path</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">obj</span></div>
+</div>
+
+
+<div class="viewcode-block" id="Tileset2D">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Tileset2D</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tileset resource used by ``TileMap2D`` nodes.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;Tileset&quot;</span>
+    <span class="n">extensions</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;.tileset&quot;</span><span class="p">,</span> <span class="s2">&quot;.json&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Tileset&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a tileset resource.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">=</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span> <span class="p">:</span> <span class="n">Texture2D</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="o">=</span> <span class="p">[</span><span class="n">Tile2D</span><span class="p">(</span><span class="mi">0</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tile_surface_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Surface</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="Tileset2D.clear_runtime_cache">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.clear_runtime_cache">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Clear cached tile surfaces built at runtime.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tile_surface_cache</span> <span class="o">=</span> <span class="p">{}</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.ensure_default_tile">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.ensure_default_tile">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_default_tile</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure the tileset always contains at least one valid tile.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">valid_tiles</span> <span class="o">=</span> <span class="p">[</span><span class="n">tile</span> <span class="k">for</span> <span class="n">tile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tile</span><span class="p">,</span> <span class="n">Tile2D</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_tiles</span><span class="p">:</span>
+            <span class="n">valid_tiles</span> <span class="o">=</span> <span class="p">[</span><span class="n">Tile2D</span><span class="p">(</span><span class="mi">0</span><span class="p">)]</span>
+
+        <span class="n">valid_tiles</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">tile</span><span class="p">:</span> <span class="n">tile</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="o">=</span> <span class="n">valid_tiles</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.next_available_tile_id">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.next_available_tile_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">next_available_tile_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the next unused tile identifier.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_default_tile</span><span class="p">()</span>
+        <span class="n">existing_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">tile</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">tile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="p">}</span>
+        <span class="n">new_id</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="n">new_id</span> <span class="ow">in</span> <span class="n">existing_ids</span><span class="p">:</span>
+            <span class="n">new_id</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">new_id</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.get_tile_by_id">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.get_tile_by_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_tile_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tile_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a tile by id or ``None`` when it does not exist.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_default_tile</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">tile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">tile</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">tile_id</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">tile</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.add_tile">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.add_tile">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_tile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tile</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a tile to the tileset and return it.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        tile:</span>
+<span class="sd">            Optional tile instance to append. When omitted, a default tile is</span>
+<span class="sd">            created automatically.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Tile2D | None</span>
+<span class="sd">            Added tile, or ``None`` when the input is invalid.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_default_tile</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">tile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">tile</span> <span class="o">=</span> <span class="n">Tile2D</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">next_available_tile_id</span><span class="p">())</span>
+            <span class="n">tile</span><span class="o">.</span><span class="n">texture_region</span> <span class="o">=</span> <span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">_coerce_int_pair</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span><span class="p">,</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tile</span><span class="p">,</span> <span class="n">Tile2D</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">duplicate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tile_by_id</span><span class="p">(</span><span class="n">tile</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">duplicate</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">duplicate</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">tile</span><span class="p">:</span>
+            <span class="n">tile</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">next_available_tile_id</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tile</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear_runtime_cache</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">tile</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.remove_tile">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.remove_tile">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">remove_tile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tile_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove a tile by id and keep the default tile fallback in place.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_default_tile</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="o">=</span> <span class="p">[</span><span class="n">tile</span> <span class="k">for</span> <span class="n">tile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="k">if</span> <span class="n">tile</span><span class="o">.</span><span class="n">id</span> <span class="o">!=</span> <span class="n">tile_id</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="o">=</span> <span class="p">[</span><span class="n">Tile2D</span><span class="p">(</span><span class="mi">0</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear_runtime_cache</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.get_tile_surface">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.get_tile_surface">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_tile_surface</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tile_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a cached surface for a tile region when available.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">tile_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tile_surface_cache</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tile_surface_cache</span><span class="p">[</span><span class="n">tile_id</span><span class="p">]</span>
+
+        <span class="n">tile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tile_by_id</span><span class="p">(</span><span class="n">tile_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">tile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_path</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="n">sheet_surface</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span><span class="o">.</span><span class="n">get_texture</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span><span class="p">,</span> <span class="n">Texture2D</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">sheet_surface</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="p">(</span><span class="n">origin_x</span><span class="p">,</span> <span class="n">origin_y</span><span class="p">),</span> <span class="p">(</span><span class="n">size_x</span><span class="p">,</span> <span class="n">size_y</span><span class="p">)</span> <span class="o">=</span> <span class="n">_coerce_texture_region</span><span class="p">(</span><span class="n">tile</span><span class="o">.</span><span class="n">texture_region</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">size_x</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">size_y</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">rect</span> <span class="o">=</span> <span class="n">pygame</span><span class="o">.</span><span class="n">Rect</span><span class="p">(</span><span class="n">origin_x</span><span class="p">,</span> <span class="n">origin_y</span><span class="p">,</span> <span class="n">size_x</span><span class="p">,</span> <span class="n">size_y</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rect</span><span class="o">.</span><span class="n">right</span> <span class="o">&gt;</span> <span class="n">sheet_surface</span><span class="o">.</span><span class="n">get_width</span><span class="p">()</span> <span class="ow">or</span> <span class="n">rect</span><span class="o">.</span><span class="n">bottom</span> <span class="o">&gt;</span> <span class="n">sheet_surface</span><span class="o">.</span><span class="n">get_height</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">surface</span> <span class="o">=</span> <span class="n">sheet_surface</span><span class="o">.</span><span class="n">subsurface</span><span class="p">(</span><span class="n">rect</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tile_surface_cache</span><span class="p">[</span><span class="n">tile_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">surface</span>
+        <span class="k">return</span> <span class="n">surface</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the tileset resource state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_default_tile</span><span class="p">()</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;tile_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">_coerce_int_pair</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span><span class="p">,</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">)))</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;tilesheet&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span><span class="p">)</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;tilesheet_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span><span class="o">.</span><span class="n">resource_path</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span><span class="p">,</span> <span class="n">Texture2D</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;tiles&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">encode_value</span><span class="p">(</span><span class="n">tile</span><span class="p">)</span> <span class="k">for</span> <span class="n">tile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore tileset state from serialized data.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">=</span> <span class="n">_coerce_int_pair</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tile_size&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span><span class="p">)</span>
+
+        <span class="n">tilesheet_value</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tilesheet&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">tilesheet_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">tilesheet_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode_value</span><span class="p">(</span><span class="n">tilesheet_value</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tilesheet_value</span><span class="p">,</span> <span class="n">Texture2D</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span> <span class="o">=</span> <span class="n">tilesheet_value</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tilesheet_path</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tilesheet_path&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tilesheet_value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">tilesheet_path</span> <span class="o">=</span> <span class="n">tilesheet_value</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tilesheet_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">tilesheet_path</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span> <span class="o">=</span> <span class="n">Texture2D</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">tilesheet_path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tilesheet</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">loaded_tiles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tiles&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">decoded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">decoded</span><span class="p">,</span> <span class="n">Tile2D</span><span class="p">):</span>
+                <span class="n">loaded_tiles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decoded</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">decoded</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="n">tile</span> <span class="o">=</span> <span class="n">Tile2D</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">tile</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">decoded</span><span class="p">)</span>
+                <span class="n">loaded_tiles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tile</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="o">=</span> <span class="n">loaded_tiles</span> <span class="ow">or</span> <span class="p">[</span><span class="n">Tile2D</span><span class="p">(</span><span class="mi">0</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_default_tile</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear_runtime_cache</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.from_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.from_path">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a tileset from disk.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">obj</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">path</span>
+                    <span class="k">return</span> <span class="n">obj</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load tileset from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Tileset2D.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tileset2D.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize a tileset resource from a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;Tileset&quot;</span><span class="p">),</span>
+            <span class="n">resource_path</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">obj</span></div>
+</div>
+
+
+<div class="viewcode-block" id="Tile2D">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tile2D">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Tile2D</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Individual tile definition stored inside a tileset.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;Tile&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Tile&quot;</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a tile definition.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        id:</span>
+<span class="sd">            Tile identifier.</span>
+<span class="sd">        name:</span>
+<span class="sd">            Tile display name.</span>
+<span class="sd">        resource_path:</span>
+<span class="sd">            Optional source path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">texture_region</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">collision_shape</span><span class="p">:</span> <span class="n">CollisionShape</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="nb">id</span>
+
+<div class="viewcode-block" id="Tile2D.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tile2D.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the tile definition.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;texture_region&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">texture_region</span><span class="p">)</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;collision_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">collision_shape</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="Tile2D.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tile2D.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore tile data from serialized input.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">texture_region</span> <span class="o">=</span> <span class="n">_coerce_texture_region</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;texture_region&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">texture_region</span><span class="p">)</span>
+
+        <span class="n">collision_shape</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;collision_shape&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">collision_shape</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">collision_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode_value</span><span class="p">(</span><span class="n">collision_shape</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">collision_shape</span> <span class="o">=</span> <span class="n">collision_shape</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">collision_shape</span><span class="p">,</span> <span class="n">CollisionShape</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Tile2D.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Tile2D.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize a tile definition from a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="nb">id</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;Tile&quot;</span><span class="p">),</span>
+            <span class="n">resource_path</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">obj</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Font">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Font">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Font</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Font resource used by UI rendering.&quot;&quot;&quot;</span>
+
+    <span class="n">type_id</span> <span class="o">=</span> <span class="s2">&quot;Font&quot;</span>
+    <span class="n">extensions</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;.font&quot;</span><span class="p">,</span> <span class="s2">&quot;.json&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Font&quot;</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">14</span><span class="p">,</span> <span class="n">resource_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a font resource.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name:</span>
+<span class="sd">            Font display name.</span>
+<span class="sd">        size:</span>
+<span class="sd">            Font size in points.</span>
+<span class="sd">        resource_path:</span>
+<span class="sd">            Optional source path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">resource_path</span><span class="o">=</span><span class="n">resource_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">color</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Font.save_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Font.save_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize the font resource state.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">save_data</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;color&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">color</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="Font.load_data">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Font.load_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore font state from serialized data.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;size&quot;</span><span class="p">,</span> <span class="mi">14</span><span class="p">))</span>
+        <span class="n">color_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;color&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">color_data</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">color</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Font.from_path">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Font.from_path">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a font resource from a file path.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">obj</span><span class="o">.</span><span class="n">resource_path</span> <span class="o">=</span> <span class="n">path</span>
+                    <span class="k">return</span> <span class="n">obj</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load font from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">resource_path</span><span class="o">=</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Font.from_dict">
+<a class="viewcode-back" href="../../../engine.html#KodEngine.engine.Resources.Font.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize a font resource from a dictionary payload.&quot;&quot;&quot;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;Font&quot;</span><span class="p">),</span>
+            <span class="n">size</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;size&quot;</span><span class="p">,</span> <span class="mi">14</span><span class="p">)),</span>
+            <span class="n">resource_path</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_path&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">load_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">obj</span></div>
+</div>
+
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">engine</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../engine.html">KodEngine.engine package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Author.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

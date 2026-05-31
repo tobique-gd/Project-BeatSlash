@@ -16,9 +16,12 @@ class EditorCommandType(str, Enum):
     RUN_PROJECT = "run_project"
     OPEN_FILE = "open_file"
     OPEN_EDITOR_SETTINGS = "open_editor_settings"
+    OPEN_PROJECT_SETTINGS = "open_project_settings"
+    OPEN_EXPORT = "open_export"
     COPY_NODE = "copy_node"
     PASTE_NODE = "paste_node"
     DUPLICATE_NODE = "duplicate_node"
+
 
 
 @dataclass
@@ -34,3 +37,5 @@ class EditorSessionState:
     selectables: dict[str, object] = field(default_factory=dict)
     selected_paint_tile_ids: dict[int, int] = field(default_factory=dict)
     selected_paint_tile_layers: dict[int, int] = field(default_factory=dict)
+    open_scene_tabs: list[str] = field(default_factory=list)
+    active_scene_path: str | None = None
