@@ -88,7 +88,10 @@ class EditorSettings:
                 "open_editor_settings": {"modifiers": ["ctrl"], "key": ","},
                 "duplicate_node": {"modifiers": ["ctrl"], "key": "d"},
                 "copy_node": {"modifiers": ["ctrl"], "key": "c"},
-                "paste_node": {"modifiers": ["ctrl"], "key": "v"}
+                "paste_node": {"modifiers": ["ctrl"], "key": "v"},
+                "tool_paint": {"modifiers": [], "key": "b"},
+                "tool_rect":  {"modifiers": [], "key": "r"},
+
             }
         }
 
@@ -986,6 +989,10 @@ class KodEditor:
                         self.queue_command(EditorCommandType.COPY_NODE)
                     case "paste_node":
                         self.queue_command(EditorCommandType.PASTE_NODE)
+                    case "tool_paint":
+                        self.tools.set_tool(EditorViewportToolController.TOOL_PAINT)
+                    case "tool_rect":
+                        self.tools.set_tool(EditorViewportToolController.TOOL_RECT)
 
     def update_events(self):
         self._drain_commands()

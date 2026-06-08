@@ -92,7 +92,7 @@ def _input(self, events):
     pass # Grab inputs from pygame
 
 def on_play_pressed(self):
-    self.node.change_scene_to("scenes/map_tiles/tile_left_right.kscn")
+    self.node.change_scene_to("scenes/map_tiles/dungeon_root.kscn")
 
 def on_back_pressed(self):
     self.node.change_scene_to("scenes/main_menu/main_menu.kscn")

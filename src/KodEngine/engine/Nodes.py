@@ -290,7 +290,11 @@ class Node:
     
     def instantiate(self, scene):
         """Return the root node of a loaded scene."""
-        return scene.root if scene else None
+        root = scene.root if scene else None
+        if root is not None:
+            root._on_enter()
+
+        return root.clone() if root else None
         
 
     def emit_signal(self, signal, *args, **kwargs):
@@ -301,6 +305,7 @@ class Node:
         int
             Number of callbacks that were successfully called.
         """
+
         callbacks = list(self._signal_connections.get(signal, []))
         oneshot_to_remove = []
         called_count = 0
@@ -346,11 +351,14 @@ class Node:
         """Attach a child node to this node."""
         self._children.append(_node)
         _node._parent = self
+        _node._on_enter()
 
         runtime_script = getattr(_node, "runtime_script", None)
         if runtime_script is not None and hasattr(runtime_script, "_ready"):
             try:
                 runtime_script._ready()
+                
+                
             except Exception:
                 pass
 
@@ -877,11 +885,23 @@ class Camera2D(Node2D):
 class AudioPlayer(Node):
     """Node that plays an audio resource through pygame mixer."""
 
-    def __init__(self) -> None:
-        """Create an audio player with no assigned sound."""
+    def __init__(self):
         super().__init__()
         self._audio_resource = None
         self._volume = 1.0
+        self._channel = None  # track the specific channel
+
+    def play(self):
+        if self._audio_resource:
+            sound = self._audio_resource.get_sound()
+            if sound:
+                self._channel = sound.play()
+
+    def _process(self, delta):
+        if self._channel is not None:
+            if not self._channel.get_busy():
+                self._channel = None
+                self.on_finished()
 
     def save_data(self) -> dict:
         """Serialize the audio player state."""
@@ -896,12 +916,10 @@ class AudioPlayer(Node):
         if "audio" in data:
             self.audio = data["audio"]
 
-    def play(self):
-        """Play the assigned audio resource if one is loaded."""
-        if self._audio_resource:
-            sound = self._audio_resource.get_sound()
-            if sound:
-                sound.play()
+    
+    def on_finished(self):
+        """Emit a signal when audio playback finishes."""
+        self.emit_signal("finished")
 
     @property
     def volume(self):
@@ -970,6 +988,7 @@ class TileMap2D(Node2D):
         self._tile_data: list[list[int]] = self._tile_layers[0]
         self._chunked_tile_data: dict[int, dict[tuple[int, int], list[tuple[int, int, int]]]] = {}
         self._chunk_size = 8
+        
     
     def _on_enter(self):
         """Rebuild chunk data when the tilemap enters the scene tree."""
@@ -1340,6 +1359,7 @@ class Control(Node):
     DEFAULT_PADDING = (4, 4, 4, 4)
     DEFAULT_GAP = 4
     DEFAULT_BG_COLOR = (58, 62, 72, 255)
+    DEFAULT_TINT = (1.0, 1.0, 1.0, 1.0)
 
     class AnchorType(Enum):
         TOP_LEFT = "TOP_LEFT"
@@ -1369,6 +1389,28 @@ class Control(Node):
         self.font_color: tuple[int, int, int, int] = self.DEFAULT_FONT_COLOR
         self.padding: tuple[int, int, int, int] = self.DEFAULT_PADDING
         self.bg_color: tuple[int, int, int, int] = self.DEFAULT_BG_COLOR
+        self.tint: tuple[float, float, float, float] = self.DEFAULT_TINT
+
+    @staticmethod
+    def _coerce_tint_value(value) -> tuple[float, float, float, float]:
+        """Normalize a tint value to RGBA multipliers."""
+        if not isinstance(value, (list, tuple)) or len(value) < 3:
+            return Control.DEFAULT_TINT
+
+        try:
+            red = float(value[0])
+            green = float(value[1])
+            blue = float(value[2])
+            alpha = float(value[3]) if len(value) > 3 else 1.0
+        except (TypeError, ValueError, IndexError):
+            return Control.DEFAULT_TINT
+
+        return (
+            max(0.0, min(1.0, red)),
+            max(0.0, min(1.0, green)),
+            max(0.0, min(1.0, blue)),
+            max(0.0, min(1.0, alpha)),
+        )
         
 
     def load_data(self, data: dict):
@@ -1379,6 +1421,9 @@ class Control(Node):
                 self.anchor = self.AnchorType[data["anchor"]]
             except (KeyError, ValueError):
                 self.anchor = self.AnchorType.NONE
+
+        if hasattr(self, "tint"):
+            self.tint = self._coerce_tint_value(getattr(self, "tint", self.DEFAULT_TINT))
 
     def _layout_parent_rect(self, viewport_size=None, parent_rect=None):
         """Return the rectangle used to resolve this control's anchors."""

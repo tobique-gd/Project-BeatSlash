@@ -367,17 +367,22 @@ class RobuEnemyController:
             self.base_velocity = (0.0, 0.0)
 
     def _die(self):
-        if self.dead:
-            try:
-                self.node.queue_free()
-            except Exception:
-                pass
-            return
-
         try:
+            credit_pickup = self.node.preload("scenes/credit_pickup.kscn")
+
+            for i in range(random.randint(1, 4)):
+                credit_pickup = self.node.instantiate(credit_pickup)
+                
+                random_position_offset = (
+                    self.node.global_position[0] + random.randint(-20, 20),
+                    self.node.global_position[1] + random.randint(-20, 20)
+                )
+                credit_pickup.global_position = random_position_offset
+                self.node._parent.add_child(credit_pickup)
+            
             self.node.queue_free()
-        except Exception:
-            pass
+        except Exception as e:
+            print(e)
 
 
 SCRIPT_CLASS = RobuEnemyController

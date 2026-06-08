@@ -2,16 +2,23 @@
   "window_width": 1710,
   "window_height": 1040,
   "window_pos": [
-    -1,
+    0,
     72
   ],
-  "last_zoom": 1.006865434658881,
-  "last_opened_scene": "scenes/map_tiles/tile_left_right.kscn",
+  "last_zoom": 0.5559917313492411,
+  "last_opened_scene": "scenes/map_tiles/dungeon_root.kscn",
   "open_scene_tabs": [
-    "scenes/map_tiles/tile_left_right.kscn",
-    "scenes/Player.kscn",
+    "scenes/map_tiles/dungeon_root.kscn",
     "scenes/main_menu/main_menu.kscn",
-    "scenes/main_menu/start_screen.kscn"
+    "scenes/map_tiles/tile_left_right_up_down_01.kscn",
+    "scenes/Player.kscn",
+    "scenes/credit_pickup.kscn",
+    "scenes/entities/robu_enemy.kscn",
+    "scenes/map_tiles/tile_right_01.kscn",
+    "scenes/main_menu/start_screen.kscn",
+    "scenes/bullet.kscn",
+    "scenes/Pillar.kscn",
+    "scenes/PillarOvergrown.kscn"
   ],
-  "active_scene_path": "scenes/map_tiles/tile_left_right.kscn"
+  "active_scene_path": "scenes/map_tiles/dungeon_root.kscn"
 }

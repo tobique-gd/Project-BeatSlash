@@ -1,5 +1,5 @@
 {
-    "name":"BeatSlashWorld.kscn",
+    "name":"tile_left_right.kscn",
     "root":{
         "type":"Node2D",
         "name":"MapTile1",
@@ -16872,34 +16872,6 @@
                 "children":[]
             },
             {
-                "type":"AudioPlayer",
-                "name":"AudioPlayer",
-                "properties":{
-                    "name":"AudioPlayer",
-                    "is_linked_scene":false,
-                    "linked_scene_path":null,
-                    "script":{
-                        "__resource__":{
-                            "name":"Script",
-                            "resource_path":"scripts/audio_player.py",
-                            "script_path":"scripts/audio_player.py",
-                            "type":"Script",
-                            "resource_type":"Script"
-                        }
-                    },
-                    "audio":{
-                        "__resource__":{
-                            "name":"Audio",
-                            "resource_path":"assets/audio/BossfightOST.mp3",
-                            "file_path":"assets/audio/BossfightOST.mp3",
-                            "type":"AudioStream",
-                            "resource_type":"AudioStream"
-                        }
-                    }
-                },
-                "children":[]
-            },
-            {
                 "type":"StaticBody2D",
                 "name":"StaticBody2D",
                 "properties":{
@@ -17249,49 +17221,6 @@
                 },
                 "children":[
                     {
-                        "type":"KinematicBody2D",
-                        "name":"Player",
-                        "properties":{
-                            "name":"Player",
-                            "is_linked_scene":true,
-                            "linked_scene_path":"scenes/Player.kscn",
-                            "position":[
-                                -73.43930487619699,
-                                -61.69295802717343
-                            ],
-                            "rotation":0.0,
-                            "scale":[
-                                1,
-                                1
-                            ],
-                            "z_index":0,
-                            "visible":true,
-                            "collision_layers":[
-                                2
-                            ],
-                            "collision_masks":[
-                                1,
-                                3,
-                                4,
-                                5
-                            ],
-                            "velocity":[
-                                0,
-                                0
-                            ],
-                            "script":{
-                                "__resource__":{
-                                    "name":"Script",
-                                    "resource_path":"scripts/player.py",
-                                    "script_path":"scripts/player.py",
-                                    "type":"Script",
-                                    "resource_type":"Script"
-                                }
-                            }
-                        },
-                        "children":[]
-                    },
-                    {
                         "type":"Node2D",
                         "name":"Details",
                         "properties":{
@@ -17620,6 +17549,61 @@
                             ],
                             "z_index":0,
                             "visible":true
+                        },
+                        "children":[]
+                    }
+                ]
+            },
+            {
+                "type":"Area2D",
+                "name":"PSpace",
+                "properties":{
+                    "name":"PSpace",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
+                    "position":[
+                        0,
+                        0
+                    ],
+                    "rotation":0.0,
+                    "scale":[
+                        1,
+                        1
+                    ],
+                    "z_index":0,
+                    "visible":true,
+                    "collision_layers":[
+                        9
+                    ],
+                    "collision_masks":[
+                        2
+                    ],
+                    "collide_with_areas":true,
+                    "collide_with_bodies":true
+                },
+                "children":[
+                    {
+                        "type":"RectangleCollisionShape2D",
+                        "name":"RectangleCollisionShape2D",
+                        "properties":{
+                            "name":"RectangleCollisionShape2D",
+                            "is_linked_scene":false,
+                            "linked_scene_path":null,
+                            "position":[
+                                -419.9476791126436,
+                                -474.978697849648
+                            ],
+                            "rotation":0.0,
+                            "scale":[
+                                1,
+                                1
+                            ],
+                            "z_index":0,
+                            "visible":true,
+                            "size":[
+                                650.0,
+                                600.0
+                            ]
                         },
                         "children":[]
                     }

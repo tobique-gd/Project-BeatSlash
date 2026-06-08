@@ -98,7 +98,6 @@ def on_buy_pressed(self):
     except Exception:
         return
 
-    # update displayed values
     new_cost = int(base * (mult ** (new_level - 1)))
     name = def_entry.get("name", "")
     desc = def_entry.get("description", "")
