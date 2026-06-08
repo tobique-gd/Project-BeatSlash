@@ -51,6 +51,12 @@
                 72,
                 255
             ],
+            "tint":[
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
             "script":{
                 "__resource__":{
                     "name":"Script",
@@ -113,6 +119,12 @@
                         72,
                         255
                     ],
+                    "tint":[
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
                     "color":[
                         211,
                         211,
@@ -165,6 +177,12 @@
                         62,
                         72,
                         255
+                    ],
+                    "tint":[
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
                     ],
                     "text":"BEATSLASH",
                     "text_align":"CENTER"
@@ -257,6 +275,12 @@
                         72,
                         255
                     ],
+                    "tint":[
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
                     "gap":4
                 },
                 "children":[
@@ -303,6 +327,12 @@
                                 62,
                                 72,
                                 255
+                            ],
+                            "tint":[
+                                1.0,
+                                1.0,
+                                1.0,
+                                1.0
                             ],
                             "text":"Continue",
                             "flat":true,
@@ -354,6 +384,12 @@
                                 72,
                                 255
                             ],
+                            "tint":[
+                                1.0,
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
                             "text":"Quit",
                             "flat":true,
                             "pressed":false
@@ -378,6 +414,72 @@
                             "resource_type":"AudioStream"
                         }
                     }
+                },
+                "children":[]
+            },
+            {
+                "type":"ColorRect2D",
+                "name":"Fader",
+                "properties":{
+                    "name":"Fader",
+                    "is_linked_scene":false,
+                    "linked_scene_path":null,
+                    "anchor":"FULL_RECT",
+                    "position":[
+                        0,
+                        0
+                    ],
+                    "size":[
+                        480.0,
+                        338.0
+                    ],
+                    "z_index":161,
+                    "font":{
+                        "__resource__":{
+                            "name":"Font",
+                            "resource_path":null,
+                            "size":14,
+                            "color":[
+                                255,
+                                255,
+                                255,
+                                255
+                            ],
+                            "type":"Font",
+                            "resource_type":"Font"
+                        }
+                    },
+                    "font_size":14,
+                    "font_color":[
+                        245,
+                        245,
+                        245,
+                        255
+                    ],
+                    "padding":[
+                        4,
+                        4,
+                        4,
+                        4
+                    ],
+                    "bg_color":[
+                        58,
+                        62,
+                        72,
+                        255
+                    ],
+                    "tint":[
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "color":[
+                        0.0,
+                        0.0,
+                        0.0,
+                        255.0
+                    ]
                 },
                 "children":[]
             }

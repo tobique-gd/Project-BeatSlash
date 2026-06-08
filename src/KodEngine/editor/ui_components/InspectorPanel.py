@@ -39,6 +39,10 @@ class InspectorPanel:
             (Nodes.CollisionObject2D, "collision_masks"): self._draw_collision_masks_property,
         })
 
+    def _set_tilemap_tool(self, node: Nodes.TileMap2D, tool_name: str):
+        self.ui.editor.tools.set_tool(tool_name)
+        self.update(node)
+
     def _resource_slot_info(self, node, attr, value):
         if isinstance(value, Resource):
             return True, value
@@ -422,6 +426,22 @@ class InspectorPanel:
                 )
             return
 
+        if isinstance(value, (list, tuple)) and len(value) == 4 and all(isinstance(v, (int, float)) for v in value):
+            float_list = [float(value[0]), float(value[1]), float(value[2]), float(value[3])]
+            with pygui.table_row():
+                pygui.add_text(label_text)
+                pygui.add_drag_floatx(
+                    label=f"##{attr}",
+                    default_value=float_list,
+                    size=4,
+                    speed=0.01,
+                    min_value=0.0,
+                    max_value=1.0,
+                    width=-1,
+                    callback=lambda s, v: self._set_node_property(node, attr, (float(v[0]), float(v[1]), float(v[2]), float(v[3]))),
+                )
+            return
+
         if isinstance(value, (list, tuple)) and len(value) in (3, 4) and all(isinstance(v, int) for v in value) and all(0 <= v <= 255 for v in value):
             color_tuple = tuple(value)
             color_list = list(color_tuple) if len(color_tuple) >= 3 else [255, 255, 255, 255]
@@ -511,6 +531,29 @@ class InspectorPanel:
         pygui.add_separator(parent="inspector_panel")
         pygui.add_text("Tile Palette", parent="inspector_panel", color=(130, 130, 130))
 
+        from ..EditorTools import EditorViewportToolController
+        active_tool = self.ui.editor.tools.active_tool
+
+        with pygui.group(parent="inspector_panel", horizontal=True):
+            pygui.add_button(
+                label="Paint",
+                width=-1,
+                callback=lambda: self._set_tilemap_tool(node, EditorViewportToolController.TOOL_PAINT),
+                user_data=node,
+            )
+            if active_tool == EditorViewportToolController.TOOL_PAINT:
+                pygui.add_text(" <", color=(255, 165, 0))
+
+        with pygui.group(parent="inspector_panel", horizontal=True):
+            pygui.add_button(
+                label="Rect Fill",
+                width=-1,
+                callback=lambda: self._set_tilemap_tool(node, EditorViewportToolController.TOOL_RECT),
+                user_data=node,
+            )
+            if active_tool == EditorViewportToolController.TOOL_RECT:
+                pygui.add_text(" <", color=(255, 165, 0))
+
         tileset = getattr(node, "tileset", None)
         if not isinstance(tileset, Resources.Tileset2D):
             pygui.add_text("Assign a Tileset resource to view available tiles.", parent="inspector_panel")
@@ -558,6 +601,21 @@ class InspectorPanel:
                         width=-1,
                         callback=lambda *_, tile_id=tile.id: self._select_tilemap_palette_tile(node, int(tile_id)),
                     )
+        
+        with pygui.group(parent="inspector_panel", horizontal=True):
+            pygui.add_button(
+                label="Clear layers",
+                width=-1,
+                callback=lambda: self.clear_tilemap_layers(node),
+                user_data=node,
+            )
+    
+    def clear_tilemap_layers(self, node: Nodes.TileMap2D):
+        self.ui.editor.set_selected_paint_tile_layer(node, 0)
+        node._tile_layers = {}
+            
+        self.update(node)
+                    
 
     def _get_selected_tilemap_tile_id(self, node: Nodes.TileMap2D, tileset: Resources.Tileset2D):
         selected_id = self.ui.editor.get_selected_paint_tile_id(node)

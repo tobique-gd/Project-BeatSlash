@@ -30,6 +30,42 @@ class Renderer2D:
         self.screen = _screen
         self.debug_renderer = _debug_renderer
         self._ui_font_cache = {}
+        self._tile_scaled_cache = {}
+        self._tile_dimmed_cache = {}
+        self._sprite_scaled_cache = {}
+
+    def _normalize_ui_tint(self, tint):
+        """Normalize a UI tint value to RGBA multipliers."""
+        if not isinstance(tint, (list, tuple)) or len(tint) < 3:
+            return (1.0, 1.0, 1.0, 1.0)
+
+        try:
+            red = float(tint[0])
+            green = float(tint[1])
+            blue = float(tint[2])
+            alpha = float(tint[3]) if len(tint) > 3 else 1.0
+        except (TypeError, ValueError, IndexError):
+            return (1.0, 1.0, 1.0, 1.0)
+
+        return (
+            max(0.0, min(1.0, red)),
+            max(0.0, min(1.0, green)),
+            max(0.0, min(1.0, blue)),
+            max(0.0, min(1.0, alpha)),
+        )
+
+    def _apply_ui_tint(self, surface, tint):
+        """Return a tinted copy of a UI surface when tint differs from neutral."""
+        normalized_tint = self._normalize_ui_tint(tint)
+        if all(abs(value - 1.0) < 0.001 for value in normalized_tint):
+            return surface
+
+        tinted_surface = surface.copy()
+        tinted_surface.fill(
+            tuple(max(0, min(255, int(255 * value))) for value in normalized_tint),
+            special_flags=self.pygame.BLEND_RGBA_MULT,
+        )
+        return tinted_surface
 
     def _apply_sprite_tint(self, texture, node):
         """Return a tinted copy of ``texture`` when the node defines tint data."""
@@ -335,7 +371,7 @@ class Renderer2D:
                 self.screen.blit(overlay, (int(screen_x), int(screen_y)))
 
 
-    def _render_ui_text(self, text, position, scale_y, surface, _font : str | None = "", _font_size=Globals.THEME_DEFAULTS.get("font_size", 16), color=(255, 255, 255), center=False, align="CENTER"):
+    def _render_ui_text(self, text, position, scale_y, surface, _font : str | None = "", _font_size=Globals.THEME_DEFAULTS.get("font_size", 16), color=(255, 255, 255), center=False, align="CENTER", tint=None):
         """Render text into a surface using the configured UI font settings."""
         font_size = max(1, int(round(_font_size * scale_y)))
         try:
@@ -345,6 +381,8 @@ class Renderer2D:
             font = pygame.sysfont.SysFont(None, font_size)
         
         text_surface = font.render(str(text), True, color)
+        if tint is not None:
+            text_surface = self._apply_ui_tint(text_surface, tint)
         text_rect = text_surface.get_rect()
         if center:
             text_rect.center = position
@@ -362,6 +400,8 @@ class Renderer2D:
         """Render a single UI node onto a surface."""
         if isinstance(node, Nodes.Node2D) and not node.global_visible:
             return
+
+        node_tint = getattr(node, "tint", (1.0, 1.0, 1.0, 1.0))
 
 
         if isinstance(node, Nodes.ColorRect2D):
@@ -386,6 +426,7 @@ class Renderer2D:
             )
 
             s.fill(color)
+            s = self._apply_ui_tint(s, node_tint)
 
             surface.blit(
                 s,
@@ -444,7 +485,8 @@ class Renderer2D:
                 _font=node.font.resource_path,
                 _font_size=node.font_size,
                 color=color,
-                align=alignment
+                align=alignment,
+                tint=node_tint
             )
 
             return
@@ -477,6 +519,7 @@ class Renderer2D:
                 )
 
                 s.fill(bg_color)
+                s = self._apply_ui_tint(s, node_tint)
 
                 surface.blit(
                     s,
@@ -494,7 +537,8 @@ class Renderer2D:
                 _font=node.font.resource_path,
                 _font_size=node.font_size,
                 color=node.font_color,
-                center=True
+                center=True,
+                tint=node_tint
             )
 
             return
@@ -531,14 +575,17 @@ class Renderer2D:
                         under_tex = self.pygame.transform.scale(under_surf, (rect_w, rect_h))
                     else:
                         under_tex = under_surf
+                    under_tex = self._apply_ui_tint(under_tex, node_tint)
                     surface.blit(under_tex, (rect_x, rect_y))
                 except Exception:
                     s = self.pygame.Surface((rect_w, rect_h), self.pygame.SRCALPHA)
                     s.fill((60, 60, 60, 255))
+                    s = self._apply_ui_tint(s, node_tint)
                     surface.blit(s, (rect_x, rect_y))
             else:
                 s = self.pygame.Surface((rect_w, rect_h), self.pygame.SRCALPHA)
                 s.fill((60, 60, 60, 255))
+                s = self._apply_ui_tint(s, node_tint)
                 surface.blit(s, (rect_x, rect_y))
 
             try:
@@ -561,6 +608,7 @@ class Renderer2D:
                         scaled = self.pygame.transform.scale(fill_surf, (rect_w, rect_h))
                     else:
                         scaled = fill_surf
+                    scaled = self._apply_ui_tint(scaled, node_tint)
 
                     try:
                         fill_part = scaled.subsurface((0, 0, fill_w, rect_h)).copy()
@@ -572,10 +620,12 @@ class Renderer2D:
                 except Exception:
                     s2 = self.pygame.Surface((fill_w, rect_h), self.pygame.SRCALPHA)
                     s2.fill((0, 200, 0, 255))
+                    s2 = self._apply_ui_tint(s2, node_tint)
                     surface.blit(s2, (rect_x, rect_y))
             else:
                 s2 = self.pygame.Surface((fill_w, rect_h), self.pygame.SRCALPHA)
                 s2.fill((0, 200, 0, 255))
+                s2 = self._apply_ui_tint(s2, node_tint)
                 surface.blit(s2, (rect_x, rect_y))
 
             return
@@ -603,6 +653,8 @@ class Renderer2D:
                         rect_h
                     )
                 )
+
+            tex = self._apply_ui_tint(tex, node_tint)
 
             surface.blit(
                 tex,
@@ -662,26 +714,128 @@ class Renderer2D:
 
         return (center_x + offset_x, center_y + offset_y)
 
+    def render_tilemap(self, node):
+        tileset = getattr(node, "tileset", None)
+        chunked_layers = getattr(node, "_chunked_tile_data", {})
+        chunk_size = getattr(node, "chunk_size", 16)
+
+        if tileset is None or not chunked_layers:
+            return
+
+        scale_x = node.global_scale[0]
+        scale_y = node.global_scale[1]
+        if scale_x == 0 or scale_y == 0:
+            return
+
+        zoom = self._get_camera_zoom()
+        viewport_size = self._viewport_size()
+        tw, th = tileset.tile_size if hasattr(tileset, "tile_size") else (16, 16)
+
+        cam_x, cam_y = self._get_camera_world_position_for_viewport(self.camera, viewport_size, zoom)
+        half_w = viewport_size[0] / (2.0 * zoom)
+        half_h = viewport_size[1] / (2.0 * zoom)
+
+        view_left   = (cam_x - half_w - node.global_position[0]) / abs(scale_x)
+        view_right  = (cam_x + half_w - node.global_position[0]) / abs(scale_x)
+        view_top    = (cam_y - half_h - node.global_position[1]) / abs(scale_y)
+        view_bottom = (cam_y + half_h - node.global_position[1]) / abs(scale_y)
+
+        chunk_pixel_w = tw * chunk_size
+        chunk_pixel_h = th * chunk_size
+
+        min_cx = int(math.floor(view_left  / chunk_pixel_w))
+        max_cx = int(math.floor(view_right / chunk_pixel_w))
+        min_cy = int(math.floor(view_top    / chunk_pixel_h))
+        max_cy = int(math.floor(view_bottom / chunk_pixel_h))
+
+        active_layer      = getattr(node, "_editor_active_paint_layer", None)
+        active_layer_index = int(active_layer) if isinstance(active_layer, int) else None
+        selection_settings = self.configuration.editor_settings.get("selection", {})
+        selected_node_id   = selection_settings.get("selected_node_id")
+        is_selected_tilemap = (selected_node_id == id(node))
+        dim_non_active = ErrorHandler.is_editor_mode() and is_selected_tilemap and active_layer_index is not None
+        dim_factor = 0.45
+        dim_mul = max(0, min(255, int(255 * dim_factor)))
+
+        if len(self._tile_scaled_cache) > 512:
+            self._tile_scaled_cache.clear()
+        if len(self._tile_dimmed_cache) > 256:
+            self._tile_dimmed_cache.clear()
+
+        node_x, node_y = node.global_position
+
+        for layer_index in sorted(chunked_layers.keys()):
+            layer_chunks   = chunked_layers[layer_index]
+            is_dim_layer   = (dim_non_active and int(layer_index) != active_layer_index)
+
+            for cx in range(min_cx, max_cx + 1):
+                for cy in range(min_cy, max_cy + 1):
+                    chunk_data = layer_chunks.get((cx, cy))
+                    if not chunk_data:
+                        continue
+
+                    for i, tile_id in enumerate(chunk_data):
+                        if tile_id < 0:
+                            continue
+
+                        tx = cx * chunk_size + (i % chunk_size)
+                        ty = cy * chunk_size + (i // chunk_size)
+
+                        texture = tileset.get_tile_surface(tile_id)
+                        if not texture:
+                            continue
+
+                        world_tx, world_ty = node.tile_to_world((tx, ty))
+
+                        screen_x = (node_x + world_tx * scale_x - cam_x + self.camera.offset[0]) * zoom + (viewport_size[0] / 2.0)
+                        screen_y = (node_y + world_ty * scale_y - cam_y + self.camera.offset[1]) * zoom + (viewport_size[1] / 2.0)
+
+                        final_zoom_x = zoom * abs(scale_x)
+                        final_zoom_y = zoom * abs(scale_y)
+
+                        if abs(final_zoom_x - 1.0) > 0.001 or abs(final_zoom_y - 1.0) > 0.001:
+                            target_w = max(1, int(texture.get_width()  * final_zoom_x))
+                            target_h = max(1, int(texture.get_height() * final_zoom_y))
+                            scaled_key = (id(texture), target_w, target_h)
+                            render_texture = self._tile_scaled_cache.get(scaled_key)
+                            if render_texture is None:
+                                render_texture = self.pygame.transform.scale(texture, (target_w, target_h))
+                                self._tile_scaled_cache[scaled_key] = render_texture
+                        else:
+                            render_texture = texture
+
+                        if scale_x < 0 or scale_y < 0:
+                            render_texture = self.pygame.transform.flip(render_texture, scale_x < 0, scale_y < 0)
+
+                        if is_dim_layer:
+                            dim_key = (id(render_texture), dim_mul)
+                            dimmed_texture = self._tile_dimmed_cache.get(dim_key)
+                            if dimmed_texture is None:
+                                dimmed_texture = render_texture.copy()
+                                dimmed_texture.fill((dim_mul, dim_mul, dim_mul), special_flags=self.pygame.BLEND_RGB_MULT)
+                                self._tile_dimmed_cache[dim_key] = dimmed_texture
+                            render_texture = dimmed_texture
+
+                        self.screen.blit(render_texture, (int(screen_x), int(screen_y)))
+
+
     def render_node(self, node):
-        """Render a single world node according to its type."""
         if isinstance(node, Nodes.Node2D) and not node.global_visible:
             return
 
         if isinstance(node, Nodes.TileMap2D):
             self.render_tilemap(node)
             return
-        
+
         if isinstance(node, Nodes.YSort2D):
             renderables = []
             for child in getattr(node, "_children", []):
                 self._collect_all_sprites(child, renderables)
-
             renderables.sort(key=lambda n: n.global_position[1])
-            
             for r in renderables:
                 self.render_node(r)
             return
-        
+
         if isinstance(node, Nodes.ColorRect2D):
             viewport_size = self._viewport_size()
             cam_x, cam_y = self._get_camera_world_position_for_viewport(self.camera, viewport_size)
@@ -711,19 +865,16 @@ class Renderer2D:
             s.fill(color)
             self.screen.blit(s, (int(rect_x), int(rect_y)))
             return
-    
+
         if isinstance(node, Nodes.TextureRect2D):
             tex = node.image
             if tex is None:
                 return
 
             viewport_size = self._viewport_size()
-
-            # this performs frustum culling to improve performance but im not sure if its actually faster since i dont exactly know how sdl works and if the frustum check is more expensive than just rendering the texture
             if not self.is_inside_viewport(node, self.camera, viewport_size):
                 return
-            
-        
+
             zoom = self._get_camera_zoom()
             cam_x, cam_y = self._get_camera_world_position_for_viewport(self.camera, viewport_size, zoom)
 
@@ -731,29 +882,23 @@ class Renderer2D:
                 (node.global_position[0] - cam_x + self.camera.offset[0]) * zoom,
                 (node.global_position[1] - cam_y + self.camera.offset[1]) * zoom,
             )
-
-       
-            camera_offset_centered = (
-                camera_offset_node_position[0] + viewport_size[0] / 2.0,
-                camera_offset_node_position[1] + viewport_size[1] / 2.0
-            )
-
-
-
             camera_space_translation = (
-                camera_offset_centered[0] + 0.0 * zoom,
-                camera_offset_centered[1] + 0.0 * zoom,
+                camera_offset_node_position[0] + viewport_size[0] / 2.0,
+                camera_offset_node_position[1] + viewport_size[1] / 2.0,
             )
 
             scale_x = zoom
             scale_y = zoom
 
             if abs(scale_x - 1.0) > 0.001 or abs(scale_y - 1.0) > 0.001:
-                target_w = max(1, int(tex.get_width() * abs(scale_x)))
+                target_w = max(1, int(tex.get_width()  * abs(scale_x)))
                 target_h = max(1, int(tex.get_height() * abs(scale_y)))
-                tex = self.pygame.transform.scale(tex, (target_w, target_h))
-                if scale_x < 0 or scale_y < 0:
-                    tex = self.pygame.transform.flip(tex, scale_x < 0, scale_y < 0)
+                scaled_key = (id(tex), target_w, target_h)
+                scaled = self._sprite_scaled_cache.get(scaled_key)
+                if scaled is None:
+                    scaled = self.pygame.transform.scale(tex, (target_w, target_h))
+                    self._sprite_scaled_cache[scaled_key] = scaled
+                tex = scaled
                 if scale_x < 0 or scale_y < 0:
                     tex = self.pygame.transform.flip(tex, scale_x < 0, scale_y < 0)
 
@@ -767,12 +912,9 @@ class Renderer2D:
             tex = self._apply_sprite_tint(tex, node)
 
             viewport_size = self._viewport_size()
-
-            # this performs frustum culling to improve performance but im not sure if its actually faster since i dont exactly know how sdl works and if the frustum check is more expensive than just rendering the texture
             if not self.is_inside_viewport(node, self.camera, viewport_size):
                 return
-            
-        
+
             zoom = self._get_camera_zoom()
             cam_x, cam_y = self._get_camera_world_position_for_viewport(self.camera, viewport_size, zoom)
 
@@ -780,11 +922,9 @@ class Renderer2D:
                 (node.global_position[0] - cam_x + self.camera.offset[0]) * zoom,
                 (node.global_position[1] - cam_y + self.camera.offset[1]) * zoom,
             )
-
-       
             camera_offset_centered = (
                 camera_offset_node_position[0] + viewport_size[0] / 2.0,
-                camera_offset_node_position[1] + viewport_size[1] / 2.0
+                camera_offset_node_position[1] + viewport_size[1] / 2.0,
             )
 
             scale_x = zoom * node.global_scale[0]
@@ -800,14 +940,24 @@ class Renderer2D:
             center_y = camera_space_translation[1]
 
             if abs(scale_x - 1.0) > 0.001 or abs(scale_y - 1.0) > 0.001:
-                target_w = max(1, int(tex.get_width() * scale_x))
-                target_h = max(1, int(tex.get_height() * scale_y))
-                tex = self.pygame.transform.scale(tex, (target_w, target_h))
-                center_x += target_w / 2.0
-                center_y += target_h / 2.0
-            else:
-                center_x += tex.get_width() / 2.0
+                target_w = max(1, int(tex.get_width()  * abs(scale_x)))
+                target_h = max(1, int(tex.get_height() * abs(scale_y)))
+                scaled_key = (id(tex), target_w, target_h)
+                scaled = self._sprite_scaled_cache.get(scaled_key)
+                if scaled is None:
+                    scaled = self.pygame.transform.scale(tex, (target_w, target_h))
+                    self._sprite_scaled_cache[scaled_key] = scaled
+                tex = scaled
+                if scale_x < 0 or scale_y < 0:
+                    tex = self.pygame.transform.flip(tex, scale_x < 0, scale_y < 0)
+                center_x += tex.get_width()  / 2.0
                 center_y += tex.get_height() / 2.0
+            else:
+                center_x += tex.get_width()  / 2.0
+                center_y += tex.get_height() / 2.0
+
+            if len(self._sprite_scaled_cache) > 256:
+                self._sprite_scaled_cache.clear()
 
             if abs(rotation) > 0.001:
                 tex = self.pygame.transform.rotate(tex, -rotation)
@@ -815,109 +965,6 @@ class Renderer2D:
                 self.screen.blit(tex, tex_rect)
             else:
                 self.screen.blit(tex, camera_space_translation)
-
-    def render_tilemap(self, node):
-        """Render a tiled world node using cached tile surfaces."""
-        tileset = getattr(node, "tileset", None)
-        chunked_layers = getattr(node, "_chunked_tile_data", {})
-        chunk_size = getattr(node, "chunk_size", 16)
-        
-        if tileset is None or not chunked_layers:
-            return
-
-        scale_x = node.global_scale[0]
-        scale_y = node.global_scale[1]
-        if scale_x == 0 or scale_y == 0:
-            return
-
-        zoom = self._get_camera_zoom()
-        viewport_size = self._viewport_size()
-        tw, th = tileset.tile_size if hasattr(tileset, "tile_size") else (16, 16)
-        
-        cam_x, cam_y = self._get_camera_world_position_for_viewport(self.camera, viewport_size, zoom)
-        half_w = viewport_size[0] / (2.0 * zoom)
-        half_h = viewport_size[1] / (2.0 * zoom)
-     
-        view_left = (cam_x - half_w - node.global_position[0]) / abs(scale_x)
-        view_right = (cam_x + half_w - node.global_position[0]) / abs(scale_x)
-        view_top = (cam_y - half_h - node.global_position[1]) / abs(scale_y)
-        view_bottom = (cam_y + half_h - node.global_position[1]) / abs(scale_y)
-
-        chunk_pixel_w = tw * chunk_size
-        chunk_pixel_h = th * chunk_size
-        
-        min_cx = int(math.floor(view_left / chunk_pixel_w))
-        max_cx = int(math.floor(view_right / chunk_pixel_w))
-        min_cy = int(math.floor(view_top / chunk_pixel_h))
-        max_cy = int(math.floor(view_bottom / chunk_pixel_h))
-
-        active_layer = getattr(node, "_editor_active_paint_layer", None)
-        active_layer_index = int(active_layer) if isinstance(active_layer, int) else None
-        selection_settings = self.configuration.editor_settings.get("selection", {})
-        selected_node_id = selection_settings.get("selected_node_id")
-        is_selected_tilemap = (selected_node_id == id(node))
-        dim_non_active = ErrorHandler.is_editor_mode() and is_selected_tilemap and active_layer_index is not None
-        dim_factor = 0.45
-
-        scaled_texture_cache = {}
-        dimmed_texture_cache = {}
-
-        node_x, node_y = node.global_position
-
-        for layer_index in sorted(chunked_layers.keys()):
-            layer_chunks = chunked_layers[layer_index]
-            is_dim_layer = (dim_non_active and int(layer_index) != active_layer_index)
-
-            for cx in range(min_cx, max_cx + 1):
-                for cy in range(min_cy, max_cy + 1):
-                    chunk_data = layer_chunks.get((cx, cy))
-                    if not chunk_data:
-                        continue
-                    
-                    for i, tile_id in enumerate(chunk_data):
-                        if tile_id < 0:
-                            continue
-
-                        tx = cx * chunk_size + (i % chunk_size)
-                        ty = cy * chunk_size + (i // chunk_size)
-                        
-                        texture = tileset.get_tile_surface(tile_id)
-                        if not texture:
-                            continue
-
-                        world_tx, world_ty = node.tile_to_world((tx, ty))
-                        
-                        screen_x = (node_x + world_tx * scale_x - cam_x + self.camera.offset[0]) * zoom + (viewport_size[0] / 2.0)
-                        screen_y = (node_y + world_ty * scale_y - cam_y + self.camera.offset[1]) * zoom + (viewport_size[1] / 2.0)
-
-                        render_texture = texture
-                        final_zoom_x = zoom * abs(scale_x)
-                        final_zoom_y = zoom * abs(scale_y)
-                        
-                        if abs(final_zoom_x - 1.0) > 0.001 or abs(final_zoom_y - 1.0) > 0.001:
-                            target_w = max(1, int(texture.get_width() * final_zoom_x))
-                            target_h = max(1, int(texture.get_height() * final_zoom_y))
-                            scaled_key = (id(texture), target_w, target_h)
-                            
-                            render_texture = scaled_texture_cache.get(scaled_key)
-                            if render_texture is None:
-                                render_texture = self.pygame.transform.scale(texture, (target_w, target_h))
-                                scaled_texture_cache[scaled_key] = render_texture
-
-                        if scale_x < 0 or scale_y < 0:
-                            render_texture = self.pygame.transform.flip(render_texture, scale_x < 0, scale_y < 0)
-
-                        if is_dim_layer:
-                            dim_key = (id(render_texture), int(dim_factor * 1000))
-                            dimmed_texture = dimmed_texture_cache.get(dim_key)
-                            if dimmed_texture is None:
-                                dimmed_texture = render_texture.copy()
-                                mul = max(0, min(255, int(255 * dim_factor)))
-                                dimmed_texture.fill((mul, mul, mul), special_flags=self.pygame.BLEND_RGB_MULT)
-                                dimmed_texture_cache[dim_key] = dimmed_texture
-                            render_texture = dimmed_texture
-
-                        self.screen.blit(render_texture, (int(screen_x), int(screen_y)))
 
 
     def create_node_structure(self, node, nodes_array=None):

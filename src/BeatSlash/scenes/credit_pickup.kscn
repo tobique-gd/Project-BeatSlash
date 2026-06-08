@@ -1,10 +1,10 @@
 {
-    "name":"Pillar.kscn",
+    "name":"credit_pickup.kscn",
     "root":{
-        "type":"Node2D",
-        "name":"PillarOvergrown",
+        "type":"KinematicBody2D",
+        "name":"CreditPickup",
         "properties":{
-            "name":"PillarOvergrown",
+            "name":"CreditPickup",
             "is_linked_scene":false,
             "linked_scene_path":null,
             "position":[
@@ -17,7 +17,17 @@
                 1
             ],
             "z_index":0,
-            "visible":true
+            "visible":true,
+            "collision_layers":[
+                8
+            ],
+            "collision_masks":[
+                10
+            ],
+            "velocity":[
+                0,
+                0
+            ]
         },
         "children":[
             {
@@ -33,8 +43,8 @@
                     ],
                     "rotation":0.0,
                     "scale":[
-                        1,
-                        1
+                        0.5,
+                        0.5
                     ],
                     "z_index":0,
                     "visible":true,
@@ -46,14 +56,14 @@
                         1.0
                     ],
                     "offset":[
-                        0.0,
-                        -42.0
+                        -16.0,
+                        -10.0
                     ],
                     "texture":{
                         "__resource__":{
                             "name":"Texture",
-                            "resource_path":"assets/textures/spritesheets/map_details/pillar0.png",
-                            "texture_path":"assets/textures/spritesheets/map_details/pillar0.png",
+                            "resource_path":"assets/textures/spritesheets/player/credits/credit.png",
+                            "texture_path":"assets/textures/spritesheets/player/credits/credit.png",
                             "type":"Texture2D",
                             "resource_type":"Texture2D"
                         }
@@ -62,15 +72,15 @@
                 "children":[]
             },
             {
-                "type":"StaticBody2D",
-                "name":"StaticBody2D",
+                "type":"RectangleCollisionShape2D",
+                "name":"RectangleCollisionShape2D",
                 "properties":{
-                    "name":"StaticBody2D",
+                    "name":"RectangleCollisionShape2D",
                     "is_linked_scene":false,
                     "linked_scene_path":null,
                     "position":[
-                        0,
-                        0
+                        -14.60987299453912,
+                        -13.782929793276653
                     ],
                     "rotation":0.0,
                     "scale":[
@@ -79,42 +89,12 @@
                     ],
                     "z_index":0,
                     "visible":true,
-                    "collision_layers":[
-                        1
-                    ],
-                    "collision_masks":[
-                        2,
-                        3,
-                        5
+                    "size":[
+                        32,
+                        32
                     ]
                 },
-                "children":[
-                    {
-                        "type":"RectangleCollisionShape2D",
-                        "name":"RectangleCollisionShape2D",
-                        "properties":{
-                            "name":"RectangleCollisionShape2D",
-                            "is_linked_scene":false,
-                            "linked_scene_path":null,
-                            "position":[
-                                0.0,
-                                -16.0
-                            ],
-                            "rotation":0.0,
-                            "scale":[
-                                1,
-                                1
-                            ],
-                            "z_index":0,
-                            "visible":true,
-                            "size":[
-                                16.0,
-                                9.0
-                            ]
-                        },
-                        "children":[]
-                    }
-                ]
+                "children":[]
             }
         ]
     }

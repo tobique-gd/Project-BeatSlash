@@ -99,6 +99,14 @@
         "ctrl"
       ],
       "key": "v"
+    },
+    "tool_paint": {
+      "modifiers": [],
+      "key": "b"
+    },
+    "tool_rect": {
+      "modifiers": [],
+      "key": "r"
     }
   },
   "selection": {

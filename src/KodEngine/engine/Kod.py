@@ -381,6 +381,8 @@ class App:
             last_frame_time = now
             scaled_delta = delta * float(self.time_scale)
 
+            self.runtime_fps = 1.0 / delta if delta > 0 else float('inf')
+
             self.current_scene._process_ui(self.internal_resolution)
             self.resolve_editor_events(pygame.event.get())
 
