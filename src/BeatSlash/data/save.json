@@ -1,13 +1,13 @@
 {
     "player": {
-        "credits": 1745
+        "credits": 631
     },
     "upgrades": {
-        "stamina": 1,
-        "speed": 1,
-        "damage": 1,
-        "health": 1,
-        "crit_chance": 1,
-        "armor": 1
+        "stamina": 6,
+        "speed": 4,
+        "damage": 5,
+        "health": 4,
+        "crit_chance": 3,
+        "armor": 4
     }
 }

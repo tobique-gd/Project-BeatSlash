@@ -6,10 +6,10 @@
     72
   ],
   "last_zoom": 0.5559917313492411,
-  "last_opened_scene": "scenes/map_tiles/dungeon_root.kscn",
+  "last_opened_scene": "scenes/main_menu/main_menu.kscn",
   "open_scene_tabs": [
-    "scenes/map_tiles/dungeon_root.kscn",
     "scenes/main_menu/main_menu.kscn",
+    "scenes/map_tiles/dungeon_root.kscn",
     "scenes/map_tiles/tile_left_right_up_down_01.kscn",
     "scenes/Player.kscn",
     "scenes/credit_pickup.kscn",
@@ -20,5 +20,5 @@
     "scenes/Pillar.kscn",
     "scenes/PillarOvergrown.kscn"
   ],
-  "active_scene_path": "scenes/map_tiles/dungeon_root.kscn"
+  "active_scene_path": "scenes/main_menu/main_menu.kscn"
 }

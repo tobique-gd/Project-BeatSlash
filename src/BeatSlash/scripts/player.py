@@ -155,6 +155,7 @@ class DeathState(PlayerState):
         super().__init__(player)
         self.post_animation_time = 0.0
         self.animation_finished = False
+        self.saved = False
 
     def on_enter(self):
         self.player.node.velocity = (0, 0)
@@ -171,23 +172,20 @@ class DeathState(PlayerState):
 
         self.post_animation_time += delta
 
-        if self.post_animation_time >= 1.0:
-            #save credits into save.json but keep upgrades upgrade to what level they are at, so that player can spend credits on upgrades before going back to main menu
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "save.json"), "w") as f:
-                json.dump({
-                    "player": {
-                        "credits": self.player.credits
-                    },
-                    "upgrades": {
-                        "stamina": self.upgrade_level("stamina"),
-                        "speed": self.upgrade_level("speed"),
-                        "damage": self.upgrade_level("damage"),
-                        "health": self.upgrade_level("health"),
-                        "crit_chance": self.upgrade_level("crit_chance"),
-                        "armor": self.upgrade_level("armor")
-                    }
-                }, f, indent=4)
-            
+        if self.post_animation_time >= 1.0 and not self.saved:
+            self.saved = True
+            save_path = self.player.save_path
+            try:
+                with open(save_path, "w") as f:
+                    json.dump({
+                        "player": {
+                            "credits": self.player.credits
+                        },
+                        "upgrades": self.player.upgrade_levels  # just write what we loaded at start
+                    }, f, indent=4)
+            except Exception as e:
+                print(f"[DeathState] Failed to save progress: {e}")
+
             self.player.node.change_scene_to("scenes/main_menu/start_screen.kscn")
 
         return None
@@ -196,20 +194,14 @@ class DeathState(PlayerState):
         pass
 
     def upgrade_level(self, upgrade_id):
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        defs_path = os.path.join(current_dir, "..", "data", "upgrades.json")
-        save_path = os.path.join(current_dir, "..", "data", "save.json")
-
         upgrade_level = 1
-
         try:
-            if os.path.exists(save_path):
-                with open(save_path, "r") as f:
+            if os.path.exists(self.player.save_path):
+                with open(self.player.save_path, "r") as f:
                     save = json.load(f)
                 upgrade_level = int(save.get("upgrades", {}).get(upgrade_id, 1))
         except Exception:
             pass
-
         return upgrade_level
 
 
@@ -472,7 +464,6 @@ def _reveal_weapon(self):
 import random
 
 def _ready(self):
-    
     self.animated_sprite = self.node.get_node("AnimatedSprite2D")
     self.weapon_pivot = self.node.get_node("WeaponPivot")
     self.weapon_sprite = self.weapon_pivot.get_node("Sprite2D") if self.weapon_pivot is not None else None
@@ -485,6 +476,11 @@ def _ready(self):
     self.health_bar = self.node.get_node("UI/HealthBar")
     self.stamina_bar = self.node.get_node("UI/StaminaBar")
     self.current_animation_name = None
+
+    # Pre-resolve save path once so DeathState can use it reliably
+    self.save_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "data", "save.json"
+    )
 
     self.credit_area = self.node.get_node("CreditPickup")
     if self.credit_area is not None:
@@ -520,7 +516,11 @@ def _ready(self):
 
     self.health = BASE_MAX_HEALTH
     self.health_bar.value = self.health
+
     self.credits, self.max_stamina, self.move_speed, self.attack_damage, self.max_health, self.armor = _load_player_progress()
+
+    self.upgrade_levels = _load_upgrade_levels()
+
     self.health = self.max_health
     if self.health_bar is not None:
         self.health_bar.max_value = self.max_health
@@ -533,6 +533,19 @@ def _ready(self):
     self.current_state = IdleState(self)
     self.current_state.on_enter()
 
+def _load_upgrade_levels():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    save_path = os.path.join(current_dir, "..", "data", "save.json")
+    defaults = {"stamina": 1, "speed": 1, "damage": 1, "health": 1, "crit_chance": 1, "armor": 1}
+    try:
+        if os.path.exists(save_path):
+            with open(save_path, "r") as f:
+                save = json.load(f)
+            saved = save.get("upgrades", {})
+            return {k: int(saved.get(k, defaults[k])) for k in defaults}
+    except Exception:
+        pass
+    return defaults
 
 def _on_credit_pickup_body_entered(self, body):
     self.credits += random.randint(5, 10)
@@ -626,12 +639,9 @@ def _process(self, delta):
 
     mouse_x, mouse_y = _get_mouse_world_position(self)
 
-
-
     app = getattr(Globals, "APP", None)
-    
-    self.node.get_node("UI/Label").text = str(app.runtime_fps if app is not None else "N/A")
 
+    self.node.get_node("UI/Label").text = str(app.runtime_fps if app is not None else "N/A")
 
     self.health_bar.value = self.health
     if isinstance(self.current_state, DeathState):
@@ -709,6 +719,7 @@ def _process(self, delta):
             self.health_bar.max_value = self.max_health
             self.health_bar.value = self.health
         self.stamina = self.max_stamina
+
     movement_input = _get_movement_input(self)
     self.input_vector = movement_input
 
