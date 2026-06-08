@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>engine.PhysicsServer &#8212; engine  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for engine.PhysicsServer</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">Nodes</span>
+
+<span class="c1"># https://gamedev.stackexchange.com/questions/32545/what-is-the-mtv-minimum-translation-vector-in-sat-seperation-of-axis</span>
+<span class="c1"># https://dyn4j.org/2010/01/sat/</span>
+
+<div class="viewcode-block" id="PhysicsSolver2D">
+<a class="viewcode-back" href="../../engine.html#engine.PhysicsServer.PhysicsSolver2D">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PhysicsSolver2D</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">configuration</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create the physics solver.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        configuration:</span>
+<span class="sd">            Project settings container used for solver configuration.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">substeps</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">project_settings</span><span class="p">[</span><span class="s2">&quot;physics&quot;</span><span class="p">][</span><span class="s2">&quot;physics_substeps&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span> <span class="o">=</span> <span class="p">[]</span>
+
+<div class="viewcode-block" id="PhysicsSolver2D.physics_process">
+<a class="viewcode-back" href="../../engine.html#engine.PhysicsServer.PhysicsSolver2D.physics_process">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">physics_process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">physics_bodies</span><span class="p">,</span> <span class="n">delta</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Advance physics for a frame using substep resolution.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        physics_bodies:</span>
+<span class="sd">            Sequence of bodies to simulate.</span>
+<span class="sd">        delta:</span>
+<span class="sd">            Frame delta time in seconds.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span> <span class="o">=</span> <span class="n">physics_bodies</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">substeps</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">substeps</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">delta</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">substeps</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">substep_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">substeps</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">resolve_physics_step_x</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">resolve_physics_step_y</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolve_area_overlaps</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_moving_body</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether a body should be integrated by the solver.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="p">(</span><span class="n">Nodes</span><span class="o">.</span><span class="n">DynamicBody2D</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">KinematicBody2D</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_solid_body</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether a body participates as a solid collider.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="p">(</span><span class="n">Nodes</span><span class="o">.</span><span class="n">StaticBody2D</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">DynamicBody2D</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">KinematicBody2D</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_rect_shapes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return rectangle collision shapes attached to a body.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">body</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">body</span><span class="o">.</span><span class="n">get_nodes_by_type</span><span class="p">(</span><span class="n">Nodes</span><span class="o">.</span><span class="n">RectangleCollisionShape2D</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_shape_world_position</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the world-space position of a collision shape.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">body</span><span class="o">.</span><span class="n">global_position</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">body</span><span class="o">.</span><span class="n">global_position</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_layers_match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether two nodes&#39; collision layers and masks overlap.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">to_masks</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+                <span class="n">layer_vals</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">&quot;collision_layers&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="n">mask_vals</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">&quot;collision_masks&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+                <span class="k">def</span><span class="w"> </span><span class="nf">norm_values</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="p">[]</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+                        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">val</span><span class="p">)[:</span><span class="mi">10</span><span class="p">]</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="n">val</span><span class="p">]</span>
+
+                <span class="k">def</span><span class="w"> </span><span class="nf">interpret_index</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+                    <span class="n">masks</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">xi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">xi</span> <span class="o">&lt;=</span> <span class="mi">32</span><span class="p">:</span>
+                            <span class="n">masks</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">xi</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                        <span class="k">pass</span>
+                    <span class="k">return</span> <span class="n">masks</span>
+
+                <span class="n">layer_masks</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">norm_values</span><span class="p">(</span><span class="n">layer_vals</span><span class="p">):</span>
+                    <span class="n">layer_masks</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">interpret_index</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+
+                <span class="n">mask_masks</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">norm_values</span><span class="p">(</span><span class="n">mask_vals</span><span class="p">):</span>
+                    <span class="n">mask_masks</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">interpret_index</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+
+                <span class="k">return</span> <span class="n">layer_masks</span><span class="p">,</span> <span class="n">mask_masks</span>
+
+            <span class="n">a_layer_masks</span><span class="p">,</span> <span class="n">a_mask_masks</span> <span class="o">=</span> <span class="n">to_masks</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+            <span class="n">b_layer_masks</span><span class="p">,</span> <span class="n">b_mask_masks</span> <span class="o">=</span> <span class="n">to_masks</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+
+            <span class="c1"># A and B collide if any layer bit of A is in B&#39;s mask and vice versa</span>
+            <span class="n">a_in_b</span> <span class="o">=</span> <span class="nb">any</span><span class="p">((</span><span class="n">al</span> <span class="o">&amp;</span> <span class="n">bm</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">al</span> <span class="ow">in</span> <span class="n">a_layer_masks</span> <span class="k">for</span> <span class="n">bm</span> <span class="ow">in</span> <span class="n">b_mask_masks</span><span class="p">)</span>
+            <span class="n">b_in_a</span> <span class="o">=</span> <span class="nb">any</span><span class="p">((</span><span class="n">bl</span> <span class="o">&amp;</span> <span class="n">am</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">bl</span> <span class="ow">in</span> <span class="n">b_layer_masks</span> <span class="k">for</span> <span class="n">am</span> <span class="ow">in</span> <span class="n">a_mask_masks</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">a_in_b</span> <span class="ow">and</span> <span class="n">b_in_a</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="PhysicsSolver2D.check_collision_pair">
+<a class="viewcode-back" href="../../engine.html#engine.PhysicsServer.PhysicsSolver2D.check_collision_pair">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_collision_pair</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body1</span><span class="p">,</span> <span class="n">shape1</span><span class="p">,</span> <span class="n">body2</span><span class="p">,</span> <span class="n">shape2</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether two rectangle collision shapes overlap.&quot;&quot;&quot;</span>
+        <span class="n">pos1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_shape_world_position</span><span class="p">(</span><span class="n">body1</span><span class="p">,</span> <span class="n">shape1</span><span class="p">)</span>
+        <span class="n">pos2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_shape_world_position</span><span class="p">(</span><span class="n">body2</span><span class="p">,</span> <span class="n">shape2</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">pos1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape2</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="n">pos1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape1</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="n">pos1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape2</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="n">pos1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape1</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_mtv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">other_shape</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the minimum translation vector for a rectangle overlap.&quot;&quot;&quot;</span>
+        <span class="n">pos1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_shape_world_position</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span>
+        <span class="n">pos2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_shape_world_position</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">other_shape</span><span class="p">)</span>
+
+        <span class="n">b1_left</span><span class="p">,</span> <span class="n">b1_right</span> <span class="o">=</span> <span class="n">pos1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">pos1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">b1_top</span><span class="p">,</span> <span class="n">b1_bottom</span> <span class="o">=</span> <span class="n">pos1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">pos1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">shape</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">b2_left</span><span class="p">,</span> <span class="n">b2_right</span> <span class="o">=</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">other_shape</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">b2_top</span><span class="p">,</span> <span class="n">b2_bottom</span> <span class="o">=</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">pos2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">other_shape</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">push_left</span> <span class="o">=</span> <span class="n">b2_left</span> <span class="o">-</span> <span class="n">b1_right</span>
+        <span class="n">push_right</span> <span class="o">=</span> <span class="n">b2_right</span> <span class="o">-</span> <span class="n">b1_left</span>
+        <span class="n">overlap_x</span> <span class="o">=</span> <span class="n">push_left</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">push_left</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">abs</span><span class="p">(</span><span class="n">push_right</span><span class="p">)</span> <span class="k">else</span> <span class="n">push_right</span>
+
+        <span class="n">push_up</span> <span class="o">=</span> <span class="n">b2_top</span> <span class="o">-</span> <span class="n">b1_bottom</span>
+        <span class="n">push_down</span> <span class="o">=</span> <span class="n">b2_bottom</span> <span class="o">-</span> <span class="n">b1_top</span>
+        <span class="n">overlap_y</span> <span class="o">=</span> <span class="n">push_up</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">push_up</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">abs</span><span class="p">(</span><span class="n">push_down</span><span class="p">)</span> <span class="k">else</span> <span class="n">push_down</span>
+
+        <span class="k">return</span> <span class="n">overlap_x</span><span class="p">,</span> <span class="n">overlap_y</span>
+
+<div class="viewcode-block" id="PhysicsSolver2D.resolve_physics_step_x">
+<a class="viewcode-back" href="../../engine.html#engine.PhysicsServer.PhysicsSolver2D.resolve_physics_step_x">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resolve_physics_step_x</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resolve horizontal movement and collisions for a body.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">body</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_moving_body</span><span class="p">(</span><span class="n">body</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">shapes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rect_shapes</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">shapes</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">DynamicBody2D</span><span class="p">):</span>
+            <span class="n">body</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">body</span><span class="o">.</span><span class="n">velocity</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">,</span> <span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">other</span> <span class="ow">is</span> <span class="n">body</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_solid_body</span><span class="p">(</span><span class="n">other</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># respect collision layers/masks</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layers_match</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="n">other_shapes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rect_shapes</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">other_shapes</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">for</span> <span class="n">shape</span> <span class="ow">in</span> <span class="n">shapes</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">other_shape</span> <span class="ow">in</span> <span class="n">other_shapes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_collision_pair</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">other_shape</span><span class="p">):</span>
+                        <span class="n">overlap_x</span><span class="p">,</span> <span class="n">overlap_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_mtv</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">other_shape</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">overlap_x</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">overlap_y</span><span class="p">):</span>
+                            <span class="n">body</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">overlap_x</span><span class="p">,</span> <span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="s1">&#39;velocity&#39;</span><span class="p">):</span>
+                                <span class="n">body</span><span class="o">.</span><span class="n">velocity</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">body</span><span class="o">.</span><span class="n">velocity</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="PhysicsSolver2D.resolve_physics_step_y">
+<a class="viewcode-back" href="../../engine.html#engine.PhysicsServer.PhysicsSolver2D.resolve_physics_step_y">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resolve_physics_step_y</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resolve vertical movement and collisions for a body.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">body</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_moving_body</span><span class="p">(</span><span class="n">body</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">shapes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rect_shapes</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">shapes</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">DynamicBody2D</span><span class="p">):</span>
+            <span class="n">body</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">body</span><span class="o">.</span><span class="n">velocity</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">other</span> <span class="ow">is</span> <span class="n">body</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_solid_body</span><span class="p">(</span><span class="n">other</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># respect collision layers/masks</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layers_match</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="n">other_shapes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rect_shapes</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">other_shapes</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">for</span> <span class="n">shape</span> <span class="ow">in</span> <span class="n">shapes</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">other_shape</span> <span class="ow">in</span> <span class="n">other_shapes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_collision_pair</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">other_shape</span><span class="p">):</span>
+                        <span class="n">overlap_x</span><span class="p">,</span> <span class="n">overlap_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_mtv</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">other_shape</span><span class="p">)</span>
+        
+                        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">overlap_y</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">overlap_x</span><span class="p">):</span>
+                            <span class="n">body</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">body</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">overlap_y</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="s1">&#39;velocity&#39;</span><span class="p">):</span>
+                                <span class="n">body</span><span class="o">.</span><span class="n">velocity</span> <span class="o">=</span> <span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">velocity</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_has_any_shape_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether any attached shapes overlap between two nodes.&quot;&quot;&quot;</span>
+        <span class="n">body_shapes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rect_shapes</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">body_shapes</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">other_shapes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_rect_shapes</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">other_shapes</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">body_shape</span> <span class="ow">in</span> <span class="n">body_shapes</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">other_shape</span> <span class="ow">in</span> <span class="n">other_shapes</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_collision_pair</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">body_shape</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">other_shape</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_emit_overlap_transition_signals</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">area</span><span class="p">,</span> <span class="n">previous_nodes</span><span class="p">,</span> <span class="n">current_nodes</span><span class="p">,</span> <span class="n">entered_signal</span><span class="p">,</span> <span class="n">exited_signal</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Emit area enter/exit signals for overlap state changes.&quot;&quot;&quot;</span>
+        <span class="n">previous_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">previous_nodes</span><span class="p">)</span>
+        <span class="n">current_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">current_nodes</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">current_set</span> <span class="o">-</span> <span class="n">previous_set</span><span class="p">:</span>
+            <span class="n">area</span><span class="o">.</span><span class="n">emit_signal</span><span class="p">(</span><span class="n">entered_signal</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">previous_set</span> <span class="o">-</span> <span class="n">current_set</span><span class="p">:</span>
+            <span class="n">area</span><span class="o">.</span><span class="n">emit_signal</span><span class="p">(</span><span class="n">exited_signal</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PhysicsSolver2D.resolve_area_overlaps">
+<a class="viewcode-back" href="../../engine.html#engine.PhysicsServer.PhysicsSolver2D.resolve_area_overlaps">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resolve_area_overlaps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update area overlap caches and emit transition signals.&quot;&quot;&quot;</span>
+        <span class="n">area_nodes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">Area2D</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="n">previous_overlaps</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">area</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;areas&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">area</span><span class="p">,</span> <span class="s2">&quot;_overlapping_areas&quot;</span><span class="p">,</span> <span class="p">[])),</span>
+                <span class="s2">&quot;bodies&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">area</span><span class="p">,</span> <span class="s2">&quot;_overlapping_bodies&quot;</span><span class="p">,</span> <span class="p">[])),</span>
+            <span class="p">}</span>
+            <span class="k">for</span> <span class="n">area</span> <span class="ow">in</span> <span class="n">area_nodes</span>
+        <span class="p">}</span>
+
+        <span class="k">for</span> <span class="n">area</span> <span class="ow">in</span> <span class="n">area_nodes</span><span class="p">:</span>
+            <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_areas</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_bodies</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">area</span> <span class="ow">in</span> <span class="n">area_nodes</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics_bodies</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">other</span> <span class="ow">is</span> <span class="n">area</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="c1"># respect area collision flags</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">Area2D</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">area</span><span class="o">.</span><span class="n">collide_with_areas</span><span class="p">:</span>
+                        <span class="k">continue</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">area</span><span class="o">.</span><span class="n">collide_with_bodies</span><span class="p">:</span>
+                        <span class="k">continue</span>
+
+                <span class="c1"># respect collision layers/masks</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layers_match</span><span class="p">(</span><span class="n">area</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+                    <span class="k">continue</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_any_shape_overlap</span><span class="p">(</span><span class="n">area</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+                    <span class="k">continue</span>
+
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Nodes</span><span class="o">.</span><span class="n">Area2D</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">other</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_areas</span><span class="p">:</span>
+                        <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_areas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">other</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_bodies</span><span class="p">:</span>
+                        <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">area</span> <span class="ow">in</span> <span class="n">area_nodes</span><span class="p">:</span>
+            <span class="n">previous</span> <span class="o">=</span> <span class="n">previous_overlaps</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">area</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;areas&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;bodies&quot;</span><span class="p">:</span> <span class="p">[]})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_emit_overlap_transition_signals</span><span class="p">(</span>
+                <span class="n">area</span><span class="p">,</span>
+                <span class="n">previous</span><span class="p">[</span><span class="s2">&quot;bodies&quot;</span><span class="p">],</span>
+                <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_bodies</span><span class="p">,</span>
+                <span class="s2">&quot;body_entered&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;body_exited&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_emit_overlap_transition_signals</span><span class="p">(</span>
+                <span class="n">area</span><span class="p">,</span>
+                <span class="n">previous</span><span class="p">[</span><span class="s2">&quot;areas&quot;</span><span class="p">],</span>
+                <span class="n">area</span><span class="o">.</span><span class="n">_overlapping_areas</span><span class="p">,</span>
+                <span class="s2">&quot;area_entered&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;area_exited&quot;</span><span class="p">,</span>
+            <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">engine</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../engine.html">engine package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Author.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

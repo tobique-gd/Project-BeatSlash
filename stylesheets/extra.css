@@ -1,0 +1,38 @@
+:root {
+  --md-default-fg-color: #1f2a37;
+  --md-default-fg-color--light: #4b5563;
+  --md-default-fg-color--lighter: #6b7280;
+  --md-default-bg-color: #f8fafc;
+}
+
+.md-typeset h1 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset h2,
+.md-typeset h3 {
+  font-weight: 600;
+}
+
+.md-typeset {
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.md-content__inner {
+  max-width: 52rem;
+}
+
+.md-typeset p {
+  margin: 0.45rem 0;
+}
+
+.md-typeset code {
+  font-size: 0.82em;
+}
+
+.wy-grid-for-nav {
+  display: flex;
+  justify-content: center;
+}
